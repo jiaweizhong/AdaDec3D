@@ -1,1 +1,0 @@
-# AdaDec3D

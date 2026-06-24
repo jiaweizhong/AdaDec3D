@@ -355,6 +355,323 @@ If DICE is below 78%, check:
 
 ---
 
+## Part 3.5: Observation Study — Validate Before Building
+
+**Purpose**: Empirically confirm that adaptive decoder computation is worth pursuing before investing GPU time in AdaDec3D. This is the Go/No-Go gate. See `1_Research_Proposal.md §4` for scientific motivation and `2_Observation_Study.md` for deliverable formats.
+
+**Prerequisites**: E0 (`best_metric_model.pth`) and E1 (`best_metric_model.pth`) must be trained first.
+
+Run all analyses in a Kaggle notebook. Save figures to `/kaggle/working/obs/`.
+
+```python
+# Setup (run once at top of each notebook)
+import torch, torch.nn.functional as F
+import numpy as np, matplotlib.pyplot as plt
+from pathlib import Path
+from monai.inferers import sliding_window_inference
+from monai.transforms import AsDiscrete
+from load_datasets_transforms import data_loader, data_transforms
+import argparse
+
+def load_model(network_name, ckpt_path, device="cuda"):
+    import argparse
+    from monai_utils.inferers.utils import sliding_window_inference_1out
+    if network_name == "3DUXNET_EffiDec3D":
+        from networks.UXNet_3D.network_backbone import UXNET_EffiDec3D
+        model = UXNET_EffiDec3D(
+            in_chans=1, out_chans=14,
+            depths=[2,2,2,2], feat_size=[48,96,192,384],
+            n_decoder_channels=48, resolution_factor=2,
+            skip_aggregation="addition"
+        ).to(device)
+    else:
+        from networks.UXNet_3D.network_backbone import UXNET
+        model = UXNET(in_chans=1, out_chans=14,
+                      depths=[2,2,2,2], feat_size=[48,96,192,384]).to(device)
+    ckpt = torch.load(ckpt_path, map_location=device)
+    model.load_state_dict(ckpt["model_state_dict"])
+    model.eval()
+    return model
+
+BTCV_CLASS_NAMES = [
+    "Aorta","Gallbladder","Spleen","L.Kidney","R.Kidney",
+    "Liver","Stomach","IVC","Port.Vein",
+    "Pancreas","R.Adrenal","L.Adrenal","Duodenum"
+]
+
+args = argparse.Namespace(root="/kaggle/input/btcv-synapse", dataset="BTCV13", mode="val")
+_, val_files, n_cls = data_loader(args)
+val_transform = data_transforms(args)
+from monai.data import DataLoader, Dataset
+val_ds = Dataset(data=val_files, transform=val_transform)
+val_loader = DataLoader(val_ds, batch_size=1, shuffle=False, num_workers=2)
+```
+
+### O1: Prediction Error Distribution
+
+**Question**: Are segmentation errors uniformly distributed, or concentrated in specific regions?
+
+```python
+from monai_utils.inferers.utils import sliding_window_inference_1out
+
+effi_model = load_model("3DUXNET_EffiDec3D", "/kaggle/input/e1-ckpt/best_metric_model.pth")
+post_pred = AsDiscrete(argmax=True, to_onehot=14)
+post_lbl  = AsDiscrete(to_onehot=14)
+
+error_rates = []  # per case
+organ_error = {name: [] for name in BTCV_CLASS_NAMES}
+boundary_error_rates, interior_error_rates = [], []
+
+with torch.no_grad():
+    for batch in val_loader:
+        img = batch["image"].cuda()
+        lbl = batch["label"].squeeze(1).long()  # [1, D, H, W]
+
+        logits = sliding_window_inference_1out(img, (96,96,96), 4, effi_model, overlap=0.7)
+        pred = logits.argmax(1).cpu()  # [1, D, H, W]
+
+        error = (pred != lbl).float()  # [1, D, H, W]
+        error_rates.append(error.mean().item())
+
+        # Per-organ error rate
+        for c, name in enumerate(BTCV_CLASS_NAMES, start=1):
+            mask = (lbl == c)
+            if mask.sum() > 0:
+                organ_error[name].append((error[mask]).mean().item())
+
+        # Boundary vs interior (erode label to get interior)
+        from scipy.ndimage import binary_erosion
+        lbl_np = (lbl > 0).squeeze().numpy()
+        interior = torch.from_numpy(binary_erosion(lbl_np, iterations=3).astype(np.float32))
+        boundary = torch.from_numpy(lbl_np.astype(np.float32)) - interior
+        if boundary.sum() > 0:
+            boundary_error_rates.append((error.squeeze() * boundary).sum() / boundary.sum())
+        if interior.sum() > 0:
+            interior_error_rates.append((error.squeeze() * interior).sum() / interior.sum())
+
+print(f"Mean voxel error rate: {np.mean(error_rates):.3f}")
+print(f"Boundary error rate:   {np.mean(boundary_error_rates):.3f}")
+print(f"Interior error rate:   {np.mean(interior_error_rates):.3f}")
+print("\nPer-organ error rates:")
+for name, vals in organ_error.items():
+    if vals: print(f"  {name:15s}: {np.mean(vals):.3f}")
+
+# Expected: boundary >> interior; Pancreas/Adrenal >> Liver/Spleen
+```
+
+**Target result**: Boundary error rate should be 3-5× interior error rate. Small organs (Pancreas, Adrenal) should have the highest organ-wise error rates.
+
+---
+
+### O2: Uncertainty (Entropy) Distribution
+
+**Question**: Are high-uncertainty voxels a small minority of the total volume?
+
+```python
+entropy_per_voxel = []  # store all entropy values (subsampled)
+high_unc_fraction = []  # fraction of voxels with entropy > 0.5
+
+with torch.no_grad():
+    for batch in val_loader:
+        img = batch["image"].cuda()
+
+        logits = sliding_window_inference_1out(img, (96,96,96), 4, effi_model, overlap=0.7)
+        prob = logits.softmax(1).cpu()  # [1, C, D, H, W]
+        entropy = -(prob * torch.log(prob + 1e-8)).sum(1)  # [1, D, H, W]
+
+        flat = entropy.flatten().numpy()
+        entropy_per_voxel.append(flat[::10])  # subsample 1/10 to save memory
+        high_unc_fraction.append((entropy > 0.5).float().mean().item())
+
+all_entropy = np.concatenate(entropy_per_voxel)
+print(f"Entropy percentiles:")
+for p in [50, 75, 90, 95, 99]:
+    print(f"  p{p}: {np.percentile(all_entropy, p):.4f}")
+print(f"Fraction with entropy > 0.5: {np.mean(high_unc_fraction):.2%}")
+
+# Plot entropy histogram
+plt.figure(figsize=(8,4))
+plt.hist(all_entropy, bins=50, log=True)
+plt.xlabel("Entropy"); plt.ylabel("Voxel count (log scale)")
+plt.title("O2: Entropy Distribution")
+plt.savefig("/kaggle/working/obs/O2_entropy_histogram.png", dpi=150)
+plt.show()
+
+# Expected: >90% of voxels have entropy < 0.1 (very low); tail extends to ~log(C)≈2.64
+```
+
+**Target result**: High-uncertainty voxels (entropy > 0.5) should comprise <10% of the total volume. If they're >30%, adaptive computation loses its efficiency advantage.
+
+---
+
+### O3: Uncertainty–Error Correlation (Key Metric)
+
+**Question**: Does high entropy reliably predict where errors occur?
+
+```python
+from scipy.stats import pearsonr, spearmanr
+
+case_entropy, case_error = [], []
+
+with torch.no_grad():
+    for batch in val_loader:
+        img = batch["image"].cuda()
+        lbl = batch["label"].squeeze(1).long().cpu()
+
+        logits = sliding_window_inference_1out(img, (96,96,96), 4, effi_model, overlap=0.7)
+        prob = logits.softmax(1).cpu()
+        pred = logits.argmax(1).cpu()
+        entropy = -(prob * torch.log(prob + 1e-8)).sum(1).squeeze()
+
+        error = (pred.squeeze() != lbl.squeeze()).float()
+
+        # Bin entropy and compute mean error per bin
+        n_bins = 20
+        for b in range(n_bins):
+            lo = b / n_bins * entropy.max().item()
+            hi = (b + 1) / n_bins * entropy.max().item()
+            mask = (entropy >= lo) & (entropy < hi)
+            if mask.sum() > 100:
+                case_entropy.append(entropy[mask].mean().item())
+                case_error.append(error[mask].mean().item())
+
+r_pearson, p_val = pearsonr(case_entropy, case_error)
+r_spearman, _ = spearmanr(case_entropy, case_error)
+print(f"Pearson r  = {r_pearson:.3f}  (p={p_val:.4f})")
+print(f"Spearman ρ = {r_spearman:.3f}")
+
+plt.figure(figsize=(6,5))
+plt.scatter(case_entropy, case_error, alpha=0.6)
+plt.xlabel("Mean Entropy"); plt.ylabel("Error Rate")
+plt.title(f"O3: Entropy vs Error  (r={r_pearson:.2f})")
+plt.savefig("/kaggle/working/obs/O3_entropy_error_scatter.png", dpi=150)
+
+# GO criterion: Pearson r > 0.60
+print(f"\n{'GO ✓' if r_pearson > 0.60 else 'NO-GO ✗'}: Pearson r = {r_pearson:.3f} (threshold: 0.60)")
+```
+
+---
+
+### O4: Per-Organ Difficulty
+
+**Question**: Which anatomical structures are inherently harder, and do they have higher entropy?
+
+```python
+organ_dice, organ_entropy = {n: [] for n in BTCV_CLASS_NAMES}, {n: [] for n in BTCV_CLASS_NAMES}
+from monai.metrics import DiceMetric
+dice_metric = DiceMetric(include_background=False, reduction="none")
+
+with torch.no_grad():
+    for batch in val_loader:
+        img = batch["image"].cuda()
+        lbl = batch["label"].cpu()
+
+        logits = sliding_window_inference_1out(img, (96,96,96), 4, effi_model, overlap=0.7)
+        prob = logits.softmax(1).cpu()
+        entropy = -(prob * torch.log(prob + 1e-8)).sum(1).squeeze()  # [D, H, W]
+
+        pred_onehot = post_pred(logits.squeeze(0))
+        lbl_onehot  = post_lbl(lbl.squeeze(0))
+        dice_vals   = dice_metric(pred_onehot.unsqueeze(0), lbl_onehot.unsqueeze(0))[0]
+
+        for c, name in enumerate(BTCV_CLASS_NAMES):
+            organ_dice[name].append(dice_vals[c].item())
+            mask = (lbl.squeeze() == c + 1)
+            if mask.sum() > 0:
+                organ_entropy[name].append(entropy[mask].mean().item())
+
+print(f"{'Organ':15s} {'Dice':>6} {'Entropy':>8}")
+print("-" * 32)
+for name in BTCV_CLASS_NAMES:
+    d = np.nanmean(organ_dice[name])
+    e = np.nanmean(organ_entropy[name]) if organ_entropy[name] else float('nan')
+    print(f"{name:15s} {d:6.3f}  {e:8.4f}")
+
+# Expected: Pancreas + Adrenal = highest entropy + lowest DICE
+```
+
+---
+
+### O5: Decoder Gain Analysis (Most Critical)
+
+**Question**: Do difficult voxels (high entropy) benefit more from the full decoder (E0) than easy voxels?
+
+This experiment directly validates the adaptive computation hypothesis.
+
+```python
+full_model  = load_model("3DUXNET",         "/kaggle/input/e0-ckpt/best_metric_model.pth")
+effi_model  = load_model("3DUXNET_EffiDec3D", "/kaggle/input/e1-ckpt/best_metric_model.pth")
+
+bin_entropy, bin_gain = [], []
+
+with torch.no_grad():
+    for batch in val_loader:
+        img = batch["image"].cuda()
+        lbl = batch["label"].squeeze(1).long().cpu()
+
+        # Full decoder prediction
+        logits_full = sliding_window_inference_1out(img, (96,96,96), 4, full_model, overlap=0.7)
+        pred_full = logits_full.argmax(1).cpu().squeeze()
+
+        # EffiDec3D prediction + uncertainty
+        logits_effi = sliding_window_inference_1out(img, (96,96,96), 4, effi_model, overlap=0.7)
+        prob_effi = logits_effi.softmax(1).cpu()
+        pred_effi = logits_effi.argmax(1).cpu().squeeze()
+        entropy = -(prob_effi * torch.log(prob_effi + 1e-8)).sum(1).squeeze()
+
+        lbl_sq = lbl.squeeze()
+        # Gain: voxels where full decoder is correct but EffiDec3D is wrong
+        gain = ((pred_full == lbl_sq) & (pred_effi != lbl_sq)).float()
+
+        # Bin by entropy, compute mean gain per bin
+        n_bins = 20
+        for b in range(n_bins):
+            lo = b / n_bins
+            hi = (b + 1) / n_bins
+            q_lo = entropy.quantile(lo).item()
+            q_hi = entropy.quantile(hi).item()
+            mask = (entropy >= q_lo) & (entropy < q_hi)
+            if mask.sum() > 100:
+                bin_entropy.append(entropy[mask].mean().item())
+                bin_gain.append(gain[mask].mean().item())
+
+# Sort by entropy for plotting
+pairs = sorted(zip(bin_entropy, bin_gain))
+x, y = zip(*pairs)
+
+plt.figure(figsize=(7,5))
+plt.plot(x, y, "o-", markersize=4)
+plt.xlabel("Mean Entropy (EffiDec3D uncertainty)")
+plt.ylabel("Decoder Gain (fraction of voxels fixed by full decoder)")
+plt.title("O5: Decoder Gain vs Uncertainty")
+plt.savefig("/kaggle/working/obs/O5_decoder_gain.png", dpi=150)
+plt.show()
+
+from scipy.stats import pearsonr
+r, p = pearsonr(x, y)
+print(f"Gain-Entropy Pearson r = {r:.3f}  (p={p:.4f})")
+print(f"\n{'GO ✓' if r > 0.50 else 'NO-GO ✗'}: gain concentrates in high-entropy regions (threshold: r > 0.50)")
+```
+
+**Target result**: The gain curve should slope upward — high-entropy voxels get 5-10× more benefit from the full decoder than low-entropy voxels. If the curve is flat, adaptive computation won't help.
+
+---
+
+### Observation Study Go/No-Go
+
+| Check | Criterion | Result | Decision |
+|-------|-----------|--------|----------|
+| O3 | Entropy–Error Pearson r > 0.60 | | |
+| O5 | Gain–Entropy Pearson r > 0.50 | | |
+| O2 | High-uncertainty voxels < 15% of volume | | |
+| O4 | Small organs (Pancreas/Adrenal) rank top-3 in entropy | | |
+
+**If all 4 pass** → proceed to Part 4 (AdaDec3D training).
+
+**If O3 or O5 fail** → entropy may not be a reliable routing signal. Consider boundary probability or feature variance as alternatives before proceeding (see `1_Research_Proposal.md §7.4`).
+
+---
+
 ## Part 4: AdaDec3D Experiments (Step by Step)
 
 **Implemented files** (ready to use):
@@ -761,6 +1078,15 @@ Week 2-3: Baseline reproduction
   [ ] E1: EffiDec3D (max_iter=45000, ~3 sessions, checkpoint across sessions)
   [ ] Confirm: GFLOPs=51.47, Params=3.16M, mean DICE in 79%-79.5%
   [ ] Record per-class DICE for all 13 organs
+
+Week 3-4: Observation study (Part 3.5) — Go/No-Go gate
+  [ ] O1: Error map analysis — confirm boundary >> interior error rate
+  [ ] O2: Entropy histogram — confirm high-unc voxels < 15% of volume
+  [ ] O3: Entropy-error Pearson r > 0.60 → entropy is a valid routing signal
+  [ ] O4: Per-organ table — confirm Pancreas/Adrenal have highest entropy
+  [ ] O5: Decoder gain analysis — Gain-Entropy r > 0.50 → adaptive decoding is justified
+  [ ] Save all figures to /kaggle/working/obs/ (these become paper Figure 2-4)
+  [ ] --- GO / NO-GO DECISION HERE ---
 
 Week 4-5: Implement AdaDec3D modules ✅ DONE
   [x] UncertaintyHead (entropy computation, no params)   → adadec3d.py:_uncertainty()

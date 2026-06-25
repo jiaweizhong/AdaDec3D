@@ -2,9 +2,28 @@
 
 **Project**: Adaptive Decoder Computation for Efficient 3D Medical Image Segmentation
 
-> **Context**: This document is the execution guide for Stage 2 of the research pipeline defined in `1_Research_Proposal.md §7.3`.
-> For scientific motivation and Go/No-Go criteria see `1_Research_Proposal.md §4, §5, §7.4`.
-> For baseline training commands (E0/E1 needed for O5) see `Experiment-Design.md Part 3`.
+> **Context**: This document is the execution guide for Stage 2 of the research pipeline defined in `Research_Proposal.md §7.3`.
+> For scientific motivation and Go/No-Go criteria see `Research_Proposal.md §4, §5, §7.4`.
+> For baseline training commands (E0/E1 needed for O5) see `Experiment-Design-Observation.md Part 3`.
+
+---
+
+# Two-Paper Strategy
+
+This observation study is designed to support **two sequential publications**:
+
+| Paper | Scope | Target Venue | Prerequisite |
+| ----- | ----- | ------------ | ------------ |
+| **Paper A** | Empirical analysis (O1–O11): where does decoder computation matter in 3D medical segmentation? | MIDL / MLMI / ISBI | O1–O5 pass Go criteria |
+| **Paper B** | AdaDec3D method: adaptive decoder via difficulty-aware routing and ROI refinement | MICCAI / TMI | Paper A accepted |
+
+**Paper A is self-contained.** Its headline claim is:
+
+> *In efficient 3D medical image segmentation, decoder redundancy is spatially heterogeneous: the top 20% of uncertain voxels account for >80% of the performance gain from additional decoder capacity.*
+
+This is validated by O9 (Pareto Analysis) and supported by O1–O5.
+
+**Paper B builds on Paper A.** AdaDec3D is motivated by the finding that uniform decoder computation is wasteful, and is designed to allocate capacity only where O9 shows it is needed.
 
 ---
 
@@ -27,22 +46,39 @@ This study therefore answers the following scientific question.
 # Overall Workflow
 
 ```text
-Reproduce EffiDec3D
-        │
-        ▼
-Save Predictions
-        │
-        ▼
-Generate Difficulty Maps
-        │
-        ▼
-Generate Error Maps
-        │
-        ▼
-Statistical Analysis
-        │
-        ▼
-Scientific Insight
+Reproduce EffiDec3D (E0) + Full Decoder (E1)
+                │
+                ▼
+      Save Predictions + Checkpoints
+                │
+                ▼
+  O1: Error Distribution  O2: Difficulty Maps
+                │
+                ▼
+  O3: Difficulty vs Error Correlation
+                │
+                ▼
+  O4: Organ-wise Difficulty
+                │
+                ▼
+  O5: Decoder Gain Analysis  ◄── Critical Go/No-Go gate
+                │
+    ┌───────────┼──────────────┐
+    ▼           ▼              ▼
+  O6: Difficulty  O7: Cross-   O8: Backbone
+  Evolution     Dataset       Consistency
+                │
+                ▼
+  O9: Pareto Curve  ◄── Headline finding for Paper A
+                │
+                ▼
+  O10: Organ Size vs Difficulty
+                │
+                ▼
+  O11: Routing Signal Comparison
+                │
+                ▼
+        Paper A Submission
 ```
 
 ---
@@ -168,7 +204,7 @@ Boundary Probability
 Entropy
 
 ```python
-entropy = -(p*log(p)).sum(1)
+entropy = -(p * torch.log(p + 1e-8)).sum(1)
 ```
 
 ---
@@ -211,9 +247,9 @@ Does predicted difficulty really indicate segmentation difficulty?
 
 ## Input
 
-Difficulty
+Difficulty Map
 
-Prediction Error
+Prediction Error Map
 
 ---
 
@@ -224,6 +260,21 @@ Pearson Correlation
 Spearman Correlation
 
 Calibration Curve
+
+---
+
+## Code
+
+```python
+from scipy.stats import pearsonr, spearmanr
+
+flat_diff = difficulty_map.flatten().numpy()
+flat_err  = error_map.float().flatten().numpy()
+
+r_p, _ = pearsonr(flat_diff, flat_err)
+r_s, _ = spearmanr(flat_diff, flat_err)
+print(f"Pearson r={r_p:.3f}  Spearman r={r_s:.3f}")
+```
 
 ---
 
@@ -275,6 +326,20 @@ Boundary Difficulty
 
 ---
 
+## Code
+
+```python
+organ_names = ["Aorta","Gallbladder","Spleen","Left Kidney","Right Kidney",
+               "Liver","Stomach","Aorta","IVC","Portal Vein","Pancreas",
+               "Right Adrenal","Left Adrenal"]
+for i, name in enumerate(organ_names):
+    mask = (lbl == i + 1)
+    organ_diff = difficulty_map[mask].mean().item()
+    print(f"{name:20s}  mean_difficulty={organ_diff:.4f}")
+```
+
+---
+
 ## Figure
 
 Organ-wise Bar Plot
@@ -309,50 +374,62 @@ Where does a stronger decoder actually help?
 
 ## Motivation
 
-This experiment validates the necessity of adaptive decoder computation.
+This experiment is the **critical Go/No-Go gate**.
+
+It validates the necessity of adaptive decoder computation by comparing
+
+EffiDec3D (E0) against a full-capacity decoder (E1).
 
 ---
 
 ## Input
 
-EffiDec3D
+E0 predictions (EffiDec3D)
 
-Large Decoder
+E1 predictions (Full decoder)
+
+Ground Truth
+
+Difficulty maps from O2
 
 ---
 
-## Generate
-
-Improvement Map
+## Code
 
 ```python
-gain = full_decoder - effidec
+import torch
+from scipy.stats import pearsonr
+
+# per-voxel gain: E1 correct where E0 was wrong
+gain = ((pred_full == lbl) & (pred_effi != lbl)).float()
+
+# bin by entropy quantile
+n_bins = 10
+percentiles = torch.quantile(entropy_map.flatten(), torch.linspace(0, 1, n_bins + 1))
+x, y = [], []
+for k in range(n_bins):
+    lo, hi = percentiles[k], percentiles[k + 1]
+    mask = (entropy_map >= lo) & (entropy_map < hi)
+    if mask.sum() > 0:
+        x.append(entropy_map[mask].mean().item())
+        y.append(gain[mask].mean().item())
+
+r, p = pearsonr(x, y)
+print(f"{'GO  ✓' if r > 0.50 else 'NO-GO ✗'}: Pearson r={r:.3f}  p={p:.4f}")
 ```
 
 ---
 
-## Statistics
+## Go Criterion
 
-Gain Histogram
-
-Gain vs Difficulty
-
-Gain vs Organ
-
-Gain vs Boundary
+Pearson r > 0.50 between entropy quantile and decoder gain rate.
 
 ---
 
 ## Figure
 
 ```text
-Difficulty Map
-
-+
-
-Gain Map
-
-Overlay
+Difficulty Map  +  Gain Map  →  Overlay
 ```
 
 ---
@@ -361,7 +438,7 @@ Overlay
 
 Higher decoder capacity mainly benefits
 
-* difficult voxels
+* difficult voxels (high entropy)
 
 * boundaries
 
@@ -375,104 +452,418 @@ Is adaptive decoder computation actually necessary?
 
 ---
 
-# O6 Routing Signal Comparison
+# O6 Difficulty Evolution During Training
+
+## Research Question
+
+Does prediction difficulty decrease over training, and does it concentrate near boundaries/hard organs as training progresses?
+
+---
+
+## Motivation
+
+If difficulty is transient and disappears as the model trains, adaptive routing offers little permanent benefit.
+
+If difficulty persists and localizes, it is a stable routing signal.
+
+---
+
+## Setup
+
+Save model checkpoints at epochs {5, 10, 20, 30, 50} during E0/E1 training.
+
+---
+
+## Code
+
+```python
+# Add to trainer: save checkpoints at milestones
+MILESTONES = [5, 10, 20, 30, 50]
+
+for epoch in MILESTONES:
+    ckpt_path = f"checkpoints/effidec3d_epoch{epoch:03d}.pt"
+    model = load_model("3DUXNET_EffiDec3D", ckpt_path)
+    entropy_maps = []
+    for img, lbl in val_loader:
+        with torch.no_grad():
+            logits = model(img.cuda())
+        prob = torch.softmax(logits, dim=1)
+        ent  = -(prob * torch.log(prob + 1e-8)).sum(1)
+        entropy_maps.append(ent.cpu())
+    mean_ent = torch.stack(entropy_maps).mean()
+    print(f"Epoch {epoch:3d}  mean_entropy={mean_ent:.4f}")
+```
+
+---
+
+## Figure
+
+Line plot: mean entropy vs training epoch
+
+Spatial map: entropy at epochs 5, 20, 50 (side-by-side)
+
+---
+
+## Expected
+
+Mean entropy decreases, but residual high-entropy voxels stabilize at boundaries/hard organs by epoch 30.
+
+---
+
+## Paper A Role
+
+Supports the claim that difficulty is a stable, persistent signal — not transient noise.
+
+---
+
+# O7 Cross-Dataset Consistency
+
+## Research Question
+
+Do the O1–O5 findings replicate on FeTA (fetal brain MRI)?
+
+---
+
+## Motivation
+
+If decoder gain concentrates on difficult voxels across both CT (BTCV) and MRI (FeTA),
+
+the finding is dataset-agnostic and generalizes beyond one modality.
+
+---
+
+## Setup
+
+Repeat O1–O5 pipeline on FeTA validation set using EffiDec3D trained on FeTA.
+
+---
+
+## Code
+
+```python
+# run identical O1-O5 analysis, but with FeTA data
+feta_loader = get_loader_feta(data_dir, batch_size=1, num_workers=4)
+model_feta = load_model("3DUXNET_EffiDec3D", ckpt_path="checkpoints/effidec3d_feta.pt")
+# then call same error/difficulty/gain analysis functions
+```
+
+---
+
+## Statistics
+
+Pearson r (O5 equivalent) on FeTA
+
+Organ-wise difficulty bar plot for fetal brain structures
+
+---
+
+## Expected
+
+r > 0.50 on FeTA, confirming the relationship is modality-agnostic.
+
+---
+
+## Paper A Role
+
+Cross-dataset replication is a key criterion for MIDL/MLMI reviewers.
+
+---
+
+# O8 Backbone Consistency
+
+## Research Question
+
+Does the O5 result hold when the backbone changes from UXNET to SwinUNETR?
+
+---
+
+## Motivation
+
+If the decoder gain–difficulty correlation depends on the specific backbone,
+
+AdaDec3D cannot claim general applicability.
+
+---
+
+## Setup
+
+Train SwinUNETR_EffiDec3D on BTCV.
+
+Run O5 analysis using SwinUNETR predictions.
+
+---
+
+## Code
+
+```python
+model_swin = load_model("SwinUNETR_EffiDec3D",
+                         ckpt_path="checkpoints/swin_effidec3d.pt")
+# identical O5 analysis
+gain_swin = ((pred_swin_full == lbl) & (pred_swin_effi != lbl)).float()
+r_swin, _ = pearsonr(x_swin, y_swin)
+print(f"SwinUNETR backbone: r={r_swin:.3f}")
+```
+
+---
+
+## Expected
+
+r > 0.45 for SwinUNETR, confirming backbone-agnostic signal.
+
+---
+
+## Paper A Role
+
+Backbone consistency strengthens the claim that the finding is architectural rather than model-specific.
+
+---
+
+# O9 Pareto Analysis
+
+## Research Question
+
+What fraction of voxels account for the majority of decoder gain?
+
+---
+
+## Motivation
+
+This is the **headline finding for Paper A**.
+
+If the top 20% of uncertain voxels capture ≥80% of total decoder gain (a Pareto distribution),
+
+it directly justifies selective computation: allocating full decoder capacity only to those voxels.
+
+---
+
+## Code
+
+```python
+import numpy as np
+
+# flatten over all validation volumes
+all_entropy = entropy_map.flatten().numpy()
+all_gain    = gain.flatten().numpy()
+
+# sort by entropy descending
+sort_idx = np.argsort(all_entropy)[::-1]
+sorted_gain = all_gain[sort_idx]
+
+cumulative_gain = np.cumsum(sorted_gain) / sorted_gain.sum()
+n = len(sorted_gain)
+x_pct = np.arange(1, n + 1) / n * 100   # voxel percentile (high-ent first)
+
+# find what % of voxels cover 80% of gain
+idx_80 = np.searchsorted(cumulative_gain, 0.80)
+voxel_pct_for_80pct_gain = (idx_80 + 1) / n * 100
+print(f"Top {voxel_pct_for_80pct_gain:.1f}% uncertain voxels → 80% of decoder gain")
+```
+
+---
+
+## Go Criterion for Paper A
+
+Top ≤ 30% of uncertain voxels cover ≥ 80% of total decoder gain.
+
+---
+
+## Figure
+
+Cumulative decoder gain vs uncertainty percentile (Lorenz-style curve)
+
+Annotate the point where cumulative gain = 80%
+
+---
+
+## Expected
+
+Top ~20% uncertain voxels → ~80% of decoder gain.
+
+---
+
+## Paper A Headline
+
+> *The top 20% of uncertain voxels account for 80% of the performance gain from additional decoder capacity, suggesting that selective decoder allocation can recover most of the full-decoder benefit at a fraction of the compute.*
+
+---
+
+# O10 Organ Size vs Difficulty
+
+## Research Question
+
+Is difficulty driven by organ size, or is it independent?
+
+---
+
+## Motivation
+
+Reviewers will ask: "Is your difficulty signal just a proxy for small organs?"
+
+If small organs are uniformly difficult but large organs are not, difficulty is confounded by size.
+
+If difficulty is heterogeneous even within organ types, it is a richer signal than size alone.
+
+---
+
+## Code
+
+```python
+# organ volume (proxy for size) vs mean difficulty
+for i, name in enumerate(organ_names):
+    mask = (lbl == i + 1)
+    size  = mask.float().sum().item()
+    diff  = difficulty_map[mask].mean().item()
+    print(f"{name:20s}  size={size:8.0f}  difficulty={diff:.4f}")
+
+# scatter plot: size vs difficulty across organs
+from scipy.stats import spearmanr
+r_size, _ = spearmanr(sizes, difficulties)
+print(f"Size vs Difficulty  Spearman r={r_size:.3f}")
+```
+
+---
+
+## Figure
+
+Scatter plot: organ volume vs mean difficulty (with organ labels)
+
+---
+
+## Expected
+
+Weak-to-moderate negative correlation (smaller organs are harder on average),
+
+but high residual variance: some large organs (stomach, liver boundary) also have high difficulty.
+
+---
+
+## Paper A Role
+
+Shows difficulty is not merely a size proxy, justifying entropy over a simple size-based routing rule.
+
+---
+
+# O11 Routing Signal Comparison
 
 ## Motivation
 
 Difficulty estimation should not rely on a single signal.
 
+The best routing signal for AdaDec3D should balance correlation with segmentation error,
+
+compute overhead, and stability across datasets.
+
 ---
 
 ## Signals
 
-Entropy
-
-Confidence
-
-Feature Variance
-
-MC Dropout
-
-Boundary Probability
+| Signal | Description |
+| ------ | ----------- |
+| Entropy | `-(p log p).sum(1)` over softmax output |
+| Confidence | `1 - max(p)` |
+| Feature Variance | variance of decoder feature maps |
+| MC Dropout | variance over T stochastic forward passes |
+| Boundary Probability | distance-to-boundary probability map |
 
 ---
 
 ## Evaluation
 
-Correlation
+Correlation with segmentation error (Pearson r)
 
-Latency
+Inference latency overhead (ms/volume)
 
-Memory
+GPU memory overhead (MB)
 
-Stability
+Stability across datasets (BTCV vs FeTA r difference)
 
 ---
 
 ## Table
 
-| Signal | Corr | Time | Memory |
-| ------ | ---- | ---- | ------ |
+| Signal | Corr (BTCV) | Corr (FeTA) | Latency (ms) | Memory (MB) |
+| ------ | ----------- | ----------- | ------------ | ----------- |
+| Entropy | | | | |
+| Confidence | | | | |
+| Feature Var | | | | |
+| MC Dropout | | | | |
+| Boundary | | | | |
 
 ---
 
 ## Goal
 
-Select the routing signal
+Select the routing signal for AdaDec3D.
 
-for AdaDec3D.
+Expected winner: Entropy (highest correlation, near-zero overhead).
 
 ---
 
 # Go / No-Go Decision
 
-Proceed only if
+## Minimum criteria to proceed to Paper A submission
 
-✔ Difficulty correlates with prediction error
+| Observation | Criterion | Status |
+| ----------- | --------- | ------ |
+| O3 | Pearson r(difficulty, error) > 0.40 | ☐ |
+| O5 | Pearson r(entropy quantile, gain) > 0.50 | ☐ |
+| O9 | Top ≤30% uncertain voxels → ≥80% gain | ☐ |
+| O2 | Difficult voxels ≤ 30% of total volume | ☐ |
 
-✔ Decoder gain correlates with difficulty
+**All four must pass** to proceed to Paper A write-up.
 
-✔ Difficult regions occupy only a small portion of voxels
+## Additional criteria to proceed to Paper B (AdaDec3D)
 
-Otherwise,
+| Observation | Criterion | Status |
+| ----------- | --------- | ------ |
+| O7 | FeTA replication: r > 0.40 | ☐ |
+| O8 | SwinUNETR backbone: r > 0.45 | ☐ |
+| O11 | Entropy is best or tied-best routing signal | ☐ |
 
-adaptive decoder computation should be reconsidered.
+**All three must pass** to justify AdaDec3D design choices.
 
 ---
 
 # Deliverables
 
-Notebook
+## Notebooks
 
-observe_error.ipynb
-
-observe_difficulty.ipynb
-
-observe_decoder_gain.ipynb
-
-observe_organs.ipynb
-
-observe_routing_signal.ipynb
+| Notebook | Observations Covered |
+| -------- | -------------------- |
+| `observe_error.ipynb` | O1 |
+| `observe_difficulty.ipynb` | O2, O10 |
+| `observe_correlation.ipynb` | O3, O4 |
+| `observe_decoder_gain.ipynb` | O5, O9 |
+| `observe_evolution.ipynb` | O6 |
+| `observe_crossdataset.ipynb` | O7, O8 |
+| `observe_routing_signal.ipynb` | O11 |
 
 ---
 
 # Final Outputs
 
-Figures
+## Figures
 
-Figure 2
+| Figure | Content | Paper |
+| ------ | ------- | ----- |
+| Fig 1 | Error distribution map (O1) | A |
+| Fig 2 | Difficulty heatmap overlay (O2) | A |
+| Fig 3 | Difficulty–error scatter (O3) | A |
+| Fig 4 | Organ-wise difficulty bar plot (O4) | A |
+| Fig 5 | Decoder gain vs difficulty (O5) | A |
+| Fig 6 | Difficulty evolution over training (O6) | A |
+| Fig 7 | Pareto curve: cumulative gain vs uncertainty % (O9) | A (headline) |
+| Fig 8 | Organ size vs difficulty scatter (O10) | A |
+| Fig 9 | Routing signal comparison table (O11) | B |
 
-Figure 3
+## Tables
 
-Figure 4
-
-Tables
-
-Organ Statistics
-
-Routing Comparison
-
-Correlation Analysis
+| Table | Content |
+| ----- | ------- |
+| T1 | Organ-wise statistics (difficulty, Dice, HD95) |
+| T2 | Cross-dataset replication (O7) |
+| T3 | Backbone consistency (O8) |
+| T4 | Routing signal comparison (O11) |
 
 ---
 
@@ -482,6 +873,9 @@ If all observations are validated,
 
 this study supports the following conclusion.
 
-> Decoder redundancy in efficient 3D medical image segmentation is spatially heterogeneous.
+> Decoder redundancy in efficient 3D medical image segmentation is **spatially heterogeneous**.
+> The top 20% of uncertain voxels account for the majority of the performance gap between
+> an efficient decoder and a full-capacity decoder.
+> This heterogeneity is consistent across datasets (BTCV, FeTA) and backbone architectures (UXNET, SwinUNETR).
 
-This conclusion directly motivates the proposed AdaDec3D framework.
+This conclusion is the core contribution of **Paper A** and directly motivates the AdaDec3D framework in **Paper B**.

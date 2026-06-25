@@ -12,9 +12,9 @@ Adaptive Decoder Computation via Difficulty-Aware Routing and Selective Refineme
 
 **Target Venues**
 
-* MICCAI
-* IEEE Transactions on Medical Imaging (TMI)
-* IEEE Journal of Biomedical and Health Informatics (JBHI)
+Paper A (observation study): MIDL / MLMI / ISBI
+
+Paper B (AdaDec3D method): MICCAI 2026 / IEEE Transactions on Medical Imaging (TMI) / JBHI
 
 ---
 
@@ -41,6 +41,26 @@ We hypothesize that decoder redundancy is **spatially heterogeneous**. Most voxe
 Based on this hypothesis, we propose **Adaptive Decoder Computation (AdaDec3D)**, a difficulty-aware decoding framework that dynamically allocates decoder computation according to predicted segmentation difficulty rather than uniformly across the entire volume.
 
 Unlike existing efficient segmentation methods that optimize decoder architectures statically, AdaDec3D focuses on **adaptive computation allocation**, allowing computational resources to be concentrated only where they are truly needed.
+
+---
+
+# 0.5 Two-Paper Publication Strategy
+
+This project is structured as two sequential publications that build on each other.
+
+| | Paper A — Observation | Paper B — Method |
+|---|---|---|
+| **Claim** | Decoder redundancy is spatially heterogeneous | AdaDec3D exploits this heterogeneity |
+| **Contribution** | Empirical analysis (O1–O11) | Adaptive decoder architecture |
+| **Target venue** | MIDL / MLMI / ISBI | MICCAI 2026 / TMI |
+| **Prerequisite** | E0 + E1 baselines | Paper A accepted |
+| **Key finding** | Top 20% uncertain voxels → 80% of gain | DICE ≥ EffiDec3D + 0.3% at same FLOPs |
+
+**Paper A is self-contained** and can be submitted before any AdaDec3D implementation is complete. Its headline claim:
+
+> *The top 20% of uncertain voxels account for >80% of the performance gain from additional decoder capacity, suggesting that selective allocation can recover most of the full-decoder benefit at a fraction of the compute.*
+
+**Paper B builds on Paper A** by proposing AdaDec3D as the practical realization of this observation. The acceptance of Paper A provides both motivation and reviewer confidence for the AdaDec3D design choices.
 
 ---
 
@@ -741,21 +761,161 @@ This observation directly motivates adaptive decoder computation.
 
 ---
 
+# Observation O6
+
+## Difficulty Evolution During Training
+
+### Research Question
+
+Does prediction difficulty persist throughout training, or is it a transient artifact of early training?
+
+### Motivation
+
+If high-entropy regions disappear as the model trains, difficulty is unstable and cannot support reliable routing. If difficulty persists and concentrates at boundaries and hard organs, it is a stable signal suitable for adaptive computation.
+
+### Method
+
+Save model checkpoints at training epochs {5, 10, 20, 30, 50}. Compute mean entropy of the validation set at each checkpoint and visualize its spatial distribution over time.
+
+### Expected Finding
+
+Mean entropy decreases over training but stabilizes. Residual high-entropy voxels at convergence are concentrated at anatomical boundaries and small organs (Pancreas, Adrenal), confirming that difficulty is a persistent, stable signal.
+
+### Role
+
+Supports Paper A's claim that entropy-based routing is reliable rather than opportunistic.
+
+---
+
+# Observation O7
+
+## Cross-Dataset Consistency
+
+### Research Question
+
+Do the O1–O5 findings generalize from CT (BTCV) to MRI (FeTA)?
+
+### Motivation
+
+If decoder gain concentrates on difficult voxels only in BTCV, the observation may be dataset-specific. Cross-dataset replication on a different modality (fetal brain MRI) is essential for a general claim.
+
+### Method
+
+Repeat the O1–O5 analysis pipeline on the FeTA 2021 dataset using EffiDec3D trained on FeTA.
+
+### Expected Finding
+
+Gain–Entropy Pearson r > 0.40 on FeTA, confirming the relationship is modality-agnostic.
+
+### Role
+
+Cross-dataset replication is a standard criterion for MIDL/MLMI acceptance.
+
+---
+
+# Observation O8
+
+## Backbone Consistency
+
+### Research Question
+
+Does the O5 Gain–Entropy correlation hold when the backbone changes from UXNET to SwinUNETR?
+
+### Motivation
+
+If the finding depends on the specific backbone, AdaDec3D cannot claim general applicability to other efficient decoders.
+
+### Method
+
+Train SwinUNETR_EffiDec3D on BTCV. Run the O5 Gain–Entropy analysis using SwinUNETR predictions.
+
+### Expected Finding
+
+Gain–Entropy r > 0.45 for SwinUNETR, confirming backbone-agnostic signal.
+
+### Role
+
+Backbone consistency strengthens the architectural generality claim in Paper A and Paper B.
+
+---
+
+# Observation O9
+
+## Pareto Analysis — Headline Finding for Paper A
+
+### Research Question
+
+What fraction of voxels account for the majority of decoder gain?
+
+### Motivation
+
+A Pareto distribution of gain (top 20% of uncertain voxels → 80% of gain) is the quantitative foundation for selective decoder allocation. This is the headline number that justifies AdaDec3D's design philosophy.
+
+### Method
+
+Sort all validation voxels by entropy (descending). Plot cumulative decoder gain as a function of voxel percentile (Lorenz-style curve). Identify the minimal voxel percentage covering 80% of total gain.
+
+### Expected Finding
+
+The top ~20% of uncertain voxels account for ~80% of total decoder gain.
+
+### Go Criterion for Paper A
+
+Top ≤ 30% of uncertain voxels cover ≥ 80% of total decoder gain.
+
+### Role
+
+This is the headline finding and primary figure of Paper A.
+
+---
+
+# Observation O10
+
+## Organ Size vs Difficulty
+
+### Research Question
+
+Is difficulty driven by organ size, or is it an independent signal?
+
+### Motivation
+
+Reviewers will ask: "Is your entropy-based difficulty just a proxy for small organs?" This observation directly addresses this concern. If difficulty is heterogeneous even within organ classes and large organs also exhibit localized difficulty, entropy is richer than a simple size-based routing rule.
+
+### Method
+
+For each organ, compute mean volume (size proxy) and mean entropy. Measure Spearman correlation between size and difficulty.
+
+### Expected Finding
+
+Weak-to-moderate negative correlation (smaller organs are harder on average), but high residual variance: some large organs (liver boundary, stomach) also exhibit high difficulty. This demonstrates entropy captures difficulty beyond size.
+
+### Role
+
+Defends entropy-based routing against the "size proxy" objection in Paper A peer review.
+
+---
+
 # Summary of Empirical Observations
 
-The five observations collectively aim to answer four scientific questions.
+The eleven observations collectively answer six scientific questions.
 
-| Observation | Scientific Question                    | Expected Finding                                                 |
-| ----------- | -------------------------------------- | ---------------------------------------------------------------- |
-| O1          | Where do errors occur?                 | Errors concentrate in difficult anatomical regions.              |
-| O2          | Where is uncertainty located?          | High uncertainty occupies only a small proportion of voxels.     |
-| O3          | Does uncertainty represent difficulty? | Prediction error increases with uncertainty.                     |
-| O4          | Which organs are difficult?            | Small organs exhibit higher uncertainty and lower Dice.          |
-| O5          | Who benefits from larger decoders?     | Large decoder capacity mainly benefits high-uncertainty regions. |
+| Observation | Scientific Question | Expected Finding | Paper |
+| ----------- | ------------------- | ---------------- | ----- |
+| O1 | Where do errors occur? | Errors concentrate in difficult anatomical regions | A |
+| O2 | Where is uncertainty located? | High uncertainty occupies only a small proportion of voxels | A |
+| O3 | Does uncertainty represent difficulty? | Prediction error increases with uncertainty | A |
+| O4 | Which organs are difficult? | Small organs exhibit higher uncertainty and lower Dice | A |
+| O5 | Who benefits from larger decoders? | Large decoder capacity mainly benefits high-uncertainty regions | A |
+| O6 | Is difficulty persistent? | High-entropy voxels stabilize at boundaries by epoch 30 | A |
+| O7 | Does this generalize across datasets? | Replicated on FeTA (MRI), confirming modality-agnostic finding | A |
+| O8 | Does this generalize across backbones? | Replicated with SwinUNETR, confirming backbone-agnostic signal | A |
+| O9 | How concentrated is the gain? (headline) | Top 20% uncertain voxels → 80% of decoder gain | A |
+| O10 | Is difficulty just a size proxy? | No — entropy captures difficulty beyond organ size | A |
+| O11 | Which routing signal is best? | Entropy: best correlation, lowest overhead | B |
 
-If these observations are experimentally validated,
+If O1–O9 are experimentally validated,
 
-they collectively support the central hypothesis of this work:
+they collectively support the central hypothesis:
 
 > **Decoder redundancy is spatially heterogeneous, and decoder computation should therefore be allocated adaptively rather than uniformly.**
 
@@ -1663,7 +1823,7 @@ Unlike conventional model development, this project follows an **observation-dri
 
 # 7.1 Overall Development Roadmap
 
-The entire project is divided into five sequential stages.
+The project follows a two-paper strategy with sequential stages.
 
 ```text
 Stage 0
@@ -1675,25 +1835,39 @@ Reproduce EffiDec3D
         │
         ▼
 Stage 2
-Observation Study
+Observation Study O1–O11
+  (O1–O5 critical gate)
+  (O6–O10 extended analysis)
         │
         ▼
-Go / No-Go Decision
+Go / No-Go Decision (Paper A)
+        │
+        ▼
+Paper A Draft
+MIDL / MLMI / ISBI Submission
         │
         ▼
 Stage 3
 AdaDec3D Development
+  (parallel to Paper A review)
         │
         ▼
 Stage 4
 Ablation & Analysis
         │
         ▼
-Stage 5
-Paper Writing
+Paper A Accepted
+        │
+        ▼
+Paper B Draft
+MICCAI 2026 / TMI Submission
 ```
 
 Each stage has explicit deliverables and acceptance criteria.
+
+**Paper A** (observation study) is the Go/No-Go gate for Paper B. AdaDec3D development begins only after O1–O5 pass their thresholds.
+
+**Paper A and Stage 3 run in parallel**: once O1–O5 pass, Paper A writing and AdaDec3D implementation proceed simultaneously. This avoids idle time during the Paper A review period (typically 3–6 months).
 
 ---
 

@@ -65,6 +65,7 @@ parser = argparse.ArgumentParser(description="AdaDec3D training")
 parser.add_argument("--root",    type=str, required=True)
 parser.add_argument("--output",  type=str, required=True)
 parser.add_argument("--dataset", type=str, default="BTCV13")
+parser.add_argument("--mode", type=str, default="train", choices=["train", "validation"])
 parser.add_argument("--img_size", type=int, nargs="+", default=[96, 96, 96])
 parser.add_argument("--n_channels", type=int, default=1)
 
@@ -99,6 +100,8 @@ parser.add_argument("--lambda_resource",    type=float, default=0.05)
 parser.add_argument("--lambda_router",      type=float, default=0.10)
 parser.add_argument("--lambda_coarse",      type=float, default=0.50,
                     help="Weight for auxiliary coarse decoder loss")
+parser.add_argument("--target_expert_cost", type=float, default=0.50,
+                    help="Target normalized expected expert cost in [0,1]")
 
 # Inference
 parser.add_argument("--overlap",      type=float, default=0.7)
@@ -111,6 +114,7 @@ parser.add_argument("--crop_sample", type=int,   default=4)
 parser.add_argument("--cache_rate",  type=float, default=0.5)
 parser.add_argument("--num_workers", type=int,   default=2)
 parser.add_argument("--gpu",         type=str,   default="0")
+parser.add_argument("--seed",        type=int,   default=0)
 
 args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -120,7 +124,9 @@ device = torch.device("cuda:0")
 # Data
 # ---------------------------------------------------------------------------
 
-set_determinism(seed=0)
+if args.dataset.lower() == "feta":
+    args.dataset = "feta"
+set_determinism(seed=args.seed)
 train_samples, valid_samples, out_classes = data_loader(args)
 
 train_files = [
@@ -261,7 +267,8 @@ def interpolate_to_label(pred: torch.Tensor, label: torch.Tensor) -> torch.Tenso
 def uncertainty_calibration_loss(coarse_pred: torch.Tensor, label: torch.Tensor) -> torch.Tensor:
     """
     Calibration: voxels with high predicted entropy should be where the model is wrong.
-    Both maps are normalised to [0,1] before MSE.
+    Entropy is normalized by its theoretical maximum log(C), preserving
+    comparability between crops and subjects.
     """
     prob = coarse_pred.softmax(dim=1)
     entropy = -(prob * torch.log(prob + 1e-8)).sum(dim=1)       # [B, D', H', W']
@@ -271,9 +278,12 @@ def uncertainty_calibration_loss(coarse_pred: torch.Tensor, label: torch.Tensor)
     ).squeeze(1).long()                                         # [B, D', H', W']
     error = (coarse_pred.argmax(dim=1) != coarse_lbl).float()  # [B, D', H', W']
 
-    unc_norm = entropy / (entropy.flatten(1).max(dim=1).values.view(-1,1,1,1) + 1e-8)
-    err_norm  = error  / (error .flatten(1).max(dim=1).values.view(-1,1,1,1) + 1e-8)
-    return F.mse_loss(unc_norm, err_norm)
+    unc_norm = entropy / np.log(coarse_pred.shape[1])
+    # Balance error/non-error voxels so easy background cannot dominate.
+    pos = error.sum().clamp_min(1.0)
+    neg = (1.0 - error).sum().clamp_min(1.0)
+    weights = error * (0.5 / pos) + (1.0 - error) * (0.5 / neg)
+    return ((unc_norm - error).square() * weights).sum()
 
 
 def resource_penalty(router_weights: torch.Tensor) -> torch.Tensor:
@@ -284,11 +294,13 @@ def resource_penalty(router_weights: torch.Tensor) -> torch.Tensor:
     return (router_weights * costs.unsqueeze(0)).sum(dim=1).mean()
 
 
-def load_balance_loss(router_weights: torch.Tensor) -> torch.Tensor:
-    """Prevent expert collapse: push usage distribution toward uniform."""
-    expected = torch.ones(router_weights.shape[1], device=router_weights.device)
-    expected = expected / expected.sum()
-    return F.mse_loss(router_weights.mean(dim=0), expected)
+def budget_loss(router_weights: torch.Tensor) -> torch.Tensor:
+    """Penalize exceeding a compute budget without forcing artificial uniform use."""
+    n = router_weights.shape[1]
+    costs = torch.linspace(0.0, 1.0, n, device=router_weights.device)
+    expected_cost = (router_weights * costs.unsqueeze(0)).sum(dim=1).mean()
+    target = torch.as_tensor(args.target_expert_cost, device=router_weights.device)
+    return F.relu(expected_cost - target).square()
 
 
 def compute_loss(
@@ -310,7 +322,7 @@ def compute_loss(
 
     # Efficiency losses
     L_res    = resource_penalty(router_weights)
-    L_router = load_balance_loss(router_weights)
+    L_router = budget_loss(router_weights)
 
     total = (L_seg
              + args.lambda_coarse       * L_coarse
@@ -332,7 +344,7 @@ def compute_loss(
 
 post_label = AsDiscrete(to_onehot=out_classes)
 post_pred  = AsDiscrete(argmax=True, to_onehot=out_classes)
-dice_metric = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
+dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
 
 
 def validation(val_loader):
@@ -374,9 +386,11 @@ def calculate_metric_percase(pred, gt):
     gt   = (gt   > 0).astype(np.uint8)
     if pred.sum() > 0 and gt.sum() > 0:
         return metric.binary.dc(pred, gt), metric.binary.hd95(pred, gt)
-    if pred.sum() > 0 and gt.sum() == 0:
-        return 1.0, 0.0
-    return 0.0, 0.0
+    if pred.sum() == 0 and gt.sum() == 0:
+        return np.nan, np.nan
+    # A false-positive-only or false-negative-only class has zero Dice. HD95 is
+    # undefined and excluded from the aggregate rather than reported as perfect.
+    return 0.0, np.nan
 
 
 def validation_final(val_loader):
@@ -505,8 +519,8 @@ model.load_state_dict(ckpt["model_state_dict"])
 
 per_class_dice, per_class_hd = validation_final(val_loader)
 
-mean_dice_per_class = per_class_dice.mean(axis=0)  # [n_classes-1]
-mean_hd_per_class   = per_class_hd.mean(axis=0)
+mean_dice_per_class = np.nanmean(per_class_dice, axis=0)  # [n_classes-1]
+mean_hd_per_class   = np.nanmean(per_class_hd, axis=0)
 
 BTCV13_NAMES = [
     "Aorta", "Gallbladder", "Spleen", "L.Kidney", "R.Kidney",
@@ -522,7 +536,7 @@ print("-" * 35)
 for name, d, h in zip(CLASS_NAMES, mean_dice_per_class, mean_hd_per_class):
     print(f"{name:>15}  {d:.4f}  {h:7.2f}")
 print("-" * 35)
-print(f"{'Mean':>15}  {mean_dice_per_class.mean():.4f}  {mean_hd_per_class.mean():7.2f}")
+print(f"{'Mean':>15}  {np.nanmean(mean_dice_per_class):.4f}  {np.nanmean(mean_hd_per_class):7.2f}")
 
 # Save CSV
 csv_path = os.path.join(root_dir, "per_class_results.csv")
@@ -531,7 +545,7 @@ with open(csv_path, "w", newline="") as f:
     writer_csv.writerow(["class", "mean_dice", "mean_hd95"])
     for name, d, h in zip(CLASS_NAMES, mean_dice_per_class, mean_hd_per_class):
         writer_csv.writerow([name, f"{d:.4f}", f"{h:.2f}"])
-    writer_csv.writerow(["Mean", f"{mean_dice_per_class.mean():.4f}",
-                          f"{mean_hd_per_class.mean():.2f}"])
+    writer_csv.writerow(["Mean", f"{np.nanmean(mean_dice_per_class):.4f}",
+                          f"{np.nanmean(mean_hd_per_class):.2f}"])
 print(f"Results saved to {csv_path}")
 writer.close()

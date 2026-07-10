@@ -54,8 +54,10 @@ class ROIRefineBlock(nn.Module):
     Voxels outside the mask are kept unchanged (zero residual update).
     """
 
-    def __init__(self, in_ch: int) -> None:
+    def __init__(self, in_ch: int, crop_margin: int = 2, tile_size: int = 8) -> None:
         super().__init__()
+        self.crop_margin = crop_margin
+        self.tile_size = tile_size
         self.conv = nn.Sequential(
             nn.Conv3d(in_ch, in_ch, kernel_size=3, padding=1, bias=False),
             nn.InstanceNorm3d(in_ch),
@@ -66,9 +68,48 @@ class ROIRefineBlock(nn.Module):
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, feat: torch.Tensor, roi_mask: torch.Tensor) -> torch.Tensor:
-        # roi_mask: [B, 1, D/2, H/2, W/2] float in {0, 1}
-        residual = self.conv(feat) * roi_mask
-        return self.relu(feat + residual)
+        """Refine contextual tiles that contain selected voxels.
+
+        Unlike dense convolution followed by masking, this executes the expensive
+        convolutions only on selected tiles. ``last_crop_fraction`` exposes the
+        actually processed spatial fraction for efficiency reporting.
+        """
+        outputs = []
+        processed, total = 0, 0
+        spatial_shape = feat.shape[-3:]
+        for b in range(feat.shape[0]):
+            mask = roi_mask[b, 0].bool()
+            total += mask.numel()
+            out = self.relu(feat[b:b + 1]).clone()
+            for z0 in range(0, spatial_shape[0], self.tile_size):
+                for y0 in range(0, spatial_shape[1], self.tile_size):
+                    for x0 in range(0, spatial_shape[2], self.tile_size):
+                        core_lo = (z0, y0, x0)
+                        core_hi = tuple(min(core_lo[i] + self.tile_size,
+                                            spatial_shape[i]) for i in range(3))
+                        core_slices = tuple(slice(core_lo[i], core_hi[i]) for i in range(3))
+                        if not mask[core_slices].any():
+                            continue
+                        crop_lo = tuple(max(0, core_lo[i] - self.crop_margin) for i in range(3))
+                        crop_hi = tuple(min(spatial_shape[i], core_hi[i] + self.crop_margin)
+                                        for i in range(3))
+                        crop_slices = tuple(slice(crop_lo[i], crop_hi[i]) for i in range(3))
+                        crop = feat[(slice(b, b + 1), slice(None), *crop_slices)]
+                        residual = self.conv(crop)
+                        local_core = tuple(slice(core_lo[i] - crop_lo[i],
+                                                 core_hi[i] - crop_lo[i]) for i in range(3))
+                        core_feat = crop[(slice(None), slice(None), *local_core)]
+                        core_residual = residual[(slice(None), slice(None), *local_core)]
+                        core_mask = roi_mask[(slice(b, b + 1), slice(None), *core_slices)]
+                        out[(slice(None), slice(None), *core_slices)] = self.relu(
+                            core_feat + core_residual * core_mask
+                        )
+                        processed += ((crop_hi[0] - crop_lo[0]) *
+                                      (crop_hi[1] - crop_lo[1]) *
+                                      (crop_hi[2] - crop_lo[2]))
+            outputs.append(out)
+        self.last_crop_fraction = processed / max(total, 1)
+        return torch.cat(outputs, dim=0)
 
 
 class AdaptiveRouter(nn.Module):
@@ -218,12 +259,27 @@ class AdaDec3D_UXNET(nn.Module):
         unc_stat = uncertainty.mean(dim=[1, 2, 3], keepdim=False).unsqueeze(-1)  # [B, 1]
         router_weights = self.router(global_feat, unc_stat)              # [B, n_experts]
 
-        expert_outs = torch.stack(
-            [expert(refined_feat) for expert in self.experts], dim=1
-        )  # [B, n_experts, C, D/2, H/2, W/2]
-
-        w = router_weights.view(B, self.n_experts, 1, 1, 1, 1)
-        final_pred = (w * expert_outs).sum(dim=1)                        # [B, C, D/2, H/2, W/2]
+        if self.training:
+            # Dense soft mixture keeps every expert trainable. Efficiency claims
+            # apply to eval/inference, where only the selected expert executes.
+            expert_outs = torch.stack(
+                [expert(refined_feat) for expert in self.experts], dim=1
+            )
+            w = router_weights.view(B, self.n_experts, 1, 1, 1, 1)
+            final_pred = (w * expert_outs).sum(dim=1)
+            expert_ids = router_weights.argmax(dim=1)
+        else:
+            expert_ids = router_weights.argmax(dim=1)
+            outputs = [None] * B
+            for expert_id, expert in enumerate(self.experts):
+                selected = (expert_ids == expert_id).nonzero(as_tuple=False).flatten()
+                if selected.numel() == 0:
+                    continue
+                expert_pred = expert(refined_feat.index_select(0, selected))
+                for local_idx, batch_idx in enumerate(selected.tolist()):
+                    outputs[batch_idx] = expert_pred[local_idx:local_idx + 1]
+            final_pred = torch.cat(outputs, dim=0)
+        self.last_expert_ids = expert_ids.detach()
         return final_pred, router_weights
 
     # ------------------------------------------------------------------
@@ -271,6 +327,13 @@ class AdaDec3D_UXNET(nn.Module):
                 extras["router_weights"] = router_weights
             if return_roi:
                 extras["roi_mask"] = roi_mask
+                extras["roi_crop_fraction"] = getattr(
+                    self.roi_refiner, "last_crop_fraction", 0.0
+                ) if self.use_roi else 0.0
+            if return_router:
+                extras["expert_ids"] = getattr(
+                    self, "last_expert_ids", router_weights.argmax(dim=1)
+                )
             return final_pred, extras
 
         return final_pred

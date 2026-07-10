@@ -23,6 +23,27 @@
 | E3 | +ROI only | `False` | `True` | Ablation: MoE disabled |
 | **E4** | **AdaDec3D** | `True` | `True` | Full method |
 
+### Step 4.1a: Mandatory causal controls
+
+E2–E4 alone cannot establish that adaptation, rather than added parameters or
+training time, causes improvement. Every final table must also include:
+
+| ID | Control | Purpose |
+|---|---|---|
+| C0 | E1 continued training | Matches E4's additional optimizer steps |
+| C1 | Static Expert-S/M/L | Tests fixed capacity at each executed cost |
+| C2 | Static decoder, parameter-matched | Controls for added parameters |
+| C3 | Static decoder, FLOP/latency-matched | Controls for added computation |
+| C4 | Random ROI, matched crop fraction | Tests whether localization matters |
+| C5 | Boundary ROI, matched crop fraction | Tests entropy beyond a simple boundary prior |
+| C6 | Dense refinement | Measures the accuracy ceiling without conditional savings |
+| C7 | Oracle positive-gain ROI | Analysis-only upper bound; never a deployable baseline |
+
+Use the same split, optimizer schedule, augmentations, checkpoint rule, and total
+data exposure. Run at least three matched seeds. Select hyperparameters on a
+development fold and report the locked configuration on a held-out fold or via
+nested cross-validation.
+
 ### Step 4.2: Stage 1 — train new modules, backbone frozen
 
 Requires E1's `best_metric_model.pth`. Freezes
@@ -125,7 +146,7 @@ python main_train_adadec3d.py \
 | `L_coarse` | 0.5 | Auxiliary DiceCE on coarse decoder output — prevents backbone degradation |
 | `L_uncertainty` | 0.1 | Calibration: high-entropy voxels should correlate with actual errors |
 | `L_resource` | 0.05 | Pushes router toward lighter experts when accuracy allows |
-| `L_router` | 0.1 | Load balancing: prevents all samples collapsing to one expert |
+| `L_router` | 0.1 | Expected-cost constraint: penalizes exceeding a declared normalized expert budget without forcing uniform use |
 
 All weights adjustable via `--lambda_uncertainty`, `--lambda_resource`, `--lambda_router`, `--lambda_coarse`.
 
@@ -137,9 +158,9 @@ All weights adjustable via `--lambda_uncertainty`, `--lambda_resource`, `--lambd
 ```
 
 Watch for:
-- `Loss/router` should decrease and stabilise — experts are being used
+- `Loss/router` should decrease and stabilise — expected cost stays at or below the declared budget
 - `Loss/unc` should decrease — uncertainty is calibrating
-- If `Loss/router` stays high → increase `--lambda_router`
+- If expected cost misses its target → tune `--lambda_router`; do not force uniform expert use
 - If `Loss/seg` stalls with low `Loss/resource` → reduce `--lambda_resource`
 
 ---
@@ -167,6 +188,13 @@ for name, d, h in zip(BTCV_CLASS_NAMES, per_class_dice, per_class_hd95):
 ```
 
 ### 5.2 Efficiency metrics
+
+`ptflops` reports the dense static graph and is retained only as a reproducible
+upper bound. The primary efficiency results are hard-routing inference latency,
+selected expert, ROI crop fraction, and executed expert/ROI MACs per subject.
+Report mean, median, and 95th percentile on the same GPU after warm-up, including
+sliding-window inference, routing, crop extraction, and scatter/fusion overhead.
+Do not label MACs as FLOPs; state the convention explicitly.
 
 ```python
 from ptflops import get_model_complexity_info
@@ -256,6 +284,10 @@ for name, vals in coverage_stats.items():
 
 **Target**: Coverage > 80% for all small organs.
 
+Also report complete-organ miss rate and the fraction of positive decoder
+transitions outside the ROI. High coverage among detected organs can hide the
+most important failure mode: a confidently missed small organ receives no ROI.
+
 #### C: Uncertainty–error calibration
 
 ```python
@@ -281,6 +313,12 @@ print(f"Uncertainty-Error Pearson r = {r:.3f}, p-value = {p:.4f}")
 ```
 
 **Target**: r > 0.60.
+
+This correlation is secondary. The primary routing metric is prediction of
+counterfactual net decoder benefit, evaluated with risk–coverage curves and
+AUROC/AUPRC against positive net-benefit regions. Report ECE and Brier score for
+calibration, and compare entropy with random, boundary, foreground, confidence,
+and organ-size signals at identical selection budgets.
 
 ### 5.4 Final result table format
 

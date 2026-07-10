@@ -30,7 +30,8 @@ Despite its impressive efficiency, EffiDec3D follows a fundamentally static comp
 * every anatomical structure uses identical decoder capacity,
 * every patient is processed using the same decoding strategy.
 
-This proposal argues that such uniform computation is inherently suboptimal.
+This proposal tests whether uniform computation is suboptimal; it does not assume
+that concentrated errors necessarily require additional decoder capacity.
 
 Instead of immediately proposing a new decoder architecture, we first investigate a more fundamental scientific question:
 
@@ -54,11 +55,53 @@ This project is structured as two sequential publications that build on each oth
 | **Contribution** | Empirical analysis (O1–O11) | Adaptive decoder architecture |
 | **Target venue** | MIDL / MLMI / ISBI | MICCAI 2026 / TMI |
 | **Prerequisite** | E0 + E1 baselines | Paper A accepted |
-| **Key finding** | Top 20% uncertain voxels → 80% of gain | DICE ≥ EffiDec3D + 0.3% at same FLOPs |
+| **Key test** | Measure how decoder benefit varies by organ/region and selection budget | DICE ≥ EffiDec3D + 0.3% at matched executed compute |
 
-**Paper A is self-contained** and can be submitted before any AdaDec3D implementation is complete. Its headline claim:
+**Paper A is self-contained** and can be completed before any AdaDec3D
+implementation. Its pre-experiment hypothesis is:
 
-> *The top 20% of uncertain voxels account for >80% of the performance gain from additional decoder capacity, suggesting that selective allocation can recover most of the full-decoder benefit at a fraction of the compute.*
+> *The marginal benefit of additional decoder capacity is heterogeneous across
+> anatomical structures and spatial regions, and a lightweight difficulty signal
+> can identify regions that benefit most.*
+
+The selected fraction and recovered benefit (for example, a possible 20/80
+pattern) are outcomes to measure, not acceptance criteria chosen in advance.
+
+## 0.6 Scope and causal safeguards
+
+This project distinguishes four claims that must not be collapsed into one:
+
+1. **Heterogeneity** — full-decoder improvements are concentrated by subject,
+   organ, or region.
+2. **Predictability** — a test-time signal predicts *counterfactual decoder
+   benefit*, not merely segmentation error.
+3. **Realizability** — a conditional decoder recovers the oracle opportunity.
+4. **Efficiency** — conditional execution reduces measured end-to-end cost.
+
+Paper A tests only Claims 1–2. A post-hoc hybrid prediction is an oracle
+opportunity analysis, not evidence of FLOP savings. Paper B must establish
+Claims 3–4 with executed-operation and latency measurements.
+
+The primary Paper A comparison freezes or shares an encoder and varies decoder
+capacity wherever practical. End-to-end matched models are retained as a
+secondary ecological comparison. This prevents encoder representation changes
+from being misattributed to decoder capacity.
+
+The routing target is marginal decoder utility,
+
+[
+\Delta L(v)=L_{Effi}(v)-L_{Full}(v),
+]
+
+not uncertainty alone. Entropy is adopted only if it predicts held-out net
+benefit better than matched random, boundary, foreground, organ-size, and
+confidence baselines. Confidently wrong voxels and completely missed organs are
+reported explicitly because an uncertainty-only proposal may never refine them.
+
+The practical method is **region-adaptive**, not independent voxel routing.
+Selected voxels activate contextual 3D tiles; refinement and hard expert dispatch
+execute only on selected tiles/experts. All efficiency claims use actual executed
+MACs, crop fractions, end-to-end latency, and memory, including routing overhead.
 
 **Paper B builds on Paper A** by proposing AdaDec3D as the practical realization of this observation. The acceptance of Paper A provides both motivation and reviewer confidence for the AdaDec3D design choices.
 
@@ -841,27 +884,36 @@ Backbone consistency strengthens the architectural generality claim in Paper A a
 
 # Observation O9
 
-## Pareto Analysis — Headline Finding for Paper A
+## Selective-Allocation Opportunity — Headline Analysis for Paper A
 
 ### Research Question
 
-What fraction of voxels account for the majority of decoder gain?
+At fixed region budgets, how much positive decoder transition can a deployable
+signal recover beyond random and boundary controls?
 
 ### Motivation
 
-A Pareto distribution of gain (top 20% of uncertain voxels → 80% of gain) is the quantitative foundation for selective decoder allocation. This is the headline number that justifies AdaDec3D's design philosophy.
+A concentration curve of held-out *net* decoder benefit is used to measure the
+opportunity for selective allocation. No 20/80 pattern is assumed, and positive
+transitions are reported alongside decoder regressions. This analysis motivates
+AdaDec3D only if a deployable signal outperforms matched random and boundary
+controls.
 
 ### Method
 
-Sort all validation voxels by entropy (descending). Plot cumulative decoder gain as a function of voxel percentile (Lorenz-style curve). Identify the minimal voxel percentage covering 80% of total gain.
+Compute subject-wise recovery curves at locked 5/10/20/30/50% union-foreground
+budgets. Compare entropy, confidence, boundary, foreground, organ-size, repeated
+random selection, and an analysis-only oracle. Bootstrap subjects for confidence
+intervals and report negative transitions separately.
 
 ### Expected Finding
 
-The top ~20% of uncertain voxels account for ~80% of total decoder gain.
+No numerical finding is assumed before evaluation.
 
 ### Go Criterion for Paper A
 
-Top ≤ 30% of uncertain voxels cover ≥ 80% of total decoder gain.
+A deployable signal outperforms matched random and boundary selection at 10–30%
+budgets with a subject-level confidence interval.
 
 ### Role
 
@@ -909,7 +961,7 @@ The eleven observations collectively answer six scientific questions.
 | O6 | Is difficulty persistent? | High-entropy voxels stabilize at boundaries by epoch 30 | A |
 | O7 | Does this generalize across datasets? | Replicated on FeTA (MRI), confirming modality-agnostic finding | A |
 | O8 | Does this generalize across backbones? | Replicated with SwinUNETR, confirming backbone-agnostic signal | A |
-| O9 | How concentrated is the gain? (headline) | Top 20% uncertain voxels → 80% of decoder gain | A |
+| O9 | Is gain predictably concentrated? (headline analysis) | Report held-out budget–recovery curves against controls | A |
 | O10 | Is difficulty just a size proxy? | No — entropy captures difficulty beyond organ size | A |
 | O11 | Which routing signal is best? | Entropy: best correlation, lowest overhead | B |
 
@@ -917,7 +969,8 @@ If O1–O9 are experimentally validated,
 
 they collectively support the central hypothesis:
 
-> **Decoder redundancy is spatially heterogeneous, and decoder computation should therefore be allocated adaptively rather than uniformly.**
+> **Hypothesis: the marginal utility of decoder capacity is spatially
+> heterogeneous and predictable enough to support region-adaptive allocation.**
 
 Only after validating this hypothesis do we proceed to design the proposed AdaDec3D framework.
 # 5. Scientific Insight
@@ -991,7 +1044,8 @@ Only a relatively small subset of voxels exhibits
 
 Decoder gain is also spatially heterogeneous.
 
-Increasing decoder capacity does not uniformly improve segmentation quality.
+We test whether increasing decoder capacity improves segmentation quality
+non-uniformly after controlling encoder features and optimization exposure.
 
 Instead,
 
@@ -1113,7 +1167,8 @@ while providing minimal improvement for easy voxels.
 
 Therefore,
 
-uniform decoder computation is computationally inefficient.
+uniform decoder computation may be inefficient; this requires measured executed
+cost and latency evidence from a realizable conditional implementation.
 
 ---
 
@@ -1260,7 +1315,8 @@ Unlike existing efficient segmentation methods that optimize decoder architectur
 
 The proposed framework is built upon one central idea:
 
-> **Different voxels should receive different decoder capacity according to their predicted segmentation difficulty.**
+> **Contextual regions should receive additional decoder capacity only when a
+> held-out signal predicts positive marginal decoder utility.**
 
 Rather than treating every voxel equally,
 
@@ -1367,7 +1423,8 @@ The proposed framework consists of three sequential stages.
 
 Purpose
 
-Estimate the segmentation difficulty of every voxel before allocating decoder computation.
+Estimate region-level marginal decoder utility from coarse predictions and
+intermediate features before allocating additional computation.
 
 Input
 
@@ -1809,9 +1866,11 @@ Duration: 25,000 iterations
 |--------------|--------|
 | Full 3DUXNET (E0) | 632 |
 | EffiDec3D (E1) | 51.47 |
-| AdaDec3D — 80% easy (Expert-S) + 20% hard (Expert-L) | ~60–80 (estimated) |
+| AdaDec3D | To be measured from hard expert choices and activated ROI tiles |
 
-Actual cost depends on routing distribution discovered during training. O5 (Decoder Gain Analysis) will reveal what proportion truly requires Expert-L.
+Actual cost depends on hard expert choices, activated contextual tiles, and their
+runtime overhead. Report executed MACs and end-to-end latency distributions; do
+not infer efficiency from a soft routing distribution.
 
 # 7. Training Strategy and Experimental Plan
 

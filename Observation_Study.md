@@ -17,11 +17,14 @@ This observation study is designed to support **two sequential publications**:
 | **Paper A** | Empirical analysis (O1–O11): where does decoder computation matter in 3D medical segmentation? | MIDL / MLMI / ISBI | O1–O5 pass Go criteria |
 | **Paper B** | AdaDec3D method: adaptive decoder via difficulty-aware routing and ROI refinement | MICCAI / TMI | Paper A accepted |
 
-**Paper A is self-contained.** Its headline claim is:
+**Paper A is self-contained.** Its hypothesis is:
 
-> *In efficient 3D medical image segmentation, decoder redundancy is spatially heterogeneous: the top 20% of uncertain voxels account for >80% of the performance gain from additional decoder capacity.*
+> *The marginal benefit of additional decoder capacity is heterogeneous across
+> anatomical structures and spatial regions, and may be predictable from a
+> lightweight difficulty signal.*
 
-This is validated by O9 (Pareto Analysis) and supported by O1–O5.
+O1–O5 and O9 test this hypothesis. The paper must report the observed selection
+budget and recovered gain rather than assuming a 20/80 result in advance.
 
 **Paper B builds on Paper A.** AdaDec3D is motivated by the finding that uniform decoder computation is wasteful, and is designed to allocate capacity only where O9 shows it is needed.
 
@@ -46,7 +49,7 @@ This study therefore answers the following scientific question.
 # Overall Workflow
 
 ```text
-Reproduce EffiDec3D (E0) + Full Decoder (E1)
+Reproduce Full Decoder (E0) + EffiDec3D (E1), using matched training budgets
                 │
                 ▼
       Save Predictions + Checkpoints
@@ -376,17 +379,17 @@ Where does a stronger decoder actually help?
 
 This experiment is the **critical Go/No-Go gate**.
 
-It validates the necessity of adaptive decoder computation by comparing
+It tests the opportunity for adaptive decoder computation by comparing
 
-EffiDec3D (E0) against a full-capacity decoder (E1).
+EffiDec3D (E1) against a full-capacity decoder (E0).
 
 ---
 
 ## Input
 
-E0 predictions (EffiDec3D)
+E0 predictions (Full decoder)
 
-E1 predictions (Full decoder)
+E1 predictions (EffiDec3D)
 
 Ground Truth
 
@@ -400,8 +403,10 @@ Difficulty maps from O2
 import torch
 from scipy.stats import pearsonr
 
-# per-voxel gain: E1 correct where E0 was wrong
-gain = ((pred_full == lbl) & (pred_effi != lbl)).float()
+# Report both directions. Net benefit is positive transitions minus regressions.
+positive = ((pred_full == lbl) & (pred_effi != lbl)).float()
+negative = ((pred_full != lbl) & (pred_effi == lbl)).float()
+gain = positive - negative
 
 # bin by entropy quantile
 n_bins = 10
@@ -422,7 +427,11 @@ print(f"{'GO  ✓' if r > 0.50 else 'NO-GO ✗'}: Pearson r={r:.3f}  p={p:.4f}")
 
 ## Go Criterion
 
-Pearson r > 0.50 between entropy quantile and decoder gain rate.
+Report positive transitions, negative transitions, and net benefit separately by
+subject, organ, and physical-distance boundary band. Proceed only when a
+deployable signal predicts held-out net benefit better than matched random and
+boundary controls with a subject-bootstrap 95% confidence interval. Correlation
+over pooled voxels or bins is descriptive, not a significance test.
 
 ---
 
@@ -618,21 +627,21 @@ Backbone consistency strengthens the claim that the finding is architectural rat
 
 ---
 
-# O9 Pareto Analysis
+# O9 Selective-Allocation Opportunity
 
 ## Research Question
 
-What fraction of voxels account for the majority of decoder gain?
+At fixed selection budgets, how much positive decoder transition can each
+test-time signal recover, and does it outperform matched random selection?
 
 ---
 
 ## Motivation
 
-This is the **headline finding for Paper A**.
-
-If the top 20% of uncertain voxels capture ≥80% of total decoder gain (a Pareto distribution),
-
-it directly justifies selective computation: allocating full decoder capacity only to those voxels.
+This is an opportunity analysis, not a demonstration of computational savings.
+Full-decoder predictions may depend on dense surrounding computation. Paper B
+must separately demonstrate that contextual region refinement realizes this
+opportunity with lower executed cost.
 
 ---
 
@@ -641,49 +650,41 @@ it directly justifies selective computation: allocating full decoder capacity on
 ```python
 import numpy as np
 
-# flatten over all validation volumes
-all_entropy = entropy_map.flatten().numpy()
-all_gain    = gain.flatten().numpy()
-
-# sort by entropy descending
-sort_idx = np.argsort(all_entropy)[::-1]
-sorted_gain = all_gain[sort_idx]
-
-cumulative_gain = np.cumsum(sorted_gain) / sorted_gain.sum()
-n = len(sorted_gain)
-x_pct = np.arange(1, n + 1) / n * 100   # voxel percentile (high-ent first)
-
-# find what % of voxels cover 80% of gain
-idx_80 = np.searchsorted(cumulative_gain, 0.80)
-voxel_pct_for_80pct_gain = (idx_80 + 1) / n * 100
-print(f"Top {voxel_pct_for_80pct_gain:.1f}% uncertain voxels → 80% of decoder gain")
+# Canonical executable implementation: Experiment-Design-Observation.md O9.
+# Compute recovery per subject at 5/10/20/30/50% union-foreground budgets.
+# Compare entropy, confidence, boundary, foreground, organ-size, 100 random
+# selections, and an analysis-only oracle positive-transition ranking.
+# Bootstrap subjects for 95% confidence intervals; never pool all scan voxels.
 ```
 
 ---
 
 ## Go Criterion for Paper A
 
-Top ≤ 30% of uncertain voxels cover ≥ 80% of total decoder gain.
+Entropy or another deployable signal must outperform matched random selection at
+10–30% budgets with a subject-bootstrap 95% confidence interval. The observed
+budget/recovery pair is reported without imposing a 20/80 threshold.
 
 ---
 
 ## Figure
 
-Cumulative decoder gain vs uncertainty percentile (Lorenz-style curve)
-
-Annotate the point where cumulative gain = 80%
+Recovered positive transitions versus selection budget, with random confidence
+band and boundary/oracle reference curves.
 
 ---
 
 ## Expected
 
-Top ~20% uncertain voxels → ~80% of decoder gain.
+No numerical result is assumed before the experiment.
 
 ---
 
 ## Paper A Headline
 
-> *The top 20% of uncertain voxels account for 80% of the performance gain from additional decoder capacity, suggesting that selective decoder allocation can recover most of the full-decoder benefit at a fraction of the compute.*
+> *The marginal utility of decoder capacity is spatially heterogeneous, and a
+> lightweight held-out signal identifies beneficial regions better than matched
+> random and anatomical heuristics.*
 
 ---
 
@@ -806,9 +807,9 @@ Expected winner: Entropy (highest correlation, near-zero overhead).
 | Observation | Criterion | Status |
 | ----------- | --------- | ------ |
 | O3 | Pearson r(difficulty, error) > 0.40 | ☐ |
-| O5 | Pearson r(entropy quantile, gain) > 0.50 | ☐ |
-| O9 | Top ≤30% uncertain voxels → ≥80% gain | ☐ |
-| O2 | Difficult voxels ≤ 30% of total volume | ☐ |
+| O5 | Held-out signal predicts net benefit beyond random/boundary controls | ☐ |
+| O9 | Deployable ranking beats random at 10–30% budgets with subject-level CI | ☐ |
+| O2 | Report observed difficulty concentration without a preset cutoff | ☐ |
 
 **All four must pass** to proceed to Paper A write-up.
 
@@ -874,8 +875,9 @@ If all observations are validated,
 this study supports the following conclusion.
 
 > Decoder redundancy in efficient 3D medical image segmentation is **spatially heterogeneous**.
-> The top 20% of uncertain voxels account for the majority of the performance gap between
-> an efficient decoder and a full-capacity decoder.
+> A held-out lightweight signal identifies regions with positive marginal decoder
+> utility better than matched random and anatomical controls, while explicitly
+> accounting for decoder regressions and confidently missed structures.
 > This heterogeneity is consistent across datasets (BTCV, FeTA) and backbone architectures (UXNET, SwinUNETR).
 
 This conclusion is the core contribution of **Paper A** and directly motivates the AdaDec3D framework in **Paper B**.

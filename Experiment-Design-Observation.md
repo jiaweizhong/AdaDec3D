@@ -17,12 +17,17 @@
 ```
 EffiDec3D (3.16M params, 51.47 GFLOPs):
   ~1-2 sec per iter (4 patches of 96^3)
-  45000 iter × 1.5s ≈ 18-20 hours → 2-3 Kaggle sessions
+  20000 iter × 1.5s ≈ 8-10 hours for the matched pilot
 
 Full 3DUXNET (53M params, 632 GFLOPs):
   ~5-8 sec per iter
-  20000 iter × 6s ≈ 33 hours → 4 sessions (use max_iter=20000 for upper-bound baseline)
+  20000 iter × 6s ≈ 33 hours → 4 sessions
 ```
+
+The pilot uses exactly 20,000 optimizer steps for both models. Comparing a
+20,000-step full decoder against a 45,000-step EffiDec3D model would confound
+decoder capacity with training exposure. A confirmatory run may extend both
+models to 45,000 steps.
 
 The training script saves `last_model.pth` after every eval step and auto-resumes — download it before each 9-hour session ends, re-upload as a dataset for the next session.
 
@@ -130,6 +135,17 @@ TRAIN = ["0001","0002","0003","0004","0005","0006","0007","0008",
 VAL   = ["0029","0030","0031","0032","0033","0034","0035","0036",
          "0037","0038","0039","0040"]
 ```
+
+This fixed split is suitable for an exploratory reproduction only. Do not tune
+thresholds, select checkpoints, formulate the headline, and report final evidence
+on the same 12 cases. For confirmatory results, use repeated/nested subject-level
+cross-validation or reserve a held-out test fold before examining O1–O11. All
+confidence intervals resample subjects, never individual voxels.
+
+For the causal decoder test, add a shared-encoder condition: initialize both
+models from the same encoder checkpoint, freeze the encoder, and train only the
+full and compressed decoders with identical schedules. The ordinary end-to-end
+comparison remains secondary because decoder changes can alter encoder features.
 
 #### BTCV13 label mapping
 
@@ -270,8 +286,8 @@ python main_train_BTCV_TU.py \
   --crop_sample 4 \
   --lr 0.001 \
   --optim AdamW \
-  --max_iter 45000 \
-  --eval_step 250 \
+  --max_iter 20000 \
+  --eval_step 500 \
   --val_batch 1 \
   --gpu 0 \
   --cache_rate 0.5 \
@@ -331,6 +347,10 @@ These milestone checkpoints are required for O6 (Difficulty Evolution Analysis).
 
 ### Step 3.6: Train on FeTA (for O7)
 
+O7 requires a matched full-decoder FeTA run as well as the EffiDec3D run below.
+Use the same steps, seeds, optimizer, preprocessing, and checkpoint rule for both;
+otherwise this tests only EffiDec3D uncertainty, not marginal decoder utility.
+
 ```bash
 python main_train_BTCV_TU.py \
   --root /kaggle/input/feta-processed \
@@ -345,6 +365,10 @@ python main_train_BTCV_TU.py \
 ```
 
 ### Step 3.7: Train SwinUNETR_EffiDec3D (for O8)
+
+O8 likewise requires the corresponding full SwinUNETR decoder trained with the
+same budget. A single compressed model cannot establish backbone consistency of
+the full-versus-efficient decoder effect.
 
 ```bash
 python main_train_BTCV_TU.py \
@@ -411,10 +435,17 @@ BTCV_CLASS_NAMES = [
     "Pancreas","R.Adrenal","L.Adrenal","Duodenum"
 ]
 
-args = argparse.Namespace(root="/kaggle/input/btcv-synapse", dataset="BTCV13", mode="val")
-_, val_files, n_cls = data_loader(args)
-val_transform = data_transforms(args)
+args = argparse.Namespace(
+    root="/kaggle/input/btcv-synapse", dataset="BTCV13",
+    mode="validation", crop_sample=4, img_size=[96, 96, 96]
+)
+_, val_samples, n_cls = data_loader(args)
+_, val_transform = data_transforms(args)
 from monai.data import DataLoader, Dataset
+val_files = [
+    {"image": image, "label": label}
+    for image, label in zip(val_samples["images"], val_samples["labels"])
+]
 val_ds = Dataset(data=val_files, transform=val_transform)
 val_loader = DataLoader(val_ds, batch_size=1, shuffle=False, num_workers=2)
 ```
@@ -572,13 +603,13 @@ for name in BTCV_CLASS_NAMES:
 
 ### O5: Decoder Gain Analysis (Critical Go/No-Go)
 
-**Question**: Do difficult voxels (high entropy) benefit more from the full decoder (E0)?
+**Question**: Do difficult voxels receive greater *net* benefit from the full decoder (E0)?
 
 ```python
 full_model  = load_model("3DUXNET",           "/kaggle/input/e0-ckpt/best_metric_model.pth")
 effi_model  = load_model("3DUXNET_EffiDec3D", "/kaggle/input/e1-ckpt/best_metric_model.pth")
 
-bin_entropy, bin_gain = [], []
+bin_entropy, bin_positive, bin_negative, bin_net = [], [], [], []
 
 with torch.no_grad():
     for batch in val_loader:
@@ -594,7 +625,9 @@ with torch.no_grad():
         entropy = -(prob_effi * torch.log(prob_effi + 1e-8)).sum(1).squeeze()
 
         lbl_sq = lbl.squeeze()
-        gain = ((pred_full == lbl_sq) & (pred_effi != lbl_sq)).float()
+        positive = ((pred_full == lbl_sq) & (pred_effi != lbl_sq)).float()
+        negative = ((pred_full != lbl_sq) & (pred_effi == lbl_sq)).float()
+        net_gain = positive - negative
 
         n_bins = 20
         for b in range(n_bins):
@@ -603,28 +636,41 @@ with torch.no_grad():
             mask = (entropy >= q_lo) & (entropy < q_hi)
             if mask.sum() > 100:
                 bin_entropy.append(entropy[mask].mean().item())
-                bin_gain.append(gain[mask].mean().item())
+                bin_positive.append(positive[mask].mean().item())
+                bin_negative.append(negative[mask].mean().item())
+                bin_net.append(net_gain[mask].mean().item())
 
 from scipy.stats import pearsonr
-pairs = sorted(zip(bin_entropy, bin_gain))
+pairs = sorted(zip(bin_entropy, bin_net))
 x, y = zip(*pairs)
 r, p = pearsonr(x, y)
-print(f"Gain-Entropy Pearson r = {r:.3f}  (p={p:.4f})")
-print(f"\n{'GO ✓' if r > 0.50 else 'NO-GO ✗'}: threshold r > 0.50")
+print(f"Net-gain/entropy Pearson r = {r:.3f} (descriptive; bins are correlated)")
+print(f"Positive transition rate = {np.mean(bin_positive):.5f}")
+print(f"Negative transition rate = {np.mean(bin_negative):.5f}")
+print(f"Net transition rate      = {np.mean(bin_net):.5f}")
 ```
 
-**Target**: Gain curve slopes upward — high-entropy voxels get 5-10× more benefit from the full decoder.
+**Target**: Net gain slopes upward with entropy. Always report positive and
+negative transitions separately; positive transitions alone overstate benefit.
 
 ---
 
-### O9: Pareto Analysis (Paper A Headline Finding)
+### O9: Selective-computation opportunity analysis
 
-**Question**: What fraction of voxels account for ≥80% of decoder gain?
+**Question**: At fixed selection budgets, does entropy recover more positive
+decoder transitions than a matched random selection?
+
+Treat the curve below as an exploratory ranking diagnostic, not proof of FLOP
+savings. Run it per subject and report the mean with a subject-bootstrap 95% CI.
+For budgets of 5%, 10%, 20%, 30%, and 50%, compare entropy against 100 random
+selections, a foreground mask, and a fixed-width organ-boundary mask. Keep the
+oracle positive-transition ranking only as an unattainable upper bound. Do not
+pool scans before inference: large volumes would dominate the result.
 
 ```python
 import numpy as np
 
-all_entropy, all_gain = [], []
+case_entropy, case_positive = [], []
 
 with torch.no_grad():
     for batch in val_loader:
@@ -640,32 +686,44 @@ with torch.no_grad():
         entropy = -(prob_effi * torch.log(prob_effi + 1e-8)).sum(1).squeeze()
 
         lbl_sq = lbl.squeeze()
-        gain = ((pred_full == lbl_sq) & (pred_effi != lbl_sq)).float()
+        positive = ((pred_full == lbl_sq) & (pred_effi != lbl_sq)).float()
+        # Restrict the budget denominator to the union of foreground predictions
+        # and labels. Otherwise easy distant background dominates every budget.
+        body = (lbl_sq > 0) | (pred_full > 0) | (pred_effi > 0)
+        case_entropy.append(entropy[body].numpy())
+        case_positive.append(positive[body].numpy())
 
-        all_entropy.append(entropy.flatten().numpy()[::5])  # subsample
-        all_gain.append(gain.flatten().numpy()[::5])
+budgets = np.array([5, 10, 20, 30, 50])
+rng = np.random.default_rng(0)
+entropy_recovery, random_recovery = [], []
+for entropy, positive in zip(case_entropy, case_positive):
+    total = positive.sum()
+    if total == 0:
+        continue
+    order = np.argsort(entropy)[::-1]
+    entropy_recovery.append([
+        positive[order[:max(1, int(len(order) * q / 100))]].sum() / total
+        for q in budgets
+    ])
+    random_recovery.append(np.mean([
+        [positive[rng.choice(len(positive), max(1, int(len(positive) * q / 100)),
+                             replace=False)].sum() / total for q in budgets]
+        for _ in range(100)
+    ], axis=0))
 
-all_entropy = np.concatenate(all_entropy)
-all_gain    = np.concatenate(all_gain)
-
-# Sort by entropy descending (high uncertainty first)
-sort_idx = np.argsort(all_entropy)[::-1]
-sorted_gain = all_gain[sort_idx]
-cumulative_gain = np.cumsum(sorted_gain) / sorted_gain.sum()
-x_pct = np.arange(1, len(sorted_gain) + 1) / len(sorted_gain) * 100
-
-idx_80 = np.searchsorted(cumulative_gain, 0.80)
-voxel_pct = (idx_80 + 1) / len(sorted_gain) * 100
-print(f"Top {voxel_pct:.1f}% uncertain voxels → 80% of decoder gain")
-print(f"\n{'GO ✓' if voxel_pct <= 30 else 'NO-GO ✗'}: threshold ≤30%")
+entropy_recovery = np.asarray(entropy_recovery)
+random_recovery = np.asarray(random_recovery)
+mean_entropy = entropy_recovery.mean(0)
+mean_random = random_recovery.mean(0)
+print("Entropy recovery:", dict(zip(budgets, mean_entropy)))
+print("Random recovery: ", dict(zip(budgets, mean_random)))
 
 plt.figure(figsize=(7, 5))
-plt.plot(x_pct, cumulative_gain * 100)
-plt.axhline(80, color="red", linestyle="--", label="80% gain threshold")
-plt.axvline(voxel_pct, color="orange", linestyle="--", label=f"Top {voxel_pct:.0f}%")
-plt.xlabel("Voxel Percentile (high uncertainty first)")
-plt.ylabel("Cumulative Decoder Gain (%)")
-plt.title("O9: Pareto Curve — Decoder Gain vs Uncertainty")
+plt.plot(budgets, mean_entropy * 100, marker="o", label="Entropy")
+plt.plot(budgets, mean_random * 100, marker="o", label="Random (100 repeats)")
+plt.xlabel("Selected union-foreground voxels (%)")
+plt.ylabel("Positive decoder transitions recovered (%)")
+plt.title("O9: Selective-computation opportunity")
 plt.legend()
 plt.savefig("/kaggle/working/obs/O9_pareto_curve.png", dpi=150)
 plt.show()
@@ -689,16 +747,18 @@ These require additional checkpoints or datasets — refer to [Observation_Study
 
 ### Observation Study Go/No-Go
 
-#### Minimum criteria for Paper A submission
+#### Minimum criteria for a confirmatory study
 
 | Check | Criterion | Result | Decision |
 |-------|-----------|--------|----------|
 | O3 | Entropy–Error Pearson r > 0.60 | | |
-| O5 | Gain–Entropy Pearson r > 0.50 | | |
-| O9 | Top ≤30% uncertain voxels → ≥80% gain | | |
-| O2 | High-uncertainty voxels < 15% of total volume | | |
+| O5 | Net benefit differs across organs/regions with a subject-level 95% CI | | |
+| O9 | Entropy beats matched random selection at 10–30% budgets | | |
+| O2 | Uncertainty is concentrated; report observed fraction without a preset cutoff | | |
 
-**If all 4 pass** → proceed to Paper A write-up.
+**If all 4 pass** → preregister/lock the confirmatory protocol, then run the
+held-out evaluation. A particular “20% recovers 80%” result is an observation,
+not a required threshold.
 
 #### Additional criteria for Paper B (AdaDec3D)
 
@@ -723,7 +783,7 @@ Week 1: Setup + data
 
 Week 2-3: Baseline reproduction
   [ ] E0: Full 3DUXNET (max_iter=20000, ~2 sessions)
-  [ ] E1: EffiDec3D on BTCV (max_iter=45000, ~3 sessions)
+  [ ] E1: EffiDec3D on BTCV (max_iter=20000, matched to E0)
   [ ] Confirm: GFLOPs=51.47, Params=3.16M, mean DICE 79.0-79.5%
 
 Week 4: Observation study O1-O5 (critical gate)
@@ -731,8 +791,8 @@ Week 4: Observation study O1-O5 (critical gate)
   [ ] O2: Entropy histogram — confirm high-unc voxels < 15% of volume
   [ ] O3: Entropy-error Pearson r > 0.60
   [ ] O4: Per-organ table — Pancreas/Adrenal rank top-3 in entropy
-  [ ] O5: Decoder gain r > 0.50
-  [ ] O9: Pareto analysis — top ≤30% voxels → ≥80% gain
+  [ ] O5: positive, negative, and net transitions by organ and boundary/interior
+  [ ] O9: entropy vs random/boundary selection at matched budgets
   [ ] --- PAPER A GO / NO-GO DECISION ---
 
 Week 5-6: Extended observations for Paper A

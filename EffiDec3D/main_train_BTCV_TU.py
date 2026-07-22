@@ -46,6 +46,7 @@ from ptflops import get_model_complexity_info
 
 import csv
 import os
+import time
 import numpy as np
 import scipy.ndimage as ndimage
 from medpy import metric
@@ -422,6 +423,10 @@ macs, params = get_model_complexity_info(model, (args.n_channels, args.img_size[
                                            print_per_layer_stat=True, verbose=True)
 print('{:<30}  {:<8}'.format('Computational complexity: ', macs))
 print('{:<30}  {:<8}'.format('Number of parameters: ', params))
+macs_gmac, params_m = get_model_complexity_info(model, (args.n_channels, args.img_size[0], args.img_size[1], args.img_size[2]),
+                                                 as_strings=False, print_per_layer_stat=False, verbose=False)
+macs_gmac = macs_gmac / 1e9
+params_m  = params_m  / 1e6
 #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 #if torch.cuda.device_count() > 1:
 #    print("Let's use", torch.cuda.device_count(), "GPUs!")
@@ -626,13 +631,39 @@ metric_values = []
 #args.overlap_mode = 'gaussian'
 
 if args.mode == 'train':
+    torch.cuda.reset_peak_memory_stats()
+    train_start_time = time.time()
     while global_step < max_iterations:
         global_step, dice_val_best, global_step_best = train(
             global_step, train_loader, dice_val_best, global_step_best
         )
+    train_time_sec = time.time() - train_start_time
+    peak_train_mem_mb = torch.cuda.max_memory_allocated() / 1024**2
+else:
+    train_time_sec = 0.0
+    peak_train_mem_mb = 0.0
 
 model.load_state_dict(torch.load(os.path.join(root_dir, "best_metric_model.pth")))
 model.eval()
+
+# Inference latency + peak memory (50 warm-up + 50 measured, single patch)
+_dummy = torch.zeros(1, args.n_channels, *args.img_size, device=device)
+with torch.no_grad():
+    for _ in range(10):
+        model(_dummy)
+torch.cuda.synchronize()
+torch.cuda.reset_peak_memory_stats()
+_lat = []
+with torch.no_grad():
+    for _ in range(50):
+        torch.cuda.synchronize(); _t = time.perf_counter()
+        model(_dummy)
+        torch.cuda.synchronize()
+        _lat.append(time.perf_counter() - _t)
+infer_lat_ms     = float(np.mean(_lat)) * 1000
+infer_lat_p95_ms = float(np.percentile(_lat, 95)) * 1000
+peak_infer_mem_mb = torch.cuda.max_memory_allocated() / 1024**2
+del _dummy, _lat
 
 epoch_iterator_val = tqdm(
     val_loader, desc="Validate (X / X Steps) (dice=X.X)", dynamic_ncols=True
@@ -904,48 +935,41 @@ def validation_save(epoch_iterator_val):
 
 # Define class labels dictionary
 
-def save_metrics_to_csv(trained_weights, dataset_name, network_name, overlap, overlap_mode, class_labels, per_class_dice, per_class_hd, mean_dice_val, mean_hd_val, csv_filename):
-    # Check if the file exists, if not, write the header
+def save_metrics_to_csv(trained_weights, dataset_name, network_name, overlap, overlap_mode,
+                        class_labels, per_class_dice, per_class_hd, mean_dice_val, mean_hd_val,
+                        csv_filename,
+                        macs_gmac=None, params_m=None,
+                        train_time_sec=None, peak_train_mem_mb=None,
+                        infer_lat_ms=None, infer_lat_p95_ms=None, peak_infer_mem_mb=None):
     file_exists = os.path.isfile(csv_filename)
-    
-    # Header for the CSV file
-    header = ["Trained_Weights", "Dataset", "Network", "Overlap", "OverlapdMode"]
-    
-    # Add Dice class-wise and mean columns using class labels
+
+    header = ["Trained_Weights", "Dataset", "Network", "Overlap", "OverlapdMode",
+              "MACs_GMac", "Params_M",
+              "Train_Time_h", "Peak_Train_Mem_GB",
+              "Infer_Lat_ms", "Infer_Lat_p95_ms", "Peak_Infer_Mem_GB"]
     header += [f"Dice_{class_labels[str(i)]}" for i in range(len(class_labels))] + ["Mean_Dice"]
-    
-    # Add HD class-wise and mean columns using class labels
-    header += [f"HD_{class_labels[str(i)]}" for i in range(len(class_labels))] + ["Mean_HD"]
-    
-    # Prepare the row data
+    header += [f"HD_{class_labels[str(i)]}"   for i in range(len(class_labels))] + ["Mean_HD"]
+
+    def _fmt(v, decimals=2): return f"{v:.{decimals}f}" if v is not None else ""
+
     row = [
-        trained_weights,  # Trained weights file name
-        dataset_name,     # Dataset name
-        network_name,      # Network name
-        overlap,
-        overlap_mode
+        trained_weights, dataset_name, network_name, overlap, overlap_mode,
+        _fmt(macs_gmac, 2), _fmt(params_m, 3),
+        _fmt(train_time_sec / 3600 if train_time_sec else None, 2),
+        _fmt(peak_train_mem_mb / 1024 if peak_train_mem_mb else None, 2),
+        _fmt(infer_lat_ms, 1), _fmt(infer_lat_p95_ms, 1),
+        _fmt(peak_infer_mem_mb / 1024 if peak_infer_mem_mb else None, 2),
     ]
-    
-    # Append class-wise Dice scores
-    row += [f"{dice:.4f}" for dice in per_class_dice.mean(axis=0)]  # average Dice per class over the validation steps
-    
-    # Append mean Dice score
+    row += [f"{dice:.4f}" for dice in per_class_dice.mean(axis=0)]
     row.append(f"{mean_dice_val:.4f}")
-    
-    # Append class-wise HD scores
-    row += [f"{hd:.4f}" for hd in per_class_hd.mean(axis=0)]  # average HD per class over the validation steps
-    
-    # Append mean HD score
+    row += [f"{hd:.4f}" for hd in per_class_hd.mean(axis=0)]
     row.append(f"{mean_hd_val:.4f}")
-    
-    # Write to CSV
+
     with open(csv_filename, mode='a', newline='') as file:
         writer = csv.writer(file)
-        
         if not file_exists:
-            writer.writerow(header)  # Write the header if file does not exist
-        
-        writer.writerow(row)  # Write the data row
+            writer.writerow(header)
+        writer.writerow(row)
 
 # Example usage:
 csv_filename = "last_validation_metrics_btcv.csv"
@@ -985,4 +1009,10 @@ else:
     }
 
 # Save the metrics into the CSV file
-save_metrics_to_csv(args.output, args.dataset, args.network, args.overlap, args.overlap_mode, class_labels, per_class_dice, per_class_hd, mean_dice_val, mean_hd_val, csv_filename)
+save_metrics_to_csv(args.output, args.dataset, args.network, args.overlap, args.overlap_mode,
+                    class_labels, per_class_dice, per_class_hd, mean_dice_val, mean_hd_val,
+                    csv_filename,
+                    macs_gmac=macs_gmac, params_m=params_m,
+                    train_time_sec=train_time_sec, peak_train_mem_mb=peak_train_mem_mb,
+                    infer_lat_ms=infer_lat_ms, infer_lat_p95_ms=infer_lat_p95_ms,
+                    peak_infer_mem_mb=peak_infer_mem_mb)

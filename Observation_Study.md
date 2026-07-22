@@ -1,883 +1,851 @@
-# Observation Study
+# Paper A: Observation Study — Complete Experiment Guide
 
-**Project**: Adaptive Decoder Computation for Efficient 3D Medical Image Segmentation
-
-> **Context**: This document is the execution guide for Stage 2 of the research pipeline defined in `Research_Proposal.md §7.3`.
-> For scientific motivation and Go/No-Go criteria see `Research_Proposal.md §4, §5, §7.4`.
-> For baseline training commands (E0/E1 needed for O5) see `Experiment-Design-Observation.md Part 3`.
+> **Scientific motivation**: [Research_Proposal.md §3–5](Research_Proposal.md)
+> **Architecture and Paper B**: [Experiment-Design-AdaDec3D.md](Experiment-Design-AdaDec3D.md)
 
 ---
 
-# Two-Paper Strategy
+## Two-Paper Strategy
 
-This observation study is designed to support **two sequential publications**:
+| | Paper A — this document | Paper B |
+|---|---|---|
+| **Claim** | Decoder capacity benefit is spatially heterogeneous and predictable | AdaDec3D realizes selective allocation with lower executed cost |
+| **Venue** | MIDL / MLMI / ISBI | MICCAI 2026 / TMI |
+| **Gate** | O1–O5 + O9 pass Go criteria | Paper A accepted; O7, O8, O11 pass |
+| **Key result** | Measure observed selection budget and recovered benefit vs controls | DICE ≥ EffiDec3D + 0.3% at matched executed MACs |
 
-| Paper | Scope | Target Venue | Prerequisite |
-| ----- | ----- | ------------ | ------------ |
-| **Paper A** | Empirical analysis (O1–O11): where does decoder computation matter in 3D medical segmentation? | MIDL / MLMI / ISBI | O1–O5 pass Go criteria |
-| **Paper B** | AdaDec3D method: adaptive decoder via difficulty-aware routing and ROI refinement | MICCAI / TMI | Paper A accepted |
-
-**Paper A is self-contained.** Its hypothesis is:
-
-> *The marginal benefit of additional decoder capacity is heterogeneous across
-> anatomical structures and spatial regions, and may be predictable from a
-> lightweight difficulty signal.*
-
-O1–O5 and O9 test this hypothesis. The paper must report the observed selection
-budget and recovered gain rather than assuming a 20/80 result in advance.
-
-**Paper B builds on Paper A.** AdaDec3D is motivated by the finding that uniform decoder computation is wasteful, and is designed to allocate capacity only where O9 shows it is needed.
+Paper A is self-contained. The selection budget and recovered benefit are **outcomes to measure**, not thresholds to hit in advance.
 
 ---
 
-# Goal
+## Part 0: Hardware & Environment
 
-Before proposing AdaDec3D,
+### Hardware
 
-we first investigate whether decoder computation is truly required everywhere.
+Kaggle P100 (16 GB VRAM, CUDA). All code is CUDA-native; no changes needed.
 
-Instead of assuming adaptive computation is beneficial,
+### Timing estimates
 
-we seek empirical evidence supporting or rejecting this hypothesis.
+```
+E0 full 3DUXNET (53M params, 632 GFLOPs):
+  ~5-8 s/iter → 20 000 iter ≈ 33 h → 4 Kaggle sessions
 
-This study therefore answers the following scientific question.
+E1 EffiDec3D (3.16M params, 51.47 GFLOPs):
+  ~1-2 s/iter → 20 000 iter ≈ 8-10 h → 2 sessions
+```
 
-> **Where does decoder computation actually matter?**
+**Matched pilot**: run both models for exactly 20 000 optimizer steps to avoid
+confounding decoder capacity with training exposure. A confirmatory run may
+extend both to 45 000 steps.
 
----
+The training script saves `last_model.pth` after every eval step and auto-resumes.
+Download before each 9-hour Kaggle session ends and re-upload as a dataset.
 
-# Overall Workflow
+### File layout
 
-```text
-Reproduce Full Decoder (E0) + EffiDec3D (E1), using matched training budgets
-                │
-                ▼
-      Save Predictions + Checkpoints
-                │
-                ▼
-  O1: Error Distribution  O2: Difficulty Maps
-                │
-                ▼
-  O3: Difficulty vs Error Correlation
-                │
-                ▼
-  O4: Organ-wise Difficulty
-                │
-                ▼
-  O5: Decoder Gain Analysis  ◄── Critical Go/No-Go gate
-                │
-    ┌───────────┼──────────────┐
-    ▼           ▼              ▼
-  O6: Difficulty  O7: Cross-   O8: Backbone
-  Evolution     Dataset       Consistency
-                │
-                ▼
-  O9: Pareto Curve  ◄── Headline finding for Paper A
-                │
-                ▼
-  O10: Organ Size vs Difficulty
-                │
-                ▼
-  O11: Routing Signal Comparison
-                │
-                ▼
-        Paper A Submission
+```
+/kaggle/
+  input/
+    btcv-synapse/       imagesTr/ labelsTr/ imagesVal/ labelsVal/
+    feta-processed/     imagesTr/ labelsTr/ imagesVal/ labelsVal/
+    adadec3d-code/      EffiDec3D/ networks/ ...
+  working/
+    output/             training checkpoints
+    obs/                observation study figures
+```
+
+### Install dependencies
+
+```bash
+pip install monai==1.3.0 batchgenerators medpy ptflops scikit-learn scipy nibabel tqdm
+```
+
+### Verify environment
+
+```bash
+cd /kaggle/input/adadec3d-code/EffiDec3D
+python -c "
+import monai, torch
+from networks.UXNet_3D.network_backbone import UXNET_EffiDec3D
+from networks.swin_unetr_effidec3d import SwinUNETR_EffiDec3D
+from monai_utils.inferers.utils import sliding_window_inference_1out
+print('All imports OK | MONAI', monai.__version__, '| PyTorch', torch.__version__)
+print(torch.cuda.get_device_name(0))
+"
 ```
 
 ---
 
-# O1 Prediction Error Distribution
+## Part 1: Dataset Setup
 
-## Research Question
+### 1.1 BTCV / Synapse (primary — CT, 13 organs)
 
-Are segmentation errors uniformly distributed?
+**Source**: TransUNet preprocessed version on Kaggle (search "Synapse multi-organ segmentation").
+Official download: [synapse.org](https://www.synapse.org) project `syn3193805`.
 
----
+**Expected layout**
 
-## Motivation
+```
+/kaggle/input/btcv-synapse/
+  imagesTr/   img0001.nii.gz … (18 cases)
+  labelsTr/   label0001.nii.gz …
+  imagesVal/  img0021.nii.gz … (12 cases)
+  labelsVal/  label0021.nii.gz …
+```
 
-If prediction errors are uniformly distributed,
-
-uniform decoder computation is reasonable.
-
-Otherwise,
-
-adaptive computation may be beneficial.
-
----
-
-## Input
-
-Validation Dataset
-
-EffiDec3D Prediction
-
-Ground Truth
-
----
-
-## Output
-
-Error Map
+**Standard split** (same as 3D UX-Net paper)
 
 ```python
-error = prediction != gt
+TRAIN = ["0001","0002","0003","0004","0005","0006","0007","0008",
+         "0009","0010","0021","0022","0023","0024","0025","0026","0027","0028"]
+VAL   = ["0029","0030","0031","0032","0033","0034","0035","0036",
+         "0037","0038","0039","0040"]
 ```
 
----
+> **Confirmatory note**: do not tune thresholds, select checkpoints, formulate
+> the Paper A headline, and report final evidence on the same 12 cases.
+> For confirmatory results reserve a held-out fold or use nested cross-validation.
+> All confidence intervals must resample subjects, not individual voxels.
 
-## Statistics
+**BTCV13 label mapping**
 
-Voxel Error Rate
+```
+0 Background  1 Aorta      2 Gallbladder  3 Spleen      4 L.Kidney
+5 R.Kidney    6 Liver      7 Stomach      8 IVC         9 Port.Vein
+10 Pancreas*  11 R.Adrenal* 12 L.Adrenal* 13 Duodenum*
+```
+\* small structures — primary metric for Paper A/B.
 
-Organ-wise Error
+**Verify loading**
 
-Boundary Error
-
-Interior Error
-
----
-
-## Figure
-
-Figure O1
-
-```text
-Image
-
-Prediction
-
-Ground Truth
-
-Error Map
+```bash
+python -c "
+import argparse; from load_datasets_transforms import data_loader
+args = argparse.Namespace(root='/kaggle/input/btcv-synapse', dataset='BTCV13', mode='train')
+tr, val, nc = data_loader(args)
+print('Train:', len(tr['images']), 'Val:', len(val['images']), 'Classes:', nc)
+"
 ```
 
----
+### 1.2 FeTA 2021 (for O7 — MRI, fetal brain, 7 structures)
 
-## Expected Result
+**Source**: [fetachallenge.github.io](https://fetachallenge.github.io), `feta_2.2.tar.gz` (~2 GB, 80 subjects).
 
-Errors mainly appear around
-
-* organ boundary
-
-* thin structures
-
-* small organs
-
----
-
-## Reviewer Question
-
-Are errors spatially clustered?
-
----
-
-# O2 Difficulty Distribution
-
-## Research Question
-
-Where are difficult voxels?
-
----
-
-## Motivation
-
-Adaptive computation requires
-
-difficulty estimation.
-
----
-
-## Candidate Difficulty Signals
-
-Entropy
-
-Confidence
-
-Feature Variance
-
-MC Dropout
-
-Boundary Probability
-
----
-
-## Default Implementation
-
-Entropy
+**Convert to expected format**
 
 ```python
-entropy = -(p * torch.log(p + 1e-8)).sum(1)
+import glob, shutil, os
+
+src = "/path/to/feta_2.2"
+dst = "/kaggle/input/feta-processed"
+subjects = sorted(glob.glob(f"{src}/sub-*/"))
+
+for split, subs in [("Tr", subjects[:70]), ("Val", subjects[70:])]:
+    os.makedirs(f"{dst}/images{split}", exist_ok=True)
+    os.makedirs(f"{dst}/labels{split}", exist_ok=True)
+    for sub in subs:
+        sid = os.path.basename(sub.rstrip("/"))
+        shutil.copy(f"{sub}/anat/{sid}_T2w.nii.gz", f"{dst}/images{split}/{sid}.nii.gz")
+        shutil.copy(f"{sub}/anat/{sid}_dseg.nii.gz", f"{dst}/labels{split}/{sid}.nii.gz")
+print("Train:", len(os.listdir(f"{dst}/imagesTr")))   # 70
+print("Val:  ", len(os.listdir(f"{dst}/imagesVal")))  # 10
+```
+
+**FeTA label mapping**: 0 BG | 1 IS | 2 WM | 3 CGM | 4 DGM\* | 5 CE | 6 BS | 7 CSF
+
+---
+
+## Part 2: Baseline Training (E0 + E1)
+
+Both models use identical optimizers, augmentations, crop sizes, and iteration
+counts so that decoder capacity is the only variable. This is the primary causal
+comparison for O5.
+
+### E0 — Full 3DUXNET (upper bound)
+
+```bash
+cd /kaggle/input/adadec3d-code/EffiDec3D
+
+python main_train_BTCV_TU.py \
+  --root /kaggle/input/btcv-synapse --output /kaggle/working/output/E0 \
+  --dataset BTCV13 --network 3DUXNET \
+  --img_size 96 96 96 --n_channels 1 \
+  --channels 48 96 192 384 --feature_size 48 \
+  --ds False --mode train --pretrain False \
+  --batch_size 1 --crop_sample 4 \
+  --lr 0.001 --optim AdamW \
+  --max_iter 20000 --eval_step 500 \
+  --val_batch 1 --gpu 0 \
+  --cache_rate 0.5 --num_workers 2 --overlap 0.7
+```
+
+### E1 — EffiDec3D (baseline to beat)
+
+```bash
+python main_train_BTCV_TU.py \
+  --root /kaggle/input/btcv-synapse --output /kaggle/working/output/E1 \
+  --dataset BTCV13 --network 3DUXNET_EffiDec3D \
+  --img_size 96 96 96 --n_channels 1 \
+  --channels 48 96 192 384 \
+  --n_decoder_channels 48 --resolution_factor 2 --skip_aggregation addition \
+  --ds False --mode train --pretrain False \
+  --batch_size 1 --crop_sample 4 \
+  --lr 0.001 --optim AdamW \
+  --max_iter 20000 --eval_step 500 \
+  --val_batch 1 --gpu 0 \
+  --cache_rate 0.5 --num_workers 2 --overlap 0.7
+```
+
+**Critical parameters for E1**
+
+| Parameter | Correct | Wrong value effect |
+|---|---|---|
+| `resolution_factor` | **2** | 1 = full resolution = not EffiDec3D |
+| `n_decoder_channels` | **48** | Different channel count |
+| `skip_aggregation` | **addition** | concatenation doubles channels |
+| `overlap` | **0.7** | Lower → worse DICE |
+
+**Verify E1 prints at startup**:
+
+```
+Computational complexity:   51.47 GMac
+Number of parameters:       3.16 M
+```
+
+**Target BTCV13 mean DICE**: 79.0–79.5% (paper: 79.25%)
+
+### Checkpoint resumption
+
+```python
+import shutil, glob
+ckpts = glob.glob("/kaggle/working/output/E1/**/last_model.pth", recursive=True)
+shutil.copy(ckpts[0], "/kaggle/working/last_model_E1.pth")
+```
+
+Upload as a Kaggle Dataset input; the script auto-resumes.
+
+### Milestone checkpoints (required for O6)
+
+Add to the training loop after each epoch evaluation:
+
+```python
+MILESTONES = [5, 10, 20, 30, 50]   # epochs
+if epoch in MILESTONES:
+    torch.save({"model_state_dict": model.state_dict()},
+               f"{output_dir}/epoch_{epoch:03d}.pth")
+```
+
+### E1 on FeTA (required for O7)
+
+O7 needs both an E0-FeTA and an E1-FeTA run with identical schedules.
+
+```bash
+# E0 FeTA
+python main_train_BTCV_TU.py \
+  --root /kaggle/input/feta-processed --output /kaggle/working/output/E0_feta \
+  --dataset FeTA --network 3DUXNET \
+  --max_iter 20000 --eval_step 500 --lr 0.001 \
+  --cache_rate 0.5 --num_workers 2 --gpu 0
+
+# E1 FeTA
+python main_train_BTCV_TU.py \
+  --root /kaggle/input/feta-processed --output /kaggle/working/output/E1_feta \
+  --dataset FeTA --network 3DUXNET_EffiDec3D \
+  --n_decoder_channels 48 --resolution_factor 2 --skip_aggregation addition \
+  --max_iter 20000 --eval_step 500 --lr 0.001 \
+  --cache_rate 0.5 --num_workers 2 --gpu 0
+```
+
+### SwinUNETR_EffiDec3D on BTCV (required for O8)
+
+O8 needs both E0-Swin and E1-Swin with identical schedules.
+
+```bash
+# E0 SwinUNETR
+python main_train_BTCV_TU.py \
+  --root /kaggle/input/btcv-synapse --output /kaggle/working/output/E0_swin \
+  --dataset BTCV13 --network SwinUNETR \
+  --max_iter 20000 --eval_step 500 --lr 0.001 \
+  --cache_rate 0.5 --num_workers 2 --gpu 0
+
+# E1 SwinUNETR_EffiDec3D
+python main_train_BTCV_TU.py \
+  --root /kaggle/input/btcv-synapse --output /kaggle/working/output/E1_swin \
+  --dataset BTCV13 --network SwinUNETR_EffiDec3D \
+  --n_decoder_channels 48 --resolution_factor 2 --skip_aggregation addition \
+  --max_iter 20000 --eval_step 500 --lr 0.001 \
+  --cache_rate 0.5 --num_workers 2 --gpu 0
 ```
 
 ---
 
-## Output
+## Part 3: Observation Study
 
-Difficulty Map
+**Prerequisites**: E0 and E1 `best_metric_model.pth` trained and verified.
+Save all figures to `/kaggle/working/obs/`.
+
+### Common notebook setup
+
+```python
+import torch, torch.nn.functional as F
+import numpy as np, matplotlib.pyplot as plt
+from monai.transforms import AsDiscrete
+from monai_utils.inferers.utils import sliding_window_inference_1out
+from load_datasets_transforms import data_loader, data_transforms
+import argparse
+
+def load_model(network_name, ckpt_path, device="cuda"):
+    if network_name == "3DUXNET_EffiDec3D":
+        from networks.UXNet_3D.network_backbone import UXNET_EffiDec3D
+        model = UXNET_EffiDec3D(in_chans=1, out_chans=14, depths=[2,2,2,2],
+            feat_size=[48,96,192,384], n_decoder_channels=48, resolution_factor=2,
+            skip_aggregation="addition").to(device)
+    elif network_name == "SwinUNETR_EffiDec3D":
+        from networks.swin_unetr_effidec3d import SwinUNETR_EffiDec3D
+        model = SwinUNETR_EffiDec3D(in_channels=1, out_channels=14,
+            n_decoder_channels=48, resolution_factor=2,
+            skip_aggregation="addition").to(device)
+    elif network_name == "SwinUNETR":
+        from networks.swin_unetr import SwinUNETR
+        model = SwinUNETR(in_channels=1, out_channels=14).to(device)
+    else:
+        from networks.UXNet_3D.network_backbone import UXNET
+        model = UXNET(in_chans=1, out_chans=14, depths=[2,2,2,2],
+                      feat_size=[48,96,192,384]).to(device)
+    ckpt = torch.load(ckpt_path, map_location=device)
+    model.load_state_dict(ckpt["model_state_dict"])
+    model.eval()
+    return model
+
+BTCV_NAMES = ["Aorta","Gallbladder","Spleen","L.Kidney","R.Kidney",
+              "Liver","Stomach","IVC","Port.Vein","Pancreas","R.Adrenal","L.Adrenal","Duodenum"]
+
+args = argparse.Namespace(
+    root="/kaggle/input/btcv-synapse", dataset="BTCV13",
+    mode="validation", crop_sample=4, img_size=[96, 96, 96]
+)
+_, val_samples, n_cls = data_loader(args)
+_, val_transform = data_transforms(args)
+from monai.data import DataLoader, Dataset
+val_files = [{"image": im, "label": lb}
+             for im, lb in zip(val_samples["images"], val_samples["labels"])]
+val_ds = Dataset(data=val_files, transform=val_transform)
+val_loader = DataLoader(val_ds, batch_size=1, shuffle=False, num_workers=2)
+
+effi_model = load_model("3DUXNET_EffiDec3D", "/kaggle/input/e1-ckpt/best_metric_model.pth")
+full_model  = load_model("3DUXNET",           "/kaggle/input/e0-ckpt/best_metric_model.pth")
+post_pred   = AsDiscrete(argmax=True, to_onehot=14)
+post_lbl    = AsDiscrete(to_onehot=14)
+```
 
 ---
 
-## Statistics
+### O1 — Prediction Error Distribution
 
-Difficulty Histogram
+**Question**: Are errors uniformly distributed or concentrated in specific regions?
 
-Difficulty Percentile
+```python
+from scipy.ndimage import binary_erosion
 
-Difficulty Heatmap
+boundary_err, interior_err = [], []
+organ_err = {n: [] for n in BTCV_NAMES}
 
----
+with torch.no_grad():
+    for batch in val_loader:
+        img = batch["image"].cuda()
+        lbl = batch["label"].squeeze(1).long().cpu()
+        logits = sliding_window_inference_1out(img, (96,96,96), 4, effi_model, overlap=0.7)
+        pred = logits.argmax(1).cpu()
+        error = (pred != lbl).float().squeeze()
 
-## Figure
+        for c, name in enumerate(BTCV_NAMES, start=1):
+            mask = (lbl.squeeze() == c)
+            if mask.sum() > 0:
+                organ_err[name].append(error[mask].mean().item())
 
-Difficulty Map Overlay
+        fg = (lbl.squeeze() > 0).numpy()
+        interior = torch.from_numpy(binary_erosion(fg, iterations=3).astype(np.float32))
+        boundary = torch.from_numpy(fg.astype(np.float32)) - interior
+        if boundary.sum() > 0: boundary_err.append((error * boundary).sum() / boundary.sum())
+        if interior.sum() > 0: interior_err.append((error * interior).sum() / interior.sum())
 
----
+print(f"Boundary error: {np.mean(boundary_err):.3f}")
+print(f"Interior error: {np.mean(interior_err):.3f}")
+print(f"Ratio: {np.mean(boundary_err)/np.mean(interior_err):.1f}×")
+for name, vals in organ_err.items():
+    if vals: print(f"  {name:15s}: {np.mean(vals):.3f}")
+```
 
-## Reviewer Question
-
-Does difficulty occupy only a small percentage of voxels?
-
----
-
-# O3 Difficulty vs Error
-
-## Research Question
-
-Does predicted difficulty really indicate segmentation difficulty?
-
----
-
-## Input
-
-Difficulty Map
-
-Prediction Error Map
-
----
-
-## Statistics
-
-Pearson Correlation
-
-Spearman Correlation
-
-Calibration Curve
+**Expected**: boundary error 3–5× interior error; Pancreas/Adrenal highest organ error.
 
 ---
 
-## Code
+### O2 — Entropy Distribution
+
+**Question**: Where is high uncertainty located, and what fraction of voxels does it occupy?
+
+```python
+all_entropy, high_unc_frac = [], []
+
+with torch.no_grad():
+    for batch in val_loader:
+        img = batch["image"].cuda()
+        logits = sliding_window_inference_1out(img, (96,96,96), 4, effi_model, overlap=0.7)
+        prob = logits.softmax(1).cpu()
+        ent = -(prob * torch.log(prob + 1e-8)).sum(1).squeeze()
+        all_entropy.append(ent.flatten().numpy()[::10])   # 10% subsample
+        high_unc_frac.append((ent > 0.5).float().mean().item())
+
+all_ent = np.concatenate(all_entropy)
+print("Entropy percentiles:", {p: f"{np.percentile(all_ent, p):.4f}" for p in [50,75,90,95,99]})
+print(f"Fraction entropy > 0.5: {np.mean(high_unc_frac):.2%}")
+
+plt.figure(figsize=(8,4))
+plt.hist(all_ent, bins=50, log=True)
+plt.xlabel("Entropy"); plt.ylabel("Voxel count (log)")
+plt.title("O2: Entropy Distribution")
+plt.savefig("/kaggle/working/obs/O2_entropy.png", dpi=150)
+```
+
+**Report**: the observed distribution and fraction. Do not apply a hard threshold.
+
+---
+
+### O3 — Uncertainty–Error Correlation
+
+**Question**: Does high entropy reliably predict where errors occur?
 
 ```python
 from scipy.stats import pearsonr, spearmanr
 
-flat_diff = difficulty_map.flatten().numpy()
-flat_err  = error_map.float().flatten().numpy()
+x_ent, y_err = [], []
+with torch.no_grad():
+    for batch in val_loader:
+        img = batch["image"].cuda()
+        lbl = batch["label"].squeeze(1).long().cpu()
+        logits = sliding_window_inference_1out(img, (96,96,96), 4, effi_model, overlap=0.7)
+        prob = logits.softmax(1).cpu()
+        ent = -(prob * torch.log(prob + 1e-8)).sum(1).squeeze()
+        err = (logits.argmax(1).cpu().squeeze() != lbl.squeeze()).float()
+        for b in range(20):
+            lo, hi = b/20 * ent.max().item(), (b+1)/20 * ent.max().item()
+            mask = (ent >= lo) & (ent < hi)
+            if mask.sum() > 100:
+                x_ent.append(ent[mask].mean().item())
+                y_err.append(err[mask].mean().item())
 
-r_p, _ = pearsonr(flat_diff, flat_err)
-r_s, _ = spearmanr(flat_diff, flat_err)
-print(f"Pearson r={r_p:.3f}  Spearman r={r_s:.3f}")
+r_p, _ = pearsonr(x_ent, y_err)
+r_s, _ = spearmanr(x_ent, y_err)
+print(f"Pearson r={r_p:.3f}  Spearman ρ={r_s:.3f}")
+print(f"{'GO ✓' if r_p > 0.60 else 'NO-GO ✗'}  (threshold r > 0.60)")
 ```
 
 ---
 
-## Figure
+### O4 — Per-Organ Difficulty
 
-```text
-Prediction Error
-
-↑
-
-│
-
-└──────────────► Difficulty
-```
-
----
-
-## Expected
-
-Positive Correlation
-
----
-
-## Reviewer Question
-
-Why is Difficulty a reasonable routing signal?
-
----
-
-# O4 Difficulty vs Anatomy
-
-## Research Question
-
-Which organs are difficult?
-
----
-
-## Statistics
-
-For each organ
-
-Mean Difficulty
-
-Dice
-
-HD95
-
-Boundary Difficulty
-
----
-
-## Code
+**Question**: Which anatomical structures are inherently harder, and do they show higher entropy?
 
 ```python
-organ_names = ["Aorta","Gallbladder","Spleen","Left Kidney","Right Kidney",
-               "Liver","Stomach","Aorta","IVC","Portal Vein","Pancreas",
-               "Right Adrenal","Left Adrenal"]
-for i, name in enumerate(organ_names):
-    mask = (lbl == i + 1)
-    organ_diff = difficulty_map[mask].mean().item()
-    print(f"{name:20s}  mean_difficulty={organ_diff:.4f}")
+from monai.metrics import DiceMetric
+
+organ_dice = {n: [] for n in BTCV_NAMES}
+organ_ent  = {n: [] for n in BTCV_NAMES}
+dice_metric = DiceMetric(include_background=False, reduction="none")
+
+with torch.no_grad():
+    for batch in val_loader:
+        img = batch["image"].cuda()
+        lbl = batch["label"].cpu()
+        logits = sliding_window_inference_1out(img, (96,96,96), 4, effi_model, overlap=0.7)
+        prob = logits.softmax(1).cpu()
+        ent = -(prob * torch.log(prob + 1e-8)).sum(1).squeeze()
+        dice_vals = dice_metric(post_pred(logits.squeeze(0)).unsqueeze(0),
+                                post_lbl(lbl.squeeze(0)).unsqueeze(0))[0]
+        for c, name in enumerate(BTCV_NAMES):
+            organ_dice[name].append(dice_vals[c].item())
+            mask = (lbl.squeeze() == c + 1)
+            if mask.sum() > 0:
+                organ_ent[name].append(ent[mask].mean().item())
+
+print(f"{'Organ':15s} {'DICE':>6} {'Entropy':>8}")
+for name in BTCV_NAMES:
+    d = np.nanmean(organ_dice[name])
+    e = np.nanmean(organ_ent[name]) if organ_ent[name] else float('nan')
+    print(f"{name:15s} {d:6.3f}  {e:8.4f}")
 ```
 
 ---
 
-## Figure
+### O5 — Decoder Gain Analysis *(critical Go/No-Go gate)*
 
-Organ-wise Bar Plot
+**Question**: Does a stronger decoder produce net benefit primarily in high-entropy voxels?
 
----
-
-## Expected
-
-Pancreas
-
-Adrenal
-
-Esophagus
-
-Highest Difficulty
-
----
-
-## Reviewer Question
-
-Do different organs require different decoder capacity?
-
----
-
-# O5 Decoder Gain Analysis
-
-## Research Question
-
-Where does a stronger decoder actually help?
-
----
-
-## Motivation
-
-This experiment is the **critical Go/No-Go gate**.
-
-It tests the opportunity for adaptive decoder computation by comparing
-
-EffiDec3D (E1) against a full-capacity decoder (E0).
-
----
-
-## Input
-
-E0 predictions (Full decoder)
-
-E1 predictions (EffiDec3D)
-
-Ground Truth
-
-Difficulty maps from O2
-
----
-
-## Code
+Report **positive** and **negative** transitions separately — positive alone overstates benefit.
 
 ```python
-import torch
+bin_ent, bin_pos, bin_neg, bin_net = [], [], [], []
+
+with torch.no_grad():
+    for batch in val_loader:
+        img = batch["image"].cuda()
+        lbl = batch["label"].squeeze(1).long().cpu().squeeze()
+
+        pred_full = sliding_window_inference_1out(img, (96,96,96), 4, full_model,
+                                                   overlap=0.7).argmax(1).cpu().squeeze()
+        logits_e  = sliding_window_inference_1out(img, (96,96,96), 4, effi_model, overlap=0.7)
+        prob_e    = logits_e.softmax(1).cpu()
+        pred_effi = logits_e.argmax(1).cpu().squeeze()
+        ent = -(prob_e * torch.log(prob_e + 1e-8)).sum(1).squeeze()
+
+        pos = ((pred_full == lbl) & (pred_effi != lbl)).float()
+        neg = ((pred_full != lbl) & (pred_effi == lbl)).float()
+        net = pos - neg
+
+        for b in range(20):
+            q_lo = ent.quantile(b/20).item()
+            q_hi = ent.quantile((b+1)/20).item()
+            mask = (ent >= q_lo) & (ent < q_hi)
+            if mask.sum() > 100:
+                bin_ent.append(ent[mask].mean().item())
+                bin_pos.append(pos[mask].mean().item())
+                bin_neg.append(neg[mask].mean().item())
+                bin_net.append(net[mask].mean().item())
+
 from scipy.stats import pearsonr
-
-# Report both directions. Net benefit is positive transitions minus regressions.
-positive = ((pred_full == lbl) & (pred_effi != lbl)).float()
-negative = ((pred_full != lbl) & (pred_effi == lbl)).float()
-gain = positive - negative
-
-# bin by entropy quantile
-n_bins = 10
-percentiles = torch.quantile(entropy_map.flatten(), torch.linspace(0, 1, n_bins + 1))
-x, y = [], []
-for k in range(n_bins):
-    lo, hi = percentiles[k], percentiles[k + 1]
-    mask = (entropy_map >= lo) & (entropy_map < hi)
-    if mask.sum() > 0:
-        x.append(entropy_map[mask].mean().item())
-        y.append(gain[mask].mean().item())
-
+pairs = sorted(zip(bin_ent, bin_net))
+x, y = zip(*pairs)
 r, p = pearsonr(x, y)
-print(f"{'GO  ✓' if r > 0.50 else 'NO-GO ✗'}: Pearson r={r:.3f}  p={p:.4f}")
+print(f"Net-gain/entropy Pearson r={r:.3f} (descriptive; bins are correlated)")
+print(f"Mean positive rate={np.mean(bin_pos):.5f}  negative rate={np.mean(bin_neg):.5f}")
 ```
 
----
-
-## Go Criterion
-
-Report positive transitions, negative transitions, and net benefit separately by
-subject, organ, and physical-distance boundary band. Proceed only when a
-deployable signal predicts held-out net benefit better than matched random and
-boundary controls with a subject-bootstrap 95% confidence interval. Correlation
-over pooled voxels or bins is descriptive, not a significance test.
+**Go criterion**: net benefit rises with entropy AND a deployable signal beats
+matched random at 10–30% budgets with a subject-level 95% CI (see O9).
 
 ---
 
-## Figure
+### O6 — Difficulty Evolution During Training
 
-```text
-Difficulty Map  +  Gain Map  →  Overlay
-```
+**Question**: Does high entropy persist and stabilize at boundaries as training progresses?
 
----
-
-## Expected
-
-Higher decoder capacity mainly benefits
-
-* difficult voxels (high entropy)
-
-* boundaries
-
-* small organs
-
----
-
-## Reviewer Question
-
-Is adaptive decoder computation actually necessary?
-
----
-
-# O6 Difficulty Evolution During Training
-
-## Research Question
-
-Does prediction difficulty decrease over training, and does it concentrate near boundaries/hard organs as training progresses?
-
----
-
-## Motivation
-
-If difficulty is transient and disappears as the model trains, adaptive routing offers little permanent benefit.
-
-If difficulty persists and localizes, it is a stable routing signal.
-
----
-
-## Setup
-
-Save model checkpoints at epochs {5, 10, 20, 30, 50} during E0/E1 training.
-
----
-
-## Code
+*Requires milestone checkpoints saved in Part 2.*
 
 ```python
-# Add to trainer: save checkpoints at milestones
 MILESTONES = [5, 10, 20, 30, 50]
 
 for epoch in MILESTONES:
-    ckpt_path = f"checkpoints/effidec3d_epoch{epoch:03d}.pt"
-    model = load_model("3DUXNET_EffiDec3D", ckpt_path)
-    entropy_maps = []
-    for img, lbl in val_loader:
-        with torch.no_grad():
-            logits = model(img.cuda())
-        prob = torch.softmax(logits, dim=1)
-        ent  = -(prob * torch.log(prob + 1e-8)).sum(1)
-        entropy_maps.append(ent.cpu())
-    mean_ent = torch.stack(entropy_maps).mean()
-    print(f"Epoch {epoch:3d}  mean_entropy={mean_ent:.4f}")
+    m = load_model("3DUXNET_EffiDec3D",
+                   f"/kaggle/input/e1-ckpt/epoch_{epoch:03d}.pth")
+    mean_ents = []
+    with torch.no_grad():
+        for batch in val_loader:
+            img = batch["image"].cuda()
+            logits = sliding_window_inference_1out(img, (96,96,96), 4, m, overlap=0.7)
+            prob = logits.softmax(1).cpu()
+            ent = -(prob * torch.log(prob + 1e-8)).sum(1)
+            mean_ents.append(ent.mean().item())
+    print(f"Epoch {epoch:3d}  mean_entropy={np.mean(mean_ents):.4f}")
+```
+
+**Figure**: mean entropy vs epoch (line) + spatial entropy maps at epochs 5, 20, 50.
+**Expected**: entropy decreases but stabilizes; residual high-entropy voxels concentrate at boundaries/small organs by epoch 30.
+
+---
+
+### O7 — Cross-Dataset Consistency
+
+**Question**: Do O1–O5 findings replicate on FeTA (fetal brain MRI)?
+
+*Requires E0_feta and E1_feta from Part 2.*
+
+```python
+# Repeat O5 analysis with FeTA models and val_loader
+FETA_NAMES = ["IS","WM","CGM","DGM","CE","BS","CSF"]
+
+feta_args = argparse.Namespace(
+    root="/kaggle/input/feta-processed", dataset="FeTA",
+    mode="validation", crop_sample=4, img_size=[96,96,96]
+)
+_, feta_val, n_cls_feta = data_loader(feta_args)
+_, feta_transform = data_transforms(feta_args)
+feta_files = [{"image": im, "label": lb}
+              for im, lb in zip(feta_val["images"], feta_val["labels"])]
+feta_loader = DataLoader(Dataset(data=feta_files, transform=feta_transform),
+                         batch_size=1, shuffle=False, num_workers=2)
+
+full_feta  = load_model("3DUXNET",           "/kaggle/input/e0-feta/best_metric_model.pth")
+effi_feta  = load_model("3DUXNET_EffiDec3D", "/kaggle/input/e1-feta/best_metric_model.pth")
+
+# Run identical O5 analysis using feta_loader, full_feta, effi_feta, n_cls=8
+# ... (same code as O5 above, replace val_loader / full_model / effi_model)
+print(f"FeTA Net-gain/entropy r={r_feta:.3f}")
+print(f"{'GO ✓' if r_feta > 0.40 else 'NO-GO ✗'}  (threshold r > 0.40)")
 ```
 
 ---
 
-## Figure
+### O8 — Backbone Consistency
 
-Line plot: mean entropy vs training epoch
+**Question**: Does the O5 gain–entropy correlation hold with SwinUNETR instead of UXNET?
 
-Spatial map: entropy at epochs 5, 20, 50 (side-by-side)
-
----
-
-## Expected
-
-Mean entropy decreases, but residual high-entropy voxels stabilize at boundaries/hard organs by epoch 30.
-
----
-
-## Paper A Role
-
-Supports the claim that difficulty is a stable, persistent signal — not transient noise.
-
----
-
-# O7 Cross-Dataset Consistency
-
-## Research Question
-
-Do the O1–O5 findings replicate on FeTA (fetal brain MRI)?
-
----
-
-## Motivation
-
-If decoder gain concentrates on difficult voxels across both CT (BTCV) and MRI (FeTA),
-
-the finding is dataset-agnostic and generalizes beyond one modality.
-
----
-
-## Setup
-
-Repeat O1–O5 pipeline on FeTA validation set using EffiDec3D trained on FeTA.
-
----
-
-## Code
+*Requires E0_swin and E1_swin from Part 2.*
 
 ```python
-# run identical O1-O5 analysis, but with FeTA data
-feta_loader = get_loader_feta(data_dir, batch_size=1, num_workers=4)
-model_feta = load_model("3DUXNET_EffiDec3D", ckpt_path="checkpoints/effidec3d_feta.pt")
-# then call same error/difficulty/gain analysis functions
+full_swin = load_model("SwinUNETR",          "/kaggle/input/e0-swin/best_metric_model.pth")
+effi_swin = load_model("SwinUNETR_EffiDec3D","/kaggle/input/e1-swin/best_metric_model.pth")
+
+# Run identical O5 analysis using val_loader, full_swin, effi_swin
+# ... (same code as O5 above, replace full_model / effi_model)
+print(f"SwinUNETR Net-gain/entropy r={r_swin:.3f}")
+print(f"{'GO ✓' if r_swin > 0.45 else 'NO-GO ✗'}  (threshold r > 0.45)")
 ```
 
 ---
 
-## Statistics
+### O9 — Selective-Allocation Opportunity *(headline result for Paper A)*
 
-Pearson r (O5 equivalent) on FeTA
+**Question**: At fixed selection budgets, does entropy recover more positive decoder
+transitions than matched random selection?
 
-Organ-wise difficulty bar plot for fetal brain structures
-
----
-
-## Expected
-
-r > 0.50 on FeTA, confirming the relationship is modality-agnostic.
-
----
-
-## Paper A Role
-
-Cross-dataset replication is a key criterion for MIDL/MLMI reviewers.
-
----
-
-# O8 Backbone Consistency
-
-## Research Question
-
-Does the O5 result hold when the backbone changes from UXNET to SwinUNETR?
-
----
-
-## Motivation
-
-If the decoder gain–difficulty correlation depends on the specific backbone,
-
-AdaDec3D cannot claim general applicability.
-
----
-
-## Setup
-
-Train SwinUNETR_EffiDec3D on BTCV.
-
-Run O5 analysis using SwinUNETR predictions.
-
----
-
-## Code
+This is an **opportunity analysis** — it measures the potential for selective
+allocation but does not prove computational savings (Paper B must show that).
 
 ```python
-model_swin = load_model("SwinUNETR_EffiDec3D",
-                         ckpt_path="checkpoints/swin_effidec3d.pt")
-# identical O5 analysis
-gain_swin = ((pred_swin_full == lbl) & (pred_swin_effi != lbl)).float()
-r_swin, _ = pearsonr(x_swin, y_swin)
-print(f"SwinUNETR backbone: r={r_swin:.3f}")
+rng = np.random.default_rng(0)
+budgets = np.array([5, 10, 20, 30, 50])
+
+entropy_recovery, random_recovery = [], []
+
+with torch.no_grad():
+    for batch in val_loader:
+        img = batch["image"].cuda()
+        lbl = batch["label"].squeeze(1).long().cpu().squeeze()
+
+        pred_full = sliding_window_inference_1out(
+            img, (96,96,96), 4, full_model, overlap=0.7).argmax(1).cpu().squeeze()
+        logits_e  = sliding_window_inference_1out(
+            img, (96,96,96), 4, effi_model, overlap=0.7)
+        prob_e    = logits_e.softmax(1).cpu()
+        pred_effi = logits_e.argmax(1).cpu().squeeze()
+        ent = -(prob_e * torch.log(prob_e + 1e-8)).sum(1).squeeze()
+
+        pos = ((pred_full == lbl) & (pred_effi != lbl)).float()
+        # Budget denominator = union of foreground predictions and labels
+        body = (lbl > 0) | (pred_full > 0) | (pred_effi > 0)
+        ent_body = ent[body].numpy()
+        pos_body = pos[body].numpy()
+
+        total = pos_body.sum()
+        if total == 0:
+            continue
+
+        # Entropy ranking
+        order = np.argsort(ent_body)[::-1]
+        entropy_recovery.append([
+            pos_body[order[:max(1, int(len(order)*q/100))]].sum() / total
+            for q in budgets
+        ])
+        # 100 random selections per subject
+        random_recovery.append(np.mean([
+            [pos_body[rng.choice(len(pos_body), max(1, int(len(pos_body)*q/100)),
+                                 replace=False)].sum() / total for q in budgets]
+            for _ in range(100)
+        ], axis=0))
+
+ent_arr  = np.asarray(entropy_recovery)
+rand_arr = np.asarray(random_recovery)
+print("Budget (%):       ", budgets)
+print("Entropy recovery: ", ent_arr.mean(0).round(3))
+print("Random recovery:  ", rand_arr.mean(0).round(3))
+
+# Subject-level 95% CI via bootstrap
+B = 2000
+diffs = []
+for _ in range(B):
+    idx = rng.integers(len(ent_arr), size=len(ent_arr))
+    diffs.append((ent_arr[idx] - rand_arr[idx]).mean(0))
+diffs = np.array(diffs)
+lo, hi = np.percentile(diffs, [2.5, 97.5], axis=0)
+print("Entropy vs Random 95% CI lower:", lo.round(3))
+print("Entropy vs Random 95% CI upper:", hi.round(3))
+
+plt.figure(figsize=(7,5))
+plt.plot(budgets, ent_arr.mean(0)*100, "o-", label="Entropy")
+plt.fill_between(budgets, (ent_arr.mean(0)+lo)*100, (ent_arr.mean(0)+hi)*100, alpha=0.2)
+plt.plot(budgets, rand_arr.mean(0)*100, "o--", label="Random (100 repeats)", color="gray")
+plt.xlabel("Selected union-foreground voxels (%)")
+plt.ylabel("Positive decoder transitions recovered (%)")
+plt.title("O9: Selective-Allocation Opportunity")
+plt.legend()
+plt.savefig("/kaggle/working/obs/O9_opportunity_curve.png", dpi=150)
+plt.show()
 ```
 
----
-
-## Expected
-
-r > 0.45 for SwinUNETR, confirming backbone-agnostic signal.
+**Go criterion**: entropy outperforms matched random at 10–30% budgets and the
+lower bound of the 95% CI is above zero. Report the actual budget/recovery pair;
+do not assume a specific concentration ratio in advance.
 
 ---
 
-## Paper A Role
+### O10 — Organ Size vs Difficulty
 
-Backbone consistency strengthens the claim that the finding is architectural rather than model-specific.
-
----
-
-# O9 Selective-Allocation Opportunity
-
-## Research Question
-
-At fixed selection budgets, how much positive decoder transition can each
-test-time signal recover, and does it outperform matched random selection?
-
----
-
-## Motivation
-
-This is an opportunity analysis, not a demonstration of computational savings.
-Full-decoder predictions may depend on dense surrounding computation. Paper B
-must separately demonstrate that contextual region refinement realizes this
-opportunity with lower executed cost.
-
----
-
-## Code
+**Question**: Is difficulty just a proxy for small organs, or does entropy capture richer signal?
 
 ```python
-import numpy as np
-
-# Canonical executable implementation: Experiment-Design-Observation.md O9.
-# Compute recovery per subject at 5/10/20/30/50% union-foreground budgets.
-# Compare entropy, confidence, boundary, foreground, organ-size, 100 random
-# selections, and an analysis-only oracle positive-transition ranking.
-# Bootstrap subjects for 95% confidence intervals; never pool all scan voxels.
-```
-
----
-
-## Go Criterion for Paper A
-
-Entropy or another deployable signal must outperform matched random selection at
-10–30% budgets with a subject-bootstrap 95% confidence interval. The observed
-budget/recovery pair is reported without imposing a 20/80 threshold.
-
----
-
-## Figure
-
-Recovered positive transitions versus selection budget, with random confidence
-band and boundary/oracle reference curves.
-
----
-
-## Expected
-
-No numerical result is assumed before the experiment.
-
----
-
-## Paper A Headline
-
-> *The marginal utility of decoder capacity is spatially heterogeneous, and a
-> lightweight held-out signal identifies beneficial regions better than matched
-> random and anatomical heuristics.*
-
----
-
-# O10 Organ Size vs Difficulty
-
-## Research Question
-
-Is difficulty driven by organ size, or is it independent?
-
----
-
-## Motivation
-
-Reviewers will ask: "Is your difficulty signal just a proxy for small organs?"
-
-If small organs are uniformly difficult but large organs are not, difficulty is confounded by size.
-
-If difficulty is heterogeneous even within organ types, it is a richer signal than size alone.
-
----
-
-## Code
-
-```python
-# organ volume (proxy for size) vs mean difficulty
-for i, name in enumerate(organ_names):
-    mask = (lbl == i + 1)
-    size  = mask.float().sum().item()
-    diff  = difficulty_map[mask].mean().item()
-    print(f"{name:20s}  size={size:8.0f}  difficulty={diff:.4f}")
-
-# scatter plot: size vs difficulty across organs
 from scipy.stats import spearmanr
-r_size, _ = spearmanr(sizes, difficulties)
-print(f"Size vs Difficulty  Spearman r={r_size:.3f}")
+
+sizes, diffs = [], []
+for c, name in enumerate(BTCV_NAMES):
+    organ_sizes, organ_diffs = [], []
+    for batch in val_loader:
+        lbl = batch["label"].cpu().squeeze()
+        if not hasattr(batch, "_ent"):   # reuse precomputed entropy from O2/O4
+            continue
+        mask = (lbl == c + 1)
+        if mask.sum() > 0:
+            organ_sizes.append(mask.float().sum().item())
+            organ_diffs.append(batch["_ent"][mask].mean().item())
+    if organ_sizes:
+        sizes.append(np.mean(organ_sizes))
+        diffs.append(np.mean(organ_diffs))
+        print(f"{name:15s}  size={np.mean(organ_sizes):8.0f}  difficulty={np.mean(organ_diffs):.4f}")
+
+r_size, _ = spearmanr(sizes, diffs)
+print(f"\nOrgan size vs difficulty  Spearman ρ={r_size:.3f}")
 ```
 
----
-
-## Figure
-
-Scatter plot: organ volume vs mean difficulty (with organ labels)
+**Expected**: weak-to-moderate negative correlation (Spearman ρ ≈ −0.4 to −0.6),
+but high residual variance — large organs (stomach, liver boundary) also show high
+difficulty. This demonstrates entropy captures difficulty beyond organ size alone.
 
 ---
 
-## Expected
+### O11 — Routing Signal Comparison
 
-Weak-to-moderate negative correlation (smaller organs are harder on average),
+**Question**: Which test-time difficulty signal best predicts decoder gain?
 
-but high residual variance: some large organs (stomach, liver boundary) also have high difficulty.
+Run after O5. Evaluate five signals on the BTCV validation set:
 
----
+| Signal | Implementation | Overhead |
+|---|---|---|
+| Entropy | `-(p log p).sum(1)` over softmax | ~0 ms |
+| Confidence | `1 - max(p)` over softmax | ~0 ms |
+| Feature Variance | std of last decoder feature map | low |
+| MC Dropout | variance over T=10 stochastic passes | T× latency |
+| Boundary Probability | distance-to-foreground-boundary map | moderate |
 
-## Paper A Role
-
-Shows difficulty is not merely a size proxy, justifying entropy over a simple size-based routing rule.
-
----
-
-# O11 Routing Signal Comparison
-
-## Motivation
-
-Difficulty estimation should not rely on a single signal.
-
-The best routing signal for AdaDec3D should balance correlation with segmentation error,
-
-compute overhead, and stability across datasets.
-
----
-
-## Signals
-
-| Signal | Description |
-| ------ | ----------- |
-| Entropy | `-(p log p).sum(1)` over softmax output |
-| Confidence | `1 - max(p)` |
-| Feature Variance | variance of decoder feature maps |
-| MC Dropout | variance over T stochastic forward passes |
-| Boundary Probability | distance-to-boundary probability map |
-
----
-
-## Evaluation
-
-Correlation with segmentation error (Pearson r)
-
-Inference latency overhead (ms/volume)
-
-GPU memory overhead (MB)
-
-Stability across datasets (BTCV vs FeTA r difference)
-
----
-
-## Table
+For each signal compute:
+- Pearson correlation with per-bin O5 net gain
+- Inference latency overhead (ms/volume vs baseline)
+- Stability: BTCV vs FeTA correlation difference
 
 | Signal | Corr (BTCV) | Corr (FeTA) | Latency (ms) | Memory (MB) |
-| ------ | ----------- | ----------- | ------------ | ----------- |
-| Entropy | | | | |
-| Confidence | | | | |
+|---|---|---|---|---|
+| Entropy | | | ≈ 0 | ≈ 0 |
+| Confidence | | | ≈ 0 | ≈ 0 |
 | Feature Var | | | | |
 | MC Dropout | | | | |
 | Boundary | | | | |
 
----
-
-## Goal
-
-Select the routing signal for AdaDec3D.
-
-Expected winner: Entropy (highest correlation, near-zero overhead).
+**Expected winner**: entropy (best corr/overhead ratio). O11 informs the AdaDec3D routing signal choice (Paper B).
 
 ---
 
-# Go / No-Go Decision
+## Part 4: Go / No-Go Decision
 
-## Minimum criteria to proceed to Paper A submission
+### Minimum criteria for Paper A submission
 
-| Observation | Criterion | Status |
-| ----------- | --------- | ------ |
-| O3 | Pearson r(difficulty, error) > 0.40 | ☐ |
-| O5 | Held-out signal predicts net benefit beyond random/boundary controls | ☐ |
-| O9 | Deployable ranking beats random at 10–30% budgets with subject-level CI | ☐ |
-| O2 | Report observed difficulty concentration without a preset cutoff | ☐ |
+| Obs | Criterion | Result | Pass? |
+|-----|-----------|--------|-------|
+| O3 | Entropy–Error Pearson r > 0.60 | | ☐ |
+| O5 | Net benefit rises with entropy; positive > negative in high-entropy bins | | ☐ |
+| O9 | Entropy outperforms matched random at 10–30% budgets (CI lower > 0) | | ☐ |
+| O2 | Entropy distribution is skewed (most voxels low entropy) | | ☐ |
 
-**All four must pass** to proceed to Paper A write-up.
+**All four must pass** → proceed to Paper A write-up.
 
-## Additional criteria to proceed to Paper B (AdaDec3D)
+### Additional criteria for Paper B
 
-| Observation | Criterion | Status |
-| ----------- | --------- | ------ |
-| O7 | FeTA replication: r > 0.40 | ☐ |
-| O8 | SwinUNETR backbone: r > 0.45 | ☐ |
-| O11 | Entropy is best or tied-best routing signal | ☐ |
+| Obs | Criterion | Result | Pass? |
+|-----|-----------|--------|-------|
+| O7 | FeTA replication: net-gain/entropy r > 0.40 | | ☐ |
+| O8 | SwinUNETR backbone: net-gain/entropy r > 0.45 | | ☐ |
+| O11 | Entropy is best or tied-best routing signal | | ☐ |
 
-**All three must pass** to justify AdaDec3D design choices.
-
----
-
-# Deliverables
-
-## Notebooks
-
-| Notebook | Observations Covered |
-| -------- | -------------------- |
-| `observe_error.ipynb` | O1 |
-| `observe_difficulty.ipynb` | O2, O10 |
-| `observe_correlation.ipynb` | O3, O4 |
-| `observe_decoder_gain.ipynb` | O5, O9 |
-| `observe_evolution.ipynb` | O6 |
-| `observe_crossdataset.ipynb` | O7, O8 |
-| `observe_routing_signal.ipynb` | O11 |
+**All three must pass** → proceed to [Experiment-Design-AdaDec3D.md](Experiment-Design-AdaDec3D.md).
 
 ---
 
-# Final Outputs
+## Part 5: Deliverables
 
-## Figures
+### Notebooks
 
-| Figure | Content | Paper |
-| ------ | ------- | ----- |
-| Fig 1 | Error distribution map (O1) | A |
-| Fig 2 | Difficulty heatmap overlay (O2) | A |
-| Fig 3 | Difficulty–error scatter (O3) | A |
-| Fig 4 | Organ-wise difficulty bar plot (O4) | A |
-| Fig 5 | Decoder gain vs difficulty (O5) | A |
-| Fig 6 | Difficulty evolution over training (O6) | A |
-| Fig 7 | Pareto curve: cumulative gain vs uncertainty % (O9) | A (headline) |
-| Fig 8 | Organ size vs difficulty scatter (O10) | A |
-| Fig 9 | Routing signal comparison table (O11) | B |
+| Notebook | Observations |
+|---|---|
+| `obs_error.ipynb` | O1 |
+| `obs_entropy.ipynb` | O2, O10 |
+| `obs_correlation.ipynb` | O3, O4 |
+| `obs_decoder_gain.ipynb` | O5, O9 |
+| `obs_evolution.ipynb` | O6 |
+| `obs_crossdataset.ipynb` | O7, O8 |
+| `obs_routing_signal.ipynb` | O11 |
 
-## Tables
+### Figures (Paper A)
 
-| Table | Content |
-| ----- | ------- |
-| T1 | Organ-wise statistics (difficulty, Dice, HD95) |
+| ID | Content |
+|---|---|
+| Fig 1 | Error map: boundary vs interior (O1) |
+| Fig 2 | Entropy heatmap overlay (O2) |
+| Fig 3 | Entropy–error scatter by bin (O3) |
+| Fig 4 | Organ-wise difficulty bar plot (O4) |
+| Fig 5 | Net gain vs entropy curve (O5) |
+| Fig 6 | Difficulty evolution over training (O6) |
+| **Fig 7** | **Opportunity curve: entropy vs random (O9) — headline** |
+| Fig 8 | Organ size vs difficulty scatter (O10) |
+
+### Tables (Paper A)
+
+| ID | Content |
+|---|---|
+| T1 | Organ-wise DICE, entropy, positive/negative transitions (O4, O5) |
 | T2 | Cross-dataset replication (O7) |
 | T3 | Backbone consistency (O8) |
 | T4 | Routing signal comparison (O11) |
 
 ---
 
-# Expected Scientific Discovery
+## Part 6: Timeline — Phase 1 (Paper A)
 
-If all observations are validated,
+```
+Week 1: Setup
+  [ ] Environment install and verify
+  [ ] BTCV dataset download and sanity check (18 train, 12 val)
+  [ ] 100-iter sanity run, confirm no OOM
 
-this study supports the following conclusion.
+Week 2-3: Baseline training
+  [ ] E0 full 3DUXNET — 20 000 iter, ~4 sessions
+  [ ] E1 EffiDec3D   — 20 000 iter, ~2 sessions (matched budget)
+  [ ] Verify: 51.47 GMac, 3.16M params, mean DICE 79.0–79.5%
+  [ ] Save milestone checkpoints at epochs 5, 10, 20, 30, 50
 
-> Decoder redundancy in efficient 3D medical image segmentation is **spatially heterogeneous**.
-> A held-out lightweight signal identifies regions with positive marginal decoder
-> utility better than matched random and anatomical controls, while explicitly
-> accounting for decoder regressions and confidently missed structures.
-> This heterogeneity is consistent across datasets (BTCV, FeTA) and backbone architectures (UXNET, SwinUNETR).
+Week 4: Observations O1–O5 + O9 (critical gate)
+  [ ] O1: boundary >> interior error rate confirmed
+  [ ] O2: entropy distribution plotted, fraction reported
+  [ ] O3: r > 0.60 → entropy is a valid routing signal
+  [ ] O4: organ-wise difficulty table
+  [ ] O5: positive and negative transitions by entropy bin
+  [ ] O9: entropy vs random opportunity curve with 95% CI
+  [ ] --- PAPER A GO / NO-GO DECISION ---
 
-This conclusion is the core contribution of **Paper A** and directly motivates the AdaDec3D framework in **Paper B**.
+Week 5-6: Extended observations
+  [ ] O6: difficulty evolution (milestone checkpoints)
+  [ ] O7: FeTA replication (E0_feta + E1_feta)
+  [ ] O8: SwinUNETR consistency (E0_swin + E1_swin)
+  [ ] O10: organ size vs difficulty
+  [ ] O11: routing signal comparison table
+
+Week 7: Paper A draft
+  [ ] Write Paper A manuscript
+  [ ] Target venue: MIDL / MLMI / ISBI (submission typically Aug–Oct)
+```

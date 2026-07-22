@@ -11,3 +11,4 @@ nibabel
 tqdm
 h5py
 matplotlib
+einops

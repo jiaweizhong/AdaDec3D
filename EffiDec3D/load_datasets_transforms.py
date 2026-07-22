@@ -6,7 +6,6 @@ from batchgenerators.utilities.file_and_folder_operations import *
 
 from monai.transforms import (
     AsDiscreted,
-    AddChanneld,
     Compose,
     CropForegroundd,
     SpatialPadd,
@@ -150,7 +149,7 @@ def data_transforms(args):
         train_transforms = Compose(
             [
                 LoadImaged(keys=["image", "label"]),
-                AddChanneld(keys=["image", "label"]),
+                EnsureChannelFirstd(keys=["image", "label"]),
                 Orientationd(keys=["image", "label"], axcodes="RAS"),
                 ScaleIntensityRanged(
                     keys=["image"], a_min=0, a_max=1000,
@@ -190,7 +189,7 @@ def data_transforms(args):
         val_transforms = Compose(
             [
                 LoadImaged(keys=["image", "label"]),
-                AddChanneld(keys=["image", "label"]),
+                EnsureChannelFirstd(keys=["image", "label"]),
                 Orientationd(keys=["image", "label"], axcodes="RAS"),
                 ScaleIntensityRanged(
                     keys=["image"], a_min=0, a_max=1000,
@@ -204,7 +203,7 @@ def data_transforms(args):
         test_transforms = Compose(
             [
                 LoadImaged(keys=["image"]),
-                AddChanneld(keys=["image"]),
+                EnsureChannelFirstd(keys=["image"]),
                 Orientationd(keys=["image"], axcodes="RAS"),
                 ScaleIntensityRanged(
                     keys=["image"], a_min=0, a_max=1000,
@@ -219,7 +218,7 @@ def data_transforms(args):
         train_transforms = Compose(
             [
                 LoadImaged(keys=["image", "label"]),
-                AddChanneld(keys=["image", "label"]),
+                EnsureChannelFirstd(keys=["image", "label"]),
                 Spacingd(keys=["image", "label"], pixdim=(
                     1.0, 1.0, 1.2), mode=("bilinear", "nearest")),
                 # ResizeWithPadOrCropd(keys=["image", "label"], spatial_size=(256,256,128), mode=("constant")),
@@ -262,7 +261,7 @@ def data_transforms(args):
         val_transforms = Compose(
             [
                 LoadImaged(keys=["image", "label"]),
-                AddChanneld(keys=["image", "label"]),
+                EnsureChannelFirstd(keys=["image", "label"]),
                 Spacingd(keys=["image", "label"], pixdim=(
                     1.0, 1.0, 1.2), mode=("bilinear", "nearest")),
                 Orientationd(keys=["image", "label"], axcodes="RAS"),
@@ -278,7 +277,7 @@ def data_transforms(args):
         test_transforms = Compose(
             [
                 LoadImaged(keys=["image"]),
-                AddChanneld(keys=["image"]),
+                EnsureChannelFirstd(keys=["image"]),
                 Spacingd(keys=["image"], pixdim=(
                     1.0, 1.0, 1.2), mode=("bilinear")),
                 # ResizeWithPadOrCropd(keys=["image"], spatial_size=(168,168,128), mode=("constant")),
@@ -296,7 +295,7 @@ def data_transforms(args):
         train_transforms = Compose(
             [
                 LoadImaged(keys=["image", "label"]),
-                AddChanneld(keys=["image", "label"]),
+                EnsureChannelFirstd(keys=["image", "label"]),
                 Spacingd(keys=["image", "label"], pixdim=(
                     1.5, 1.5, 2.0), mode=("bilinear", "nearest")),
                 ResizeWithPadOrCropd(keys=["image", "label"], spatial_size=(512,512,512), mode=("constant")), # added by me
@@ -339,7 +338,7 @@ def data_transforms(args):
         val_transforms = Compose(
             [
                 LoadImaged(keys=["image", "label"]),
-                AddChanneld(keys=["image", "label"]),
+                EnsureChannelFirstd(keys=["image", "label"]),
                 Spacingd(keys=["image", "label"], pixdim=(
                     1.5, 1.5, 2.0), mode=("bilinear", "nearest")),
                 Orientationd(keys=["image", "label"], axcodes="RAS"),
@@ -355,7 +354,7 @@ def data_transforms(args):
         test_transforms = Compose(
             [
                 LoadImaged(keys=["image"]),
-                AddChanneld(keys=["image"]),
+                EnsureChannelFirstd(keys=["image"]),
                 Spacingd(keys=["image"], pixdim=(
                     1.5, 1.5, 2.0), mode=("bilinear")),
                 Orientationd(keys=["image"], axcodes="RAS"),
@@ -371,7 +370,7 @@ def data_transforms(args):
         train_transforms = Compose(
             [
                 LoadImaged(keys=["image", "label"]),
-                AddChanneld(keys=["image", "label"]),
+                EnsureChannelFirstd(keys=["image", "label"]),
                 Spacingd(keys=["image", "label"], pixdim=(
                     1.5, 1.5, 2.0), mode=("bilinear", "nearest")),
                 #ResizeWithPadOrCropd(keys=["image", "label"], spatial_size=(512,512,192), mode=("constant")), # added by me
@@ -414,7 +413,7 @@ def data_transforms(args):
         val_transforms = Compose(
             [
                 LoadImaged(keys=["image", "label"]),
-                AddChanneld(keys=["image", "label"]),
+                EnsureChannelFirstd(keys=["image", "label"]),
                 Spacingd(keys=["image", "label"], pixdim=(
                     1.5, 1.5, 2.0), mode=("bilinear", "nearest")),
                 Orientationd(keys=["image", "label"], axcodes="RAS"),
@@ -430,7 +429,7 @@ def data_transforms(args):
         test_transforms = Compose(
             [
                 LoadImaged(keys=["image"]),
-                AddChanneld(keys=["image"]),
+                EnsureChannelFirstd(keys=["image"]),
                 Spacingd(keys=["image"], pixdim=(
                     1.5, 1.5, 2.0), mode=("bilinear")),
                 Orientationd(keys=["image"], axcodes="RAS"),
@@ -446,7 +445,7 @@ def data_transforms(args):
         train_transforms = Compose(
             [
                 LoadImaged(keys=["image", "label"], ensure_channel_first=True),
-                #AddChanneld(keys=["image", "label"]),
+                #EnsureChannelFirstd(keys=["image", "label"]),
                 #ScaleIntensityRanged(
                 #    keys=["image"], a_min=-125, a_max=275,
                 #    b_min=0.0, b_max=1.0, clip=True,
@@ -521,7 +520,7 @@ def data_transforms(args):
         val_transforms = Compose(
             [
                 LoadImaged(keys=["image", "label"], ensure_channel_first=True),
-                #AddChanneld(keys=["image", "label"]),
+                #EnsureChannelFirstd(keys=["image", "label"]),
                 ScaleIntensityRanged(keys=["image"], a_min=-175, a_max=250, b_min=0.0, b_max=1.0, clip=True),
                 CropForegroundd(keys=["image", "label"], source_key="image"),
                 Orientationd(keys=["image", "label"], axcodes="RAS"),
@@ -538,7 +537,7 @@ def data_transforms(args):
         test_transforms = Compose(
             [
                 LoadImaged(keys=["image"], ensure_channel_first=True),
-                #AddChanneld(keys=["image", "label"]),
+                #EnsureChannelFirstd(keys=["image", "label"]),
                 ScaleIntensityRanged(keys=["image"], a_min=-175, a_max=250, b_min=0.0, b_max=1.0, clip=True),
                 CropForegroundd(keys=["image"], source_key="image"),
                 Orientationd(keys=["image"], axcodes="RAS"),
@@ -800,7 +799,7 @@ def data_transforms(args):
                 # load 2 Nifti images and stack them together
                 LoadImaged(keys=["image", "label"]),
                 EnsureChannelFirstd(keys="image"),
-                AddChanneld(keys="label"),
+                EnsureChannelFirstd(keys="label"),
                 EnsureTyped(keys=["image", "label"]),
                 Spacingd(keys=["image", "label"], pixdim=(0.5, 0.5, 0.5), mode=("bilinear", "nearest"),),#
                 #SpatialPadd(keys=["image", "label"], spatial_size=args.img_size),
@@ -842,7 +841,7 @@ def data_transforms(args):
             [
                 LoadImaged(keys=["image", "label"]),
                 EnsureChannelFirstd(keys="image"),
-                AddChanneld(keys="label"),
+                EnsureChannelFirstd(keys="label"),
                 EnsureTyped(keys=["image", "label"]),
                 Spacingd(keys=["image", "label"], pixdim=(0.5, 0.5, 0.5), mode=("bilinear", "nearest"),),#0.5, 0.5, 0.5
                 #SpatialPadd(keys=["image", "label"], spatial_size=args.img_size),

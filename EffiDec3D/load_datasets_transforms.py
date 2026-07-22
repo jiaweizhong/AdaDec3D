@@ -16,7 +16,7 @@ from monai.transforms import (
     ScaleIntensityRanged,
     KeepLargestConnectedComponentd,
     Spacingd,
-    ToTensord,
+
     RandAffined,
     RandFlipd,
     RandShiftIntensityd,
@@ -182,7 +182,7 @@ def data_transforms(args):
                     prob=1.0, spatial_size=args.img_size,
                     rotate_range=(0, 0, np.pi / 15),
                     scale_range=(0.1, 0.1, 0.1)),
-                ToTensord(keys=["image", "label"]),
+                EnsureTyped(keys=["image", "label"]),
             ]
         )
 
@@ -196,7 +196,7 @@ def data_transforms(args):
                     b_min=0.0, b_max=1.0, clip=True,
                 ),
                 CropForegroundd(keys=["image", "label"], source_key="image"),
-                ToTensord(keys=["image", "label"]),
+                EnsureTyped(keys=["image", "label"]),
             ]
         )
 
@@ -210,7 +210,7 @@ def data_transforms(args):
                     b_min=0.0, b_max=1.0, clip=True,
                 ),
                 CropForegroundd(keys=["image"], source_key="image"),
-                ToTensord(keys=["image"]),
+                EnsureTyped(keys=["image"]),
             ]
         )
 
@@ -254,7 +254,7 @@ def data_transforms(args):
                     prob=1.0, spatial_size=args.img_size,
                     rotate_range=(0, 0, np.pi / 30),
                     scale_range=(0.1, 0.1, 0.1)),
-                ToTensord(keys=["image", "label"]),
+                EnsureTyped(keys=["image", "label"]),
             ]
         )
 
@@ -270,7 +270,7 @@ def data_transforms(args):
                     b_min=0.0, b_max=1.0, clip=True,
                 ),
                 CropForegroundd(keys=["image", "label"], source_key="image"),
-                ToTensord(keys=["image", "label"]),
+                EnsureTyped(keys=["image", "label"]),
             ]
         )
 
@@ -287,7 +287,7 @@ def data_transforms(args):
                     b_min=0.0, b_max=1.0, clip=True,
                 ),
                 CropForegroundd(keys=["image"], source_key="image"),
-                ToTensord(keys=["image"]),
+                EnsureTyped(keys=["image"]),
             ]
         )
 
@@ -331,7 +331,7 @@ def data_transforms(args):
                     prob=1.0, spatial_size=args.img_size,
                     rotate_range=(0, 0, np.pi / 30),
                     scale_range=(0.1, 0.1, 0.1)),
-                ToTensord(keys=["image", "label"]),
+                EnsureTyped(keys=["image", "label"]),
             ]
         )
 
@@ -347,7 +347,7 @@ def data_transforms(args):
                     b_min=0.0, b_max=1.0, clip=True,
                 ),
                 CropForegroundd(keys=["image", "label"], source_key="image"),
-                ToTensord(keys=["image", "label"]),
+                EnsureTyped(keys=["image", "label"]),
             ]
         )
 
@@ -363,7 +363,7 @@ def data_transforms(args):
                     b_min=0.0, b_max=1.0, clip=True,
                 ),
                 CropForegroundd(keys=["image"], source_key="image"),
-                ToTensord(keys=["image"]),
+                EnsureTyped(keys=["image"]),
             ]
         )
     elif dataset == 'BTCV8':
@@ -406,7 +406,7 @@ def data_transforms(args):
                     prob=1.0, spatial_size=args.img_size,
                     rotate_range=(0, 0, np.pi / 30),
                     scale_range=(0.1, 0.1, 0.1)),
-                ToTensord(keys=["image", "label"]),
+                EnsureTyped(keys=["image", "label"]),
             ]
         )
 
@@ -422,7 +422,7 @@ def data_transforms(args):
                     b_min=0.0, b_max=1.0, clip=True,
                 ),
                 CropForegroundd(keys=["image", "label"], source_key="image"),
-                ToTensord(keys=["image", "label"]),
+                EnsureTyped(keys=["image", "label"]),
             ]
         )
 
@@ -438,7 +438,7 @@ def data_transforms(args):
                     b_min=0.0, b_max=1.0, clip=True,
                 ),
                 CropForegroundd(keys=["image"], source_key="image"),
-                ToTensord(keys=["image"]),
+                EnsureTyped(keys=["image"]),
             ]
         )
     elif dataset == 'BTCV13':
@@ -513,7 +513,7 @@ def data_transforms(args):
                     prob=1.0, spatial_size=args.img_size,
                     rotate_range=(0, 0, np.pi / 30),
                     scale_range=(0.1, 0.1, 0.1)),
-                ToTensord(keys=["image", "label"]),
+                EnsureTyped(keys=["image", "label"]),
             ]
         )
 
@@ -530,7 +530,7 @@ def data_transforms(args):
                 #    keys=["image"], a_min=-125, a_max=275,
                 #    b_min=0.0, b_max=1.0, clip=True,
                 #),
-                ToTensord(keys=["image", "label"]),
+                EnsureTyped(keys=["image", "label"]),
             ]
         )
 
@@ -547,7 +547,7 @@ def data_transforms(args):
                 #    keys=["image"], a_min=-125, a_max=275,
                 #    b_min=0.0, b_max=1.0, clip=True,
                 #),
-                #ToTensord(keys=["image"]),
+                #EnsureTyped(keys=["image"]),
             ]
         )  
     elif dataset == 'Task09_Spleen':

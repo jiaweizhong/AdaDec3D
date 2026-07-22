@@ -1,6 +1,6 @@
 # Core DL — PyTorch is pre-installed in the AutoDL image (2.6+/2.8+, CUDA 12.8)
 # Install remaining packages:
-monai>=1.3.1,<1.4
+monai>=1.4
 timm
 batchgenerators
 medpy

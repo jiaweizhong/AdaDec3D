@@ -282,14 +282,14 @@ O7 needs both an E0-FeTA and an E1-FeTA run with identical schedules.
 # E0 FeTA
 python main_train_BTCV_TU.py \
   --root /root/autodl-tmp/feta-processed --output /root/output/E0_feta \
-  --dataset FeTA --network 3DUXNET \
+  --dataset feta --network 3DUXNET \
   --max_iter 20000 --eval_step 500 --lr 0.001 \
   --cache_rate 1.0 --num_workers 8 --gpu 0
 
 # E1 FeTA
 python main_train_BTCV_TU.py \
   --root /root/autodl-tmp/feta-processed --output /root/output/E1_feta \
-  --dataset FeTA --network 3DUXNET_EffiDec3D \
+  --dataset feta --network 3DUXNET_EffiDec3D \
   --n_decoder_channels 48 --resolution_factor 2 --skip_aggregation addition \
   --max_iter 20000 --eval_step 500 --lr 0.001 \
   --cache_rate 1.0 --num_workers 8 --gpu 0

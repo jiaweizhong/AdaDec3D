@@ -66,19 +66,31 @@ The practical method is **region-adaptive**, not independent voxel routing. Sele
 
 ## 1.2 Decoder Redundancy
 
-EffiDec3D showed that the decoder contributes a surprisingly large proportion of overall computation while providing relatively limited performance gain: decoder channels can be drastically reduced and the highest-resolution stage removed while maintaining near-identical accuracy. This establishes that modern decoders contain significant structural redundancy, and that aggressive architectural simplification is feasible.
+EffiDec3D showed that the decoder contributes a surprisingly large proportion of overall computation while providing relatively limited performance gain. Two specific decisions drove its 90%+ FLOP reduction:
+
+**Channel reduction** — EffiDec3D sets every decoder stage to a uniform width of `C_reduced = min(C_encoder stages)`. For 3D UX-Net with encoder channels [48, 96, 192, 384], this means C_reduced = 48 across all decoder stages, compressing 53M → 3.16M parameters. The rule is architectural and global: 48 channels are applied identically to every location in every decoder stage.
+
+**Resolution restriction** — EffiDec3D removes the highest-resolution decoder stage (H×W×D) and instead outputs predictions at H/2×W/2×D/2, restoring to full resolution via a single trilinear upsample. An empirical ablation showed this costs only −0.3% DICE on BTCV (79.7% → 79.4%) while saving 368 GFLOPs; on FeTA it actually improves accuracy (+0.44%). The full-resolution stage contributes almost nothing on average and is globally removed.
+
+These two decisions are made at the **stage level**: which decoder blocks should be eliminated or compressed for all inputs uniformly. This establishes that modern decoders contain significant structural redundancy and that aggressive simplification is feasible.
 
 ## 1.3 The Static Computation Problem
 
-EffiDec3D achieves efficiency through architectural simplification, but the resulting decoder assigns identical computation to every voxel — formally, C(v) = C_fixed for all v. This assumption implies every voxel contributes equally to segmentation difficulty, which is unlikely to hold in practice.
+EffiDec3D's two design decisions answer a **stage-level** question: *which decoder blocks can be globally eliminated?* They do not address the **spatial** question: *does every voxel in the remaining decoder equally benefit from its 48 channels?*
+
+The resulting decoder assigns identical computation to every voxel — formally, C(v) = C_fixed = 48 channels for all v, everywhere in the volume. This uniform treatment is efficient on average, but implies every voxel contributes equally to segmentation difficulty, which is unlikely to hold in practice.
 
 Medical images exhibit highly heterogeneous anatomical complexity. Large organs (liver, spleen, kidneys) present smooth boundaries and large volumes; small structures (pancreas, adrenal glands, esophagus, vessels) present irregular geometry, blurry boundaries, severe class imbalance, and limited context. Prediction errors cluster around anatomical boundaries, thin structures, and low-contrast regions rather than distributing uniformly. This raises the central question:
 
-> **Do difficult regions require more decoder computation than easy regions?**
+> **Do difficult spatial regions require more decoder computation than easy regions — even within an already-compressed decoder?**
+
+EffiDec3D's ablation shows the full-resolution stage provides near-zero *average* benefit, justifying its removal. But averages hide spatial heterogeneity: the removed FLOPs might have been disproportionately valuable for the 5–10% of voxels at hard boundaries and small organs. The question is whether that heterogeneity is large enough to exploit adaptively.
 
 ## 1.4 Research Gap
 
-Existing efficient segmentation methods optimize decoder computation through static architectural simplifications: channel reduction, layer removal, lightweight convolutions, and efficient attention. Dynamic computation has been extensively studied in classification, NLP, and vision transformers — through dynamic inference, adaptive computation, and sparse mixture-of-experts — but **adaptive decoder computation** in 3D medical image segmentation remains unexplored. Whether decoder computation should be spatially adaptive is a fundamental scientific question that has not been answered.
+Existing efficient segmentation methods — including EffiDec3D — optimize decoder computation through **static architectural simplifications**: channel reduction, layer removal, lightweight convolutions. These methods answer the question "which decoder stages are globally expendable?" by averaging performance across all voxels and all subjects, then making one fixed architectural decision.
+
+They do not ask: "given a fixed decoder budget, which spatial regions would benefit most from additional capacity?" Dynamic computation has been extensively studied in classification, NLP, and vision transformers — through dynamic inference, adaptive computation, and sparse mixture-of-experts — but **spatially adaptive decoder computation** in 3D medical image segmentation remains unexplored. Whether decoder computation should vary across regions within the same forward pass is a fundamentally different question, and it has not been answered.
 
 ---
 

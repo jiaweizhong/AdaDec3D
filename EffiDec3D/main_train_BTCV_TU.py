@@ -8,7 +8,7 @@ python main_finetune_BTCV_TU.py --root /research/data/amos_trns/ --output output
 
 """
 
-from torch.cuda.amp import autocast, GradScaler
+from torch.cuda.amp import GradScaler
 
 from monai.utils import set_determinism
 from monai.transforms import AsDiscrete
@@ -139,6 +139,8 @@ if args.ds == 'True':
     
 ## Load Networks
 device = torch.device("cuda:0")
+# BF16 is native on Ampere/Hopper/Blackwell; fall back to FP16 on older cards.
+_amp_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
 
 if args.network == '3DUXNET_EffiDec3D':
 	model = UXNET_EffiDec3D(
@@ -436,7 +438,7 @@ elif args.optim == 'Adam':
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 print('Optimizer for training: {}, learning rate: {}'.format(args.optim, args.lr))
 # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.9, patience=1000)
-scaler = GradScaler()
+scaler = GradScaler(enabled=(_amp_dtype == torch.float16))
 
 if '3DUXNET' in args.network and 'EffiDec3D' in args.network:
     args.output = args.output + '_network_' + args.network + '_fc' + str(args.channels[0]) + '_' + str(args.channels[1]) + '_' + str(args.channels[2]) + '_' + str(args.channels[3]) + '_n_decoder_channels' + str(args.n_decoder_channels) + '_rf'+str(args.resolution_factor)+'_skip_aggregation_'+args.skip_aggregation + '_roi' + str(args.img_size[0]) + 'x' + str(args.img_size[1]) + 'x' + str(args.img_size[2])+'_vb'+str(args.val_batch)+'_cs'+str(args.crop_sample)+'_overlap'+str(args.overlap) + '_ds' + str(args.ds) + '_pretrain_'+str(args.pretrain)+'_lr_'+str(args.lr)
@@ -501,7 +503,7 @@ def validation(epoch_iterator_val):
                 val_labels[val_labels==13] = 0
                 val_labels[val_labels==11] = 5
             
-            with autocast(enabled=False):
+            with torch.autocast("cuda", dtype=_amp_dtype):
                 val_outputs = sliding_window_inference_1out(val_inputs, (args.img_size[0], args.img_size[1], args.img_size[2]), args.val_batch, model, overlap=args.overlap)
                 val_labels_list = decollate_batch(val_labels)
                 val_labels_convert = [
@@ -533,7 +535,7 @@ def train(global_step, train_loader, dice_val_best, global_step_best):
     for step, batch in enumerate(epoch_iterator):
         step += 1
         x, y = (batch["image"].cuda(), batch["label"].cuda())
-        with autocast(enabled=False):
+        with torch.autocast("cuda", dtype=_amp_dtype):
             p = model(x, mode='train')
             P = []
             if type(p) is not list:
@@ -692,7 +694,7 @@ def validation_last(epoch_iterator_val):
                 val_labels[val_labels == 13] = 0
                 val_labels[val_labels == 11] = 5
             
-            with autocast(enabled=False):
+            with torch.autocast("cuda", dtype=_amp_dtype):
                 val_outputs = sliding_window_inference_1out(
                     val_inputs, 
                     (args.img_size[0], args.img_size[1], args.img_size[2]), 
@@ -826,7 +828,7 @@ def validation_save(epoch_iterator_val):
                 val_labels[val_labels == 13] = 0
                 val_labels[val_labels == 11] = 5
             
-            with autocast(enabled=False):
+            with torch.autocast("cuda", dtype=_amp_dtype):
                 val_outputs = sliding_window_inference_1out(
                     val_inputs, 
                     (args.img_size[0], args.img_size[1], args.img_size[2]), 

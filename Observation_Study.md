@@ -22,55 +22,67 @@ Paper A is self-contained. The selection budget and recovered benefit are **outc
 
 ### Hardware
 
-Kaggle P100 (16 GB VRAM, CUDA). All code is CUDA-native; no changes needed.
+AutoDL RTX 5090 (32 GB VRAM, Blackwell / SM_100). Requires CUDA ≥ 12.8 and PyTorch ≥ 2.6.
 
-### Timing estimates
+Both training scripts auto-detect GPU capability and use BF16 mixed precision on Blackwell/Ampere (`torch.autocast("cuda", dtype=torch.bfloat16)`), falling back to FP16 on older cards. BF16 gives ~1.5–2× wall-clock speedup over FP32 on the 5090 with no loss scaling required.
+
+### Timing estimates (RTX 5090 + BF16)
 
 ```
 E0 full 3DUXNET (53M params, 632 GFLOPs):
-  ~5-8 s/iter → 20 000 iter ≈ 33 h → 4 Kaggle sessions
+  ~0.4-0.7 s/iter → 20 000 iter ≈ 2-4 h
 
 E1 EffiDec3D (3.16M params, 51.47 GFLOPs):
-  ~1-2 s/iter → 20 000 iter ≈ 8-10 h → 2 sessions
+  ~0.1-0.2 s/iter → 20 000 iter ≈ 30-60 min
 ```
 
 **Matched pilot**: run both models for exactly 20 000 optimizer steps to avoid
 confounding decoder capacity with training exposure. A confirmatory run may
 extend both to 45 000 steps.
 
-The training script saves `last_model.pth` after every eval step and auto-resumes.
-Download before each 9-hour Kaggle session ends and re-upload as a dataset.
+The training script saves `last_model.pth` after every eval step and auto-resumes on restart. Run training inside `tmux` or `screen` so the session persists if the SSH connection drops.
 
 ### File layout
 
 ```
-/kaggle/
-  input/
-    btcv-synapse/       imagesTr/ labelsTr/ imagesVal/ labelsVal/
-    feta-processed/     imagesTr/ labelsTr/ imagesVal/ labelsVal/
-    adadec3d-code/      EffiDec3D/ networks/ ...
-  working/
-    output/             training checkpoints
-    obs/                observation study figures
+/root/
+  AdaDec3D/           EffiDec3D/ networks/ ...   (code, cloned from repo)
+  autodl-tmp/
+    btcv-synapse/     imagesTr/ labelsTr/ imagesVal/ labelsVal/
+    feta-processed/   imagesTr/ labelsTr/ imagesVal/ labelsVal/
+  output/             training checkpoints
+  obs/                observation study figures
 ```
 
-### Install dependencies
+`/root/autodl-tmp/` is the AutoDL persistent data disk (larger SSD, persists between instances). Put datasets there, not in `/root/` which is on the system disk.
+
+### AutoDL instance setup
+
+Select image: **PyTorch 2.6.0 / CUDA 12.8** (required for RTX 5090 Blackwell support).
 
 ```bash
+# 1. Clone code
+cd /root && git clone https://github.com/<your-repo>/AdaDec3D.git
+
+# 2. Install dependencies (inside the pre-activated conda env)
 pip install monai==1.3.0 batchgenerators medpy ptflops scikit-learn scipy nibabel tqdm
+
+# 3. Upload datasets to /root/autodl-tmp/btcv-synapse/ and /root/autodl-tmp/feta-processed/
+#    (use AutoDL file upload, scp, or wget)
 ```
 
 ### Verify environment
 
 ```bash
-cd /kaggle/input/adadec3d-code/EffiDec3D
+cd /root/AdaDec3D/EffiDec3D
 python -c "
 import monai, torch
 from networks.UXNet_3D.network_backbone import UXNET_EffiDec3D
 from networks.swin_unetr_effidec3d import SwinUNETR_EffiDec3D
 from monai_utils.inferers.utils import sliding_window_inference_1out
 print('All imports OK | MONAI', monai.__version__, '| PyTorch', torch.__version__)
-print(torch.cuda.get_device_name(0))
+print('GPU:', torch.cuda.get_device_name(0))
+print('BF16 supported:', torch.cuda.is_bf16_supported())
 "
 ```
 
@@ -86,7 +98,7 @@ Official download: [synapse.org](https://www.synapse.org) project `syn3193805`.
 **Expected layout**
 
 ```
-/kaggle/input/btcv-synapse/
+/root/autodl-tmp/btcv-synapse/
   imagesTr/   img0001.nii.gz … (18 cases)
   labelsTr/   label0001.nii.gz …
   imagesVal/  img0021.nii.gz … (12 cases)
@@ -121,7 +133,7 @@ VAL   = ["0029","0030","0031","0032","0033","0034","0035","0036",
 ```bash
 python -c "
 import argparse; from load_datasets_transforms import data_loader
-args = argparse.Namespace(root='/kaggle/input/btcv-synapse', dataset='BTCV13', mode='train')
+args = argparse.Namespace(root='/root/autodl-tmp/btcv-synapse', dataset='BTCV13', mode='train')
 tr, val, nc = data_loader(args)
 print('Train:', len(tr['images']), 'Val:', len(val['images']), 'Classes:', nc)
 "
@@ -136,8 +148,8 @@ print('Train:', len(tr['images']), 'Val:', len(val['images']), 'Classes:', nc)
 ```python
 import glob, shutil, os
 
-src = "/path/to/feta_2.2"
-dst = "/kaggle/input/feta-processed"
+src = "/root/autodl-tmp/feta_2.2"
+dst = "/root/autodl-tmp/feta-processed"
 subjects = sorted(glob.glob(f"{src}/sub-*/"))
 
 for split, subs in [("Tr", subjects[:70]), ("Val", subjects[70:])]:
@@ -164,10 +176,10 @@ comparison for O5.
 ### E0 — Full 3DUXNET (upper bound)
 
 ```bash
-cd /kaggle/input/adadec3d-code/EffiDec3D
+cd /root/AdaDec3D/EffiDec3D
 
 python main_train_BTCV_TU.py \
-  --root /kaggle/input/btcv-synapse --output /kaggle/working/output/E0 \
+  --root /root/autodl-tmp/btcv-synapse --output /root/output/E0 \
   --dataset BTCV13 --network 3DUXNET \
   --img_size 96 96 96 --n_channels 1 \
   --channels 48 96 192 384 --feature_size 48 \
@@ -176,14 +188,14 @@ python main_train_BTCV_TU.py \
   --lr 0.001 --optim AdamW \
   --max_iter 20000 --eval_step 500 \
   --val_batch 1 --gpu 0 \
-  --cache_rate 0.5 --num_workers 2 --overlap 0.7
+  --cache_rate 1.0 --num_workers 8 --overlap 0.7
 ```
 
 ### E1 — EffiDec3D (baseline to beat)
 
 ```bash
 python main_train_BTCV_TU.py \
-  --root /kaggle/input/btcv-synapse --output /kaggle/working/output/E1 \
+  --root /root/autodl-tmp/btcv-synapse --output /root/output/E1 \
   --dataset BTCV13 --network 3DUXNET_EffiDec3D \
   --img_size 96 96 96 --n_channels 1 \
   --channels 48 96 192 384 \
@@ -193,7 +205,7 @@ python main_train_BTCV_TU.py \
   --lr 0.001 --optim AdamW \
   --max_iter 20000 --eval_step 500 \
   --val_batch 1 --gpu 0 \
-  --cache_rate 0.5 --num_workers 2 --overlap 0.7
+  --cache_rate 1.0 --num_workers 8 --overlap 0.7
 ```
 
 **Critical parameters for E1**
@@ -216,13 +228,13 @@ Number of parameters:       3.16 M
 
 ### Checkpoint resumption
 
-```python
-import shutil, glob
-ckpts = glob.glob("/kaggle/working/output/E1/**/last_model.pth", recursive=True)
-shutil.copy(ckpts[0], "/kaggle/working/last_model_E1.pth")
-```
+The script saves `last_model.pth` after every eval step and auto-resumes on restart. Run inside `tmux` to survive SSH disconnection:
 
-Upload as a Kaggle Dataset input; the script auto-resumes.
+```bash
+tmux new -s e1_train
+# ... run training command ...
+# Ctrl-B D to detach; tmux attach -t e1_train to re-attach
+```
 
 ### Milestone checkpoints (required for O6)
 
@@ -242,18 +254,18 @@ O7 needs both an E0-FeTA and an E1-FeTA run with identical schedules.
 ```bash
 # E0 FeTA
 python main_train_BTCV_TU.py \
-  --root /kaggle/input/feta-processed --output /kaggle/working/output/E0_feta \
+  --root /root/autodl-tmp/feta-processed --output /root/output/E0_feta \
   --dataset FeTA --network 3DUXNET \
   --max_iter 20000 --eval_step 500 --lr 0.001 \
-  --cache_rate 0.5 --num_workers 2 --gpu 0
+  --cache_rate 1.0 --num_workers 8 --gpu 0
 
 # E1 FeTA
 python main_train_BTCV_TU.py \
-  --root /kaggle/input/feta-processed --output /kaggle/working/output/E1_feta \
+  --root /root/autodl-tmp/feta-processed --output /root/output/E1_feta \
   --dataset FeTA --network 3DUXNET_EffiDec3D \
   --n_decoder_channels 48 --resolution_factor 2 --skip_aggregation addition \
   --max_iter 20000 --eval_step 500 --lr 0.001 \
-  --cache_rate 0.5 --num_workers 2 --gpu 0
+  --cache_rate 1.0 --num_workers 8 --gpu 0
 ```
 
 ### SwinUNETR_EffiDec3D on BTCV (required for O8)
@@ -263,18 +275,18 @@ O8 needs both E0-Swin and E1-Swin with identical schedules.
 ```bash
 # E0 SwinUNETR
 python main_train_BTCV_TU.py \
-  --root /kaggle/input/btcv-synapse --output /kaggle/working/output/E0_swin \
+  --root /root/autodl-tmp/btcv-synapse --output /root/output/E0_swin \
   --dataset BTCV13 --network SwinUNETR \
   --max_iter 20000 --eval_step 500 --lr 0.001 \
-  --cache_rate 0.5 --num_workers 2 --gpu 0
+  --cache_rate 1.0 --num_workers 8 --gpu 0
 
 # E1 SwinUNETR_EffiDec3D
 python main_train_BTCV_TU.py \
-  --root /kaggle/input/btcv-synapse --output /kaggle/working/output/E1_swin \
+  --root /root/autodl-tmp/btcv-synapse --output /root/output/E1_swin \
   --dataset BTCV13 --network SwinUNETR_EffiDec3D \
   --n_decoder_channels 48 --resolution_factor 2 --skip_aggregation addition \
   --max_iter 20000 --eval_step 500 --lr 0.001 \
-  --cache_rate 0.5 --num_workers 2 --gpu 0
+  --cache_rate 1.0 --num_workers 8 --gpu 0
 ```
 
 ---
@@ -282,7 +294,7 @@ python main_train_BTCV_TU.py \
 ## Part 3: Observation Study
 
 **Prerequisites**: E0 and E1 `best_metric_model.pth` trained and verified.
-Save all figures to `/kaggle/working/obs/`.
+Save all figures to `/root/obs/`.
 
 ### Common notebook setup
 
@@ -321,7 +333,7 @@ BTCV_NAMES = ["Aorta","Gallbladder","Spleen","L.Kidney","R.Kidney",
               "Liver","Stomach","IVC","Port.Vein","Pancreas","R.Adrenal","L.Adrenal","Duodenum"]
 
 args = argparse.Namespace(
-    root="/kaggle/input/btcv-synapse", dataset="BTCV13",
+    root="/root/autodl-tmp/btcv-synapse", dataset="BTCV13",
     mode="validation", crop_sample=4, img_size=[96, 96, 96]
 )
 _, val_samples, n_cls = data_loader(args)
@@ -332,8 +344,8 @@ val_files = [{"image": im, "label": lb}
 val_ds = Dataset(data=val_files, transform=val_transform)
 val_loader = DataLoader(val_ds, batch_size=1, shuffle=False, num_workers=2)
 
-effi_model = load_model("3DUXNET_EffiDec3D", "/kaggle/input/e1-ckpt/best_metric_model.pth")
-full_model  = load_model("3DUXNET",           "/kaggle/input/e0-ckpt/best_metric_model.pth")
+effi_model = load_model("3DUXNET_EffiDec3D", "/root/output/E1/.../best_metric_model.pth")
+full_model  = load_model("3DUXNET",           "/root/output/E0/.../best_metric_model.pth")
 post_pred   = AsDiscrete(argmax=True, to_onehot=14)
 post_lbl    = AsDiscrete(to_onehot=14)
 ```
@@ -404,7 +416,7 @@ plt.figure(figsize=(8,4))
 plt.hist(all_ent, bins=50, log=True)
 plt.xlabel("Entropy"); plt.ylabel("Voxel count (log)")
 plt.title("O2: Entropy Distribution")
-plt.savefig("/kaggle/working/obs/O2_entropy.png", dpi=150)
+plt.savefig("/root/obs/O2_entropy.png", dpi=150)
 ```
 
 **Report**: the observed distribution and fraction. Do not apply a hard threshold.
@@ -536,7 +548,7 @@ MILESTONES = [5, 10, 20, 30, 50]
 
 for epoch in MILESTONES:
     m = load_model("3DUXNET_EffiDec3D",
-                   f"/kaggle/input/e1-ckpt/epoch_{epoch:03d}.pth")
+                   f"/root/output/E1/.../epoch_{epoch:03d}.pth")
     mean_ents = []
     with torch.no_grad():
         for batch in val_loader:
@@ -564,7 +576,7 @@ for epoch in MILESTONES:
 FETA_NAMES = ["IS","WM","CGM","DGM","CE","BS","CSF"]
 
 feta_args = argparse.Namespace(
-    root="/kaggle/input/feta-processed", dataset="FeTA",
+    root="/root/autodl-tmp/feta-processed", dataset="FeTA",
     mode="validation", crop_sample=4, img_size=[96,96,96]
 )
 _, feta_val, n_cls_feta = data_loader(feta_args)
@@ -574,8 +586,8 @@ feta_files = [{"image": im, "label": lb}
 feta_loader = DataLoader(Dataset(data=feta_files, transform=feta_transform),
                          batch_size=1, shuffle=False, num_workers=2)
 
-full_feta  = load_model("3DUXNET",           "/kaggle/input/e0-feta/best_metric_model.pth")
-effi_feta  = load_model("3DUXNET_EffiDec3D", "/kaggle/input/e1-feta/best_metric_model.pth")
+full_feta  = load_model("3DUXNET",           "/root/output/E0_feta/.../best_metric_model.pth")
+effi_feta  = load_model("3DUXNET_EffiDec3D", "/root/output/E1_feta/.../best_metric_model.pth")
 
 # Run identical O5 analysis using feta_loader, full_feta, effi_feta, n_cls=8
 # ... (same code as O5 above, replace val_loader / full_model / effi_model)
@@ -592,8 +604,8 @@ print(f"{'GO ✓' if r_feta > 0.40 else 'NO-GO ✗'}  (threshold r > 0.40)")
 *Requires E0_swin and E1_swin from Part 2.*
 
 ```python
-full_swin = load_model("SwinUNETR",          "/kaggle/input/e0-swin/best_metric_model.pth")
-effi_swin = load_model("SwinUNETR_EffiDec3D","/kaggle/input/e1-swin/best_metric_model.pth")
+full_swin = load_model("SwinUNETR",          "/root/output/E0_swin/.../best_metric_model.pth")
+effi_swin = load_model("SwinUNETR_EffiDec3D","/root/output/E1_swin/.../best_metric_model.pth")
 
 # Run identical O5 analysis using val_loader, full_swin, effi_swin
 # ... (same code as O5 above, replace full_model / effi_model)
@@ -678,7 +690,7 @@ plt.xlabel("Selected union-foreground voxels (%)")
 plt.ylabel("Positive decoder transitions recovered (%)")
 plt.title("O9: Selective-Allocation Opportunity")
 plt.legend()
-plt.savefig("/kaggle/working/obs/O9_opportunity_curve.png", dpi=150)
+plt.savefig("/root/obs/O9_opportunity_curve.png", dpi=150)
 plt.show()
 ```
 

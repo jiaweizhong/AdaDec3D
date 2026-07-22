@@ -36,7 +36,7 @@ import scipy.ndimage as ndimage
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.cuda.amp import autocast, GradScaler
+from torch.cuda.amp import GradScaler
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
@@ -119,6 +119,8 @@ parser.add_argument("--seed",        type=int,   default=0)
 args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 device = torch.device("cuda:0")
+# BF16 is native on Ampere/Hopper/Blackwell; fall back to FP16 on older cards.
+_amp_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
 
 # ---------------------------------------------------------------------------
 # Data
@@ -219,7 +221,7 @@ else:  # stage 2
     ], weight_decay=1e-5)
     print(f"[Stage 2] backbone lr={backbone_lr:.2e}, new modules lr={args.lr:.2e}")
 
-scaler = GradScaler()
+scaler = GradScaler(enabled=(_amp_dtype == torch.float16))
 
 # ---------------------------------------------------------------------------
 # Output directory & checkpoint resumption
@@ -354,7 +356,7 @@ def validation(val_loader):
         for batch in tqdm(val_loader, desc="Validate", dynamic_ncols=True, leave=False):
             val_inputs = batch["image"].to(device)
             val_labels = batch["label"].to(device)
-            with autocast(enabled=False):
+            with torch.autocast("cuda", dtype=_amp_dtype):
                 val_outputs = sliding_window_inference_1out(
                     val_inputs,
                     tuple(args.img_size),
@@ -401,7 +403,7 @@ def validation_final(val_loader):
             val_inputs  = batch["image"].to(device)
             val_labels  = batch["label"].to(device)
             _, _, h, w, d = val_labels.shape
-            with autocast(enabled=False):
+            with torch.autocast("cuda", dtype=_amp_dtype):
                 val_outputs = sliding_window_inference_1out(
                     val_inputs, tuple(args.img_size), args.val_batch,
                     model, overlap=args.overlap, mode=args.overlap_mode,
@@ -434,7 +436,7 @@ def train_one_epoch(global_step, train_loader, dice_val_best, global_step_best):
         x = batch["image"].to(device)
         y = batch["label"].to(device)
 
-        with autocast(enabled=False):
+        with torch.autocast("cuda", dtype=_amp_dtype):
             outputs = model(x)
             # outputs = [final_pred, coarse_pred, router_weights] during training
             final_pred    = outputs[0]

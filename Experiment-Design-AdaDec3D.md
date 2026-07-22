@@ -61,23 +61,23 @@ Run ≥ 3 matched seeds. Select hyperparameters on a dev fold; report on held-ou
 
 ## Part 3: Training Commands
 
-All commands run from `/kaggle/input/adadec3d-code/EffiDec3D`.
+All commands run from `/root/AdaDec3D/EffiDec3D`.
 Common args for every run:
 
 ```
---root /kaggle/input/btcv-synapse --dataset BTCV13
---cache_rate 0.5 --num_workers 2 --gpu 0
+--root /root/autodl-tmp/btcv-synapse --dataset BTCV13
+--cache_rate 1.0 --num_workers 8 --gpu 0
 ```
 
 ### Stage 1 — freeze backbone, train new modules only
 
 ```bash
 python main_train_adadec3d.py \
-  --effidec3d_weights /kaggle/input/e1-ckpt/best_metric_model.pth \
-  --output /kaggle/working/output/E4 \
+  --effidec3d_weights /root/output/E1/.../best_metric_model.pth \
+  --output /root/output/E4 \
   --stage 1 --max_iter 20000 --eval_step 500 --lr 5e-4 \
-  --root /kaggle/input/btcv-synapse --dataset BTCV13 \
-  --cache_rate 0.5 --num_workers 2 --gpu 0
+  --root /root/autodl-tmp/btcv-synapse --dataset BTCV13 \
+  --cache_rate 1.0 --num_workers 8 --gpu 0
 ```
 
 Expected at startup:
@@ -92,11 +92,11 @@ Expected at startup:
 
 ```bash
 python main_train_adadec3d.py \
-  --stage1_ckpt /kaggle/input/e4-stage1/best_metric_model.pth \
-  --output /kaggle/working/output/E4 \
+  --stage1_ckpt /root/output/E4/stage1/.../best_metric_model.pth \
+  --output /root/output/E4 \
   --stage 2 --max_iter 25000 --eval_step 500 --lr 5e-4 --backbone_lr_factor 0.1 \
-  --root /kaggle/input/btcv-synapse --dataset BTCV13 \
-  --cache_rate 0.5 --num_workers 2 --gpu 0
+  --root /root/autodl-tmp/btcv-synapse --dataset BTCV13 \
+  --cache_rate 1.0 --num_workers 8 --gpu 0
 ```
 
 Backbone LR = 5e-4 × 0.1 = 5e-5. New modules LR = 5e-4.
@@ -107,36 +107,36 @@ Backbone LR = 5e-4 × 0.1 = 5e-5. New modules LR = 5e-4.
 # E2: MoE only
 python main_train_adadec3d.py \
   --effidec3d_weights /path/to/E1/best_metric_model.pth \
-  --output /kaggle/working/output/E2 \
+  --output /root/output/E2 \
   --stage 1 --use_moe True --use_roi False \
   --max_iter 20000 --lr 5e-4 \
-  --root /kaggle/input/btcv-synapse --dataset BTCV13 \
-  --cache_rate 0.5 --num_workers 2 --gpu 0
+  --root /root/autodl-tmp/btcv-synapse --dataset BTCV13 \
+  --cache_rate 1.0 --num_workers 8 --gpu 0
 
 python main_train_adadec3d.py \
   --stage1_ckpt /path/to/E2/stage1/best_metric_model.pth \
-  --output /kaggle/working/output/E2 \
+  --output /root/output/E2 \
   --stage 2 --use_moe True --use_roi False \
   --max_iter 25000 --lr 5e-4 \
-  --root /kaggle/input/btcv-synapse --dataset BTCV13 \
-  --cache_rate 0.5 --num_workers 2 --gpu 0
+  --root /root/autodl-tmp/btcv-synapse --dataset BTCV13 \
+  --cache_rate 1.0 --num_workers 8 --gpu 0
 
 # E3: ROI only
 python main_train_adadec3d.py \
   --effidec3d_weights /path/to/E1/best_metric_model.pth \
-  --output /kaggle/working/output/E3 \
+  --output /root/output/E3 \
   --stage 1 --use_moe False --use_roi True \
   --max_iter 20000 --lr 5e-4 \
-  --root /kaggle/input/btcv-synapse --dataset BTCV13 \
-  --cache_rate 0.5 --num_workers 2 --gpu 0
+  --root /root/autodl-tmp/btcv-synapse --dataset BTCV13 \
+  --cache_rate 1.0 --num_workers 8 --gpu 0
 
 python main_train_adadec3d.py \
   --stage1_ckpt /path/to/E3/stage1/best_metric_model.pth \
-  --output /kaggle/working/output/E3 \
+  --output /root/output/E3 \
   --stage 2 --use_moe False --use_roi True \
   --max_iter 25000 --lr 5e-4 \
-  --root /kaggle/input/btcv-synapse --dataset BTCV13 \
-  --cache_rate 0.5 --num_workers 2 --gpu 0
+  --root /root/autodl-tmp/btcv-synapse --dataset BTCV13 \
+  --cache_rate 1.0 --num_workers 8 --gpu 0
 ```
 
 ---
@@ -157,7 +157,7 @@ All adjustable via `--lambda_uncertainty`, `--lambda_resource`, `--lambda_router
 
 ```python
 %load_ext tensorboard
-%tensorboard --logdir /kaggle/working/output/E4/stage1/BTCV13/tensorboard
+%tensorboard --logdir /root/output/E4/stage1/BTCV13/tensorboard
 ```
 
 | Signal | Healthy | Action if unhealthy |

@@ -75,25 +75,45 @@ pip install monai==1.3.0 batchgenerators medpy ptflops scikit-learn scipy nibabe
 
 ```bash
 cd /root/AdaDec3D/EffiDec3D
-python -c "
-import monai, torch
-from networks.UXNet_3D.network_backbone import UXNET_EffiDec3D
-from networks.swin_unetr_effidec3d import SwinUNETR_EffiDec3D
-from monai_utils.inferers.utils import sliding_window_inference_1out
-print('All imports OK | MONAI', monai.__version__, '| PyTorch', torch.__version__)
-print('GPU:', torch.cuda.get_device_name(0))
-print('BF16 supported:', torch.cuda.is_bf16_supported())
-"
+python verify_env.py
 ```
 
 ---
 
 ## Part 1: Dataset Setup
 
+### 1.0 Kaggle API Setup (one-time on AutoDL)
+
+All datasets are sourced from Kaggle. Run once per AutoDL instance:
+
+```bash
+pip install kaggle
+mkdir -p ~/.kaggle
+# Kaggle → Account → API → Create New Token → paste the JSON below
+cat > ~/.kaggle/kaggle.json << 'EOF'
+{"username":"YOUR_USERNAME","key":"YOUR_API_KEY"}
+EOF
+chmod 600 ~/.kaggle/kaggle.json
+kaggle datasets list --search "synapse" | head -5   # verify credentials
+```
+
+---
+
 ### 1.1 BTCV / Synapse (primary — CT, 13 organs)
 
 **Source**: TransUNet preprocessed version on Kaggle (search "Synapse multi-organ segmentation").
-Official download: [synapse.org](https://www.synapse.org) project `syn3193805`.
+Official source: [synapse.org](https://www.synapse.org) project `syn3193805`.
+
+**Download to AutoDL**
+
+```bash
+# Search on Kaggle to confirm the slug, then:
+kaggle datasets download -d tiangexiang/synapse-multi-organ-segmentation \
+    -p /root/autodl-tmp/ --unzip
+# If the extracted folder name differs, rename it:
+mv /root/autodl-tmp/Synapse /root/autodl-tmp/btcv-synapse 2>/dev/null || true
+ls /root/autodl-tmp/btcv-synapse/imagesTr/ | head -3   # expect img0001.nii.gz …
+```
 
 **Expected layout**
 
@@ -131,17 +151,24 @@ VAL   = ["0029","0030","0031","0032","0033","0034","0035","0036",
 **Verify loading**
 
 ```bash
-python -c "
-import argparse; from load_datasets_transforms import data_loader
-args = argparse.Namespace(root='/root/autodl-tmp/btcv-synapse', dataset='BTCV13', mode='train')
-tr, val, nc = data_loader(args)
-print('Train:', len(tr['images']), 'Val:', len(val['images']), 'Classes:', nc)
-"
+python -c "import argparse; from load_datasets_transforms import data_loader; args = argparse.Namespace(root='/root/autodl-tmp/btcv-synapse', dataset='BTCV13', mode='train'); tr, val, nc = data_loader(args); print('Train:', len(tr['images']), 'Val:', len(val['images']), 'Classes:', nc)"
 ```
 
 ### 1.2 FeTA 2021 (for O7 — MRI, fetal brain, 7 structures)
 
-**Source**: [fetachallenge.github.io](https://fetachallenge.github.io), `feta_2.2.tar.gz` (~2 GB, 80 subjects).
+**Source**: Check Kaggle first (search "FeTA 2021 fetal brain MRI"); if available download with:
+
+```bash
+kaggle datasets download -d <feta-dataset-slug> -p /root/autodl-tmp/ --unzip
+```
+
+Otherwise download directly: [fetachallenge.github.io](https://fetachallenge.github.io), `feta_2.2.tar.gz` (~2 GB, 80 subjects).
+
+```bash
+wget -O /root/autodl-tmp/feta_2.2.tar.gz \
+    https://zenodo.org/record/xxxxxx/files/feta_2.2.tar.gz   # use link from site
+tar -xzf /root/autodl-tmp/feta_2.2.tar.gz -C /root/autodl-tmp/
+```
 
 **Convert to expected format**
 
@@ -301,10 +328,26 @@ Save all figures to `/root/obs/`.
 ```python
 import torch, torch.nn.functional as F
 import numpy as np, matplotlib.pyplot as plt
+import json, os
 from monai.transforms import AsDiscrete
 from monai_utils.inferers.utils import sliding_window_inference_1out
 from load_datasets_transforms import data_loader, data_transforms
 import argparse
+
+os.makedirs("/root/obs", exist_ok=True)
+RESULTS_FILE = "/root/obs/results.json"
+
+def save_obs(tag, metrics):
+    """Append/update one observation's metrics in the shared results JSON."""
+    data = {}
+    if os.path.exists(RESULTS_FILE):
+        try:
+            data = json.load(open(RESULTS_FILE))
+        except json.JSONDecodeError:
+            pass
+    data[tag] = metrics
+    json.dump(data, open(RESULTS_FILE, "w"), indent=2)
+    print(f"[{tag}] metrics saved → {RESULTS_FILE}")
 
 def load_model(network_name, ckpt_path, device="cuda"):
     if network_name == "3DUXNET_EffiDec3D":
@@ -381,11 +424,31 @@ with torch.no_grad():
         if boundary.sum() > 0: boundary_err.append((error * boundary).sum() / boundary.sum())
         if interior.sum() > 0: interior_err.append((error * interior).sum() / interior.sum())
 
-print(f"Boundary error: {np.mean(boundary_err):.3f}")
-print(f"Interior error: {np.mean(interior_err):.3f}")
-print(f"Ratio: {np.mean(boundary_err)/np.mean(interior_err):.1f}×")
+b_err = float(np.mean(boundary_err))
+i_err = float(np.mean(interior_err))
+print(f"Boundary error: {b_err:.3f}")
+print(f"Interior error: {i_err:.3f}")
+print(f"Ratio: {b_err/i_err:.1f}×")
 for name, vals in organ_err.items():
     if vals: print(f"  {name:15s}: {np.mean(vals):.3f}")
+
+# Figure: per-organ error bar chart
+names_o1 = [n for n, v in organ_err.items() if v]
+vals_o1  = [np.mean(organ_err[n]) for n in names_o1]
+plt.figure(figsize=(11, 4))
+plt.bar(range(len(names_o1)), vals_o1)
+plt.xticks(range(len(names_o1)), names_o1, rotation=45, ha="right")
+plt.ylabel("Mean pixel error rate"); plt.title("O1: Per-Organ Error Rate")
+plt.tight_layout()
+plt.savefig("/root/obs/O1_organ_error.png", dpi=150)
+plt.show()
+
+save_obs("O1", {
+    "boundary_error": b_err,
+    "interior_error": i_err,
+    "boundary_interior_ratio": round(b_err / i_err, 2),
+    "organ_error": {n: round(float(np.mean(v)), 4) for n, v in organ_err.items() if v},
+})
 ```
 
 **Expected**: boundary error 3–5× interior error; Pancreas/Adrenal highest organ error.
@@ -409,14 +472,19 @@ with torch.no_grad():
         high_unc_frac.append((ent > 0.5).float().mean().item())
 
 all_ent = np.concatenate(all_entropy)
-print("Entropy percentiles:", {p: f"{np.percentile(all_ent, p):.4f}" for p in [50,75,90,95,99]})
-print(f"Fraction entropy > 0.5: {np.mean(high_unc_frac):.2%}")
+pcts = {p: float(np.percentile(all_ent, p)) for p in [50, 75, 90, 95, 99]}
+frac_high = float(np.mean(high_unc_frac))
+print("Entropy percentiles:", {p: f"{v:.4f}" for p, v in pcts.items()})
+print(f"Fraction entropy > 0.5: {frac_high:.2%}")
 
 plt.figure(figsize=(8,4))
 plt.hist(all_ent, bins=50, log=True)
 plt.xlabel("Entropy"); plt.ylabel("Voxel count (log)")
 plt.title("O2: Entropy Distribution")
 plt.savefig("/root/obs/O2_entropy.png", dpi=150)
+plt.show()
+
+save_obs("O2", {"percentiles": pcts, "fraction_above_0.5": frac_high})
 ```
 
 **Report**: the observed distribution and fraction. Do not apply a hard threshold.
@@ -450,6 +518,18 @@ r_p, _ = pearsonr(x_ent, y_err)
 r_s, _ = spearmanr(x_ent, y_err)
 print(f"Pearson r={r_p:.3f}  Spearman ρ={r_s:.3f}")
 print(f"{'GO ✓' if r_p > 0.60 else 'NO-GO ✗'}  (threshold r > 0.60)")
+
+# Figure: entropy bin vs error rate scatter
+plt.figure(figsize=(6, 5))
+plt.scatter(x_ent, y_err, alpha=0.7)
+plt.xlabel("Mean entropy (bin)"); plt.ylabel("Error rate (bin)")
+plt.title(f"O3: Uncertainty–Error  r={r_p:.3f}")
+plt.tight_layout()
+plt.savefig("/root/obs/O3_unc_error_scatter.png", dpi=150)
+plt.show()
+
+save_obs("O3", {"pearson_r": float(r_p), "spearman_rho": float(r_s),
+                "go": r_p > 0.60})
 ```
 
 ---
@@ -481,10 +561,30 @@ with torch.no_grad():
                 organ_ent[name].append(ent[mask].mean().item())
 
 print(f"{'Organ':15s} {'DICE':>6} {'Entropy':>8}")
+dice_summary, ent_summary = {}, {}
 for name in BTCV_NAMES:
-    d = np.nanmean(organ_dice[name])
-    e = np.nanmean(organ_ent[name]) if organ_ent[name] else float('nan')
+    d = float(np.nanmean(organ_dice[name]))
+    e = float(np.nanmean(organ_ent[name])) if organ_ent[name] else float('nan')
+    dice_summary[name] = round(d, 4)
+    ent_summary[name]  = round(e, 4)
     print(f"{name:15s} {d:6.3f}  {e:8.4f}")
+
+# Figure: dual bar chart
+fig, ax1 = plt.subplots(figsize=(12, 5))
+x = np.arange(len(BTCV_NAMES))
+ax1.bar(x - 0.2, [dice_summary[n] for n in BTCV_NAMES], 0.4, label="DICE", color="steelblue")
+ax1.set_ylabel("DICE"); ax1.set_ylim(0, 1)
+ax2 = ax1.twinx()
+ax2.bar(x + 0.2, [ent_summary[n] for n in BTCV_NAMES], 0.4, label="Entropy", color="orange", alpha=0.8)
+ax2.set_ylabel("Mean Entropy")
+ax1.set_xticks(x); ax1.set_xticklabels(BTCV_NAMES, rotation=45, ha="right")
+ax1.set_title("O4: Per-Organ DICE vs Entropy")
+fig.legend(loc="upper right", bbox_to_anchor=(0.88, 0.88))
+plt.tight_layout()
+plt.savefig("/root/obs/O4_organ_dice_entropy.png", dpi=150)
+plt.show()
+
+save_obs("O4", {"dice": dice_summary, "entropy": ent_summary})
 ```
 
 ---
@@ -529,7 +629,30 @@ pairs = sorted(zip(bin_ent, bin_net))
 x, y = zip(*pairs)
 r, p = pearsonr(x, y)
 print(f"Net-gain/entropy Pearson r={r:.3f} (descriptive; bins are correlated)")
-print(f"Mean positive rate={np.mean(bin_pos):.5f}  negative rate={np.mean(bin_neg):.5f}")
+mean_pos = float(np.mean(bin_pos))
+mean_neg = float(np.mean(bin_neg))
+print(f"Mean positive rate={mean_pos:.5f}  negative rate={mean_neg:.5f}")
+
+# Figure: net gain curve with positive/negative lines
+plt.figure(figsize=(8, 5))
+plt.plot(list(x), [p_ for p_ in bin_pos], "g--o", markersize=4, label="Positive rate")
+plt.plot(list(x), [n_ for n_ in bin_neg], "r--o", markersize=4, label="Negative rate")
+plt.plot(list(x), list(y), "b-o", markersize=5, label=f"Net gain (r={r:.2f})")
+plt.axhline(0, color="k", linewidth=0.8, linestyle=":")
+plt.xlabel("Mean entropy (bin)"); plt.ylabel("Rate")
+plt.title("O5: Decoder Gain vs Uncertainty")
+plt.legend(); plt.tight_layout()
+plt.savefig("/root/obs/O5_decoder_gain.png", dpi=150)
+plt.show()
+
+save_obs("O5", {
+    "net_gain_entropy_pearson_r": float(r),
+    "mean_positive_rate": mean_pos,
+    "mean_negative_rate": mean_neg,
+    "bin_ent": [float(v) for v in x],
+    "bin_net": [float(v) for v in y],
+    "go": r > 0.0 and mean_pos > mean_neg,
+})
 ```
 
 **Go criterion**: net benefit rises with entropy AND a deployable signal beats
@@ -546,6 +669,7 @@ matched random at 10–30% budgets with a subject-level 95% CI (see O9).
 ```python
 MILESTONES = [5, 10, 20, 30, 50]
 
+epoch_ent = {}
 for epoch in MILESTONES:
     m = load_model("3DUXNET_EffiDec3D",
                    f"/root/output/E1/.../epoch_{epoch:03d}.pth")
@@ -557,7 +681,19 @@ for epoch in MILESTONES:
             prob = logits.softmax(1).cpu()
             ent = -(prob * torch.log(prob + 1e-8)).sum(1)
             mean_ents.append(ent.mean().item())
-    print(f"Epoch {epoch:3d}  mean_entropy={np.mean(mean_ents):.4f}")
+    epoch_ent[epoch] = float(np.mean(mean_ents))
+    print(f"Epoch {epoch:3d}  mean_entropy={epoch_ent[epoch]:.4f}")
+
+# Figure: entropy vs training epoch
+plt.figure(figsize=(7, 4))
+plt.plot(list(epoch_ent.keys()), list(epoch_ent.values()), "o-")
+plt.xlabel("Epoch"); plt.ylabel("Mean entropy")
+plt.title("O6: Entropy Evolution During Training")
+plt.tight_layout()
+plt.savefig("/root/obs/O6_entropy_evolution.png", dpi=150)
+plt.show()
+
+save_obs("O6", {"epoch_mean_entropy": epoch_ent})
 ```
 
 **Figure**: mean entropy vs epoch (line) + spatial entropy maps at epochs 5, 20, 50.
@@ -593,6 +729,8 @@ effi_feta  = load_model("3DUXNET_EffiDec3D", "/root/output/E1_feta/.../best_metr
 # ... (same code as O5 above, replace val_loader / full_model / effi_model)
 print(f"FeTA Net-gain/entropy r={r_feta:.3f}")
 print(f"{'GO ✓' if r_feta > 0.40 else 'NO-GO ✗'}  (threshold r > 0.40)")
+
+save_obs("O7", {"feta_gain_entropy_pearson_r": float(r_feta), "go": r_feta > 0.40})
 ```
 
 ---
@@ -611,6 +749,8 @@ effi_swin = load_model("SwinUNETR_EffiDec3D","/root/output/E1_swin/.../best_metr
 # ... (same code as O5 above, replace full_model / effi_model)
 print(f"SwinUNETR Net-gain/entropy r={r_swin:.3f}")
 print(f"{'GO ✓' if r_swin > 0.45 else 'NO-GO ✗'}  (threshold r > 0.45)")
+
+save_obs("O8", {"swin_gain_entropy_pearson_r": float(r_swin), "go": r_swin > 0.45})
 ```
 
 ---
@@ -692,6 +832,15 @@ plt.title("O9: Selective-Allocation Opportunity")
 plt.legend()
 plt.savefig("/root/obs/O9_opportunity_curve.png", dpi=150)
 plt.show()
+
+save_obs("O9", {
+    "budgets_pct": budgets.tolist(),
+    "entropy_recovery_mean": ent_arr.mean(0).round(4).tolist(),
+    "random_recovery_mean":  rand_arr.mean(0).round(4).tolist(),
+    "ci_lower_95": lo.round(4).tolist(),
+    "ci_upper_95": hi.round(4).tolist(),
+    "go": bool((lo > 0).any()),   # any budget where lower CI > 0
+})
 ```
 
 **Go criterion**: entropy outperforms matched random at 10–30% budgets and the
@@ -704,27 +853,48 @@ do not assume a specific concentration ratio in advance.
 
 **Question**: Is difficulty just a proxy for small organs, or does entropy capture richer signal?
 
+*Requires O4 to have been run (uses `organ_ent` dict from O4).*
+
 ```python
 from scipy.stats import spearmanr
 
-sizes, diffs = [], []
-for c, name in enumerate(BTCV_NAMES):
-    organ_sizes, organ_diffs = [], []
-    for batch in val_loader:
-        lbl = batch["label"].cpu().squeeze()
-        if not hasattr(batch, "_ent"):   # reuse precomputed entropy from O2/O4
-            continue
+# Compute mean voxel size per organ from validation labels
+organ_sizes_all = {n: [] for n in BTCV_NAMES}
+for batch in val_loader:
+    lbl = batch["label"].cpu().squeeze()
+    for c, name in enumerate(BTCV_NAMES):
         mask = (lbl == c + 1)
         if mask.sum() > 0:
-            organ_sizes.append(mask.float().sum().item())
-            organ_diffs.append(batch["_ent"][mask].mean().item())
-    if organ_sizes:
-        sizes.append(np.mean(organ_sizes))
-        diffs.append(np.mean(organ_diffs))
-        print(f"{name:15s}  size={np.mean(organ_sizes):8.0f}  difficulty={np.mean(organ_diffs):.4f}")
+            organ_sizes_all[name].append(mask.float().sum().item())
+
+sizes, diffs, names_o10 = [], [], []
+print(f"{'Organ':15s}  {'Size (vx)':>10}  {'Difficulty':>10}")
+for name in BTCV_NAMES:
+    if organ_sizes_all[name] and organ_ent.get(name):   # organ_ent from O4
+        s = float(np.mean(organ_sizes_all[name]))
+        d = float(np.nanmean(organ_ent[name]))
+        sizes.append(s); diffs.append(d); names_o10.append(name)
+        print(f"{name:15s}  {s:10.0f}  {d:10.4f}")
 
 r_size, _ = spearmanr(sizes, diffs)
 print(f"\nOrgan size vs difficulty  Spearman ρ={r_size:.3f}")
+
+# Figure: scatter size vs difficulty
+plt.figure(figsize=(7, 5))
+plt.scatter(sizes, diffs, zorder=3)
+for n, s, d in zip(names_o10, sizes, diffs):
+    plt.annotate(n, (s, d), fontsize=7, xytext=(4, 2), textcoords="offset points")
+plt.xlabel("Mean organ size (voxels)"); plt.ylabel("Mean entropy (difficulty)")
+plt.title(f"O10: Organ Size vs Difficulty  ρ={r_size:.2f}")
+plt.tight_layout()
+plt.savefig("/root/obs/O10_size_vs_difficulty.png", dpi=150)
+plt.show()
+
+save_obs("O10", {
+    "spearman_rho_size_vs_difficulty": float(r_size),
+    "organ_size": {n: round(s, 0) for n, s in zip(names_o10, sizes)},
+    "organ_difficulty": {n: round(d, 4) for n, d in zip(names_o10, diffs)},
+})
 ```
 
 **Expected**: weak-to-moderate negative correlation (Spearman ρ ≈ −0.4 to −0.6),
@@ -751,6 +921,95 @@ For each signal compute:
 - Pearson correlation with per-bin O5 net gain
 - Inference latency overhead (ms/volume vs baseline)
 - Stability: BTCV vs FeTA correlation difference
+
+*Requires O5 to have been run (`bin_ent`, `bin_net` populated).*
+
+```python
+import time
+from scipy.stats import pearsonr
+
+assert len(bin_net) > 0, "Run O5 first to populate bin_ent and bin_net"
+
+signal_results = {}
+
+# ---------- Entropy (from O5 — zero extra compute) ----------
+signal_results["Entropy"] = {
+    "corr_btcv": float(pearsonr(bin_ent, bin_net)[0]),
+    "latency_ms": 0.0,
+}
+
+# ---------- Confidence = 1 − max(softmax) ----------
+conf_bins_signal, conf_bins_gain = [], []
+t0 = time.perf_counter()
+with torch.no_grad():
+    for batch in val_loader:
+        img = batch["image"].cuda()
+        lbl = batch["label"].squeeze(1).long().cpu().squeeze()
+        logits_e = sliding_window_inference_1out(img, (96,96,96), 4, effi_model, overlap=0.7)
+        prob_e   = logits_e.softmax(1).cpu()
+        pred_effi = logits_e.argmax(1).cpu().squeeze()
+        pred_full = sliding_window_inference_1out(img, (96,96,96), 4, full_model,
+                                                   overlap=0.7).argmax(1).cpu().squeeze()
+        conf = 1 - prob_e.max(1).values.squeeze()   # high = uncertain
+        pos = ((pred_full == lbl) & (pred_effi != lbl)).float()
+        neg = ((pred_full != lbl) & (pred_effi == lbl)).float()
+        net_c = pos - neg
+        for b in range(20):
+            q_lo = conf.quantile(b/20).item()
+            q_hi = conf.quantile((b+1)/20).item()
+            mask = (conf >= q_lo) & (conf < q_hi)
+            if mask.sum() > 100:
+                conf_bins_signal.append(conf[mask].mean().item())
+                conf_bins_gain.append(net_c[mask].mean().item())
+lat_conf = (time.perf_counter() - t0) / len(val_loader) * 1000
+signal_results["Confidence"] = {
+    "corr_btcv": float(pearsonr(conf_bins_signal, conf_bins_gain)[0]),
+    "latency_ms": round(lat_conf, 1),
+}
+
+# ---------- MC Dropout (T=10 forward passes) ----------
+# Requires dropout layers to be active (model.train() mode during inference)
+mc_bins_signal, mc_bins_gain = [], []
+t0 = time.perf_counter()
+effi_model.train()   # enable dropout
+with torch.no_grad():
+    for batch in val_loader:
+        img = batch["image"].cuda()
+        lbl = batch["label"].squeeze(1).long().cpu().squeeze()
+        T = 10
+        preds = torch.stack([
+            sliding_window_inference_1out(img, (96,96,96), 4, effi_model, overlap=0.7).softmax(1).cpu()
+            for _ in range(T)
+        ])
+        mc_var = preds.var(0).sum(1).squeeze()   # sum of per-class variance
+        pred_effi_mc = preds.mean(0).argmax(1).cpu().squeeze()
+        pred_full_mc = sliding_window_inference_1out(img, (96,96,96), 4, full_model,
+                                                      overlap=0.7).argmax(1).cpu().squeeze()
+        pos = ((pred_full_mc == lbl) & (pred_effi_mc != lbl)).float()
+        neg = ((pred_full_mc != lbl) & (pred_effi_mc == lbl)).float()
+        net_mc = pos - neg
+        for b in range(20):
+            q_lo = mc_var.quantile(b/20).item()
+            q_hi = mc_var.quantile((b+1)/20).item()
+            mask = (mc_var >= q_lo) & (mc_var < q_hi)
+            if mask.sum() > 100:
+                mc_bins_signal.append(mc_var[mask].mean().item())
+                mc_bins_gain.append(net_mc[mask].mean().item())
+lat_mc = (time.perf_counter() - t0) / len(val_loader) * 1000
+effi_model.eval()
+signal_results["MC Dropout"] = {
+    "corr_btcv": float(pearsonr(mc_bins_signal, mc_bins_gain)[0]) if len(mc_bins_signal) > 2 else float('nan'),
+    "latency_ms": round(lat_mc, 1),
+}
+
+# ---------- Print summary table ----------
+print(f"\n{'Signal':15s} {'Corr (BTCV)':>12} {'Latency ms':>12}")
+for sig, vals in signal_results.items():
+    print(f"{sig:15s} {vals['corr_btcv']:12.3f} {vals['latency_ms']:12.1f}")
+
+# Fill in the table below manually after running
+save_obs("O11", signal_results)
+```
 
 | Signal | Corr (BTCV) | Corr (FeTA) | Latency (ms) | Memory (MB) |
 |---|---|---|---|---|

@@ -361,13 +361,8 @@ class UXNET(nn.Module):
         x = x.permute(new_axes).contiguous()
         return x
     
-    def forward(self, x_in):
+    def forward(self, x_in, **kwargs):
         outs = self.uxnet_3d(x_in)
-        #print([outs[0].shape,outs[1].shape,outs[2].shape,outs[3].shape])
-        # print(outs[0].size())
-        # print(outs[1].size())
-        # print(outs[2].size())
-        # print(outs[3].size())
         enc1 = self.encoder1(x_in)
         #print('enc1:', enc1.size())
         x2 = outs[0]
@@ -602,7 +597,7 @@ class UXNET_EffiDec3D(nn.Module):
         x = x.permute(new_axes).contiguous()
         return x
     
-    def forward(self, x_in):
+    def forward(self, x_in, **kwargs):
 
         # Check for invalid resolution_factor
         if self.resolution_factor > 16:

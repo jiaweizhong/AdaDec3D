@@ -394,7 +394,7 @@ class SwinUNETR(nn.Module):
                 f" must be divisible by {self.patch_size}**5."
             )
 
-    def forward(self, x_in):
+    def forward(self, x_in, **kwargs):
         if not torch.jit.is_scripting() and not torch.jit.is_tracing():
             self._check_input_size(x_in.shape[2:])
         hidden_states_out = self.swinViT(x_in, self.normalize)
@@ -715,7 +715,7 @@ class SwinUNETR_EffiDec3D(nn.Module):
                 f" must be divisible by {self.patch_size}**5."
             )
 
-    def forward(self, x_in):
+    def forward(self, x_in, **kwargs):
         # Check for invalid resolution_factor
         if self.resolution_factor > 32:
             print("Invalid resolution_factor for this model. Must be <= 16.")

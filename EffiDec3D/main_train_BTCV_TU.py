@@ -550,7 +550,7 @@ def train(global_step, train_loader, dice_val_best, global_step_best):
                 y[y==13] = 0
                 y[y==11] = 5
             if args.ds == True:
-                ss = [[0],[1],[2],[3],[4]]
+                ss = [[i] for i in range(min(len(P), 5))]
             else:
                 ss = [[0]]
 

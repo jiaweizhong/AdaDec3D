@@ -64,8 +64,8 @@ Select image: **PyTorch 2.6.0 / CUDA 12.8** (required for RTX 5090 Blackwell sup
 # 1. Clone code
 cd /root && git clone https://github.com/<your-repo>/AdaDec3D.git
 
-# 2. Install dependencies (inside the pre-activated conda env)
-pip install monai==1.3.0 batchgenerators medpy ptflops scikit-learn scipy nibabel tqdm
+# 2. Install dependencies
+pip install -r requirements.txt
 
 # 3. Upload datasets to /root/autodl-tmp/btcv-synapse/ and /root/autodl-tmp/feta-processed/
 #    (use AutoDL file upload, scp, or wget)
@@ -128,10 +128,10 @@ ls /root/autodl-tmp/btcv-synapse/imagesTr/ | head -3   # expect img0001.nii.gz â
 **Standard split** (same as 3D UX-Net paper)
 
 ```python
-TRAIN = ["0001","0002","0003","0004","0005","0006","0007","0008",
-         "0009","0010","0021","0022","0023","0024","0025","0026","0027","0028"]
-VAL   = ["0029","0030","0031","0032","0033","0034","0035","0036",
-         "0037","0038","0039","0040"]
+TRAIN = ["0005","0006","0007","0009","0010","0021","0023","0024",
+         "0026","0027","0028","0030","0031","0033","0034","0037","0039","0040"]
+VAL   = ["0001","0002","0003","0004","0008","0022","0025","0029",
+         "0032","0035","0036","0038"]
 ```
 
 > **Confirmatory note**: do not tune thresholds, select checkpoints, formulate

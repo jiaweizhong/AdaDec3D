@@ -13,8 +13,10 @@ for fname in sorted(os.listdir(f"{src}/test_vol_h5")):
         continue
     cid = fname.replace("case", "").replace(".npy.h5", "").replace(".h5", "")
     with h5py.File(f"{src}/test_vol_h5/{fname}") as f:
-        img = np.array(f["image"])
+        img = np.array(f["image"])   # H5 stores as (D, H, W)
         lbl = np.array(f["label"])
+    img = img.transpose(1, 2, 0)    # → (H, W, D) to match NPZ train volumes
+    lbl = lbl.transpose(1, 2, 0)
     nib.save(nib.Nifti1Image(img.astype(np.float32), np.eye(4)),
              f"{dst}/imagesVal/img{cid}.nii.gz")
     nib.save(nib.Nifti1Image(lbl.astype(np.uint8), np.eye(4)),

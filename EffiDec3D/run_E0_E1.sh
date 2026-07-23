@@ -11,7 +11,7 @@ git pull
 cd EffiDec3D
 
 COMMON="--root $ROOT --dataset BTCV13 --cache_rate 1.0 --num_workers 8 --gpu 0"
-TRAIN_ARGS="--max_iter 20000 --eval_step 500"
+TRAIN_ARGS="--max_iter 40000 --eval_step 500"
 
 log() { echo "[$(date '+%H:%M:%S')] $*" | tee -a $LOG; }
 

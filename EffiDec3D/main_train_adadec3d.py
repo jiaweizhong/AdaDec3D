@@ -10,7 +10,7 @@ Example – Stage 1:
     python main_train_adadec3d.py \
         --root /path/to/btcv \
         --output output/adadec3d_s1 \
-        --dataset BTCV8 \
+        --dataset BTCV13 \
         --effidec3d_weights output/E1_effidec3d/.../best_metric_model.pth \
         --stage 1 \
         --max_iter 20000 --eval_step 500 --lr 5e-4 \
@@ -20,7 +20,7 @@ Example – Stage 2:
     python main_train_adadec3d.py \
         --root /path/to/btcv \
         --output output/adadec3d_s2 \
-        --dataset BTCV8 \
+        --dataset BTCV13 \
         --stage1_ckpt output/adadec3d_s1/.../best_metric_model.pth \
         --stage 2 \
         --max_iter 25000 --eval_step 500 --lr 5e-4 \

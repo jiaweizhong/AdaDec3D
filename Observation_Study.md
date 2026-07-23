@@ -207,7 +207,7 @@ cd /root/AdaDec3D/EffiDec3D
 
 python main_train_BTCV_TU.py \
   --root /root/autodl-tmp/btcv-synapse --output /root/output/E0 \
-  --dataset BTCV8 --network 3DUXNET \
+  --dataset BTCV13 --network 3DUXNET \
   --img_size 96 96 96 --n_channels 1 \
   --channels 48 96 192 384 --feature_size 48 \
   --ds False --mode train --pretrain False \
@@ -223,7 +223,7 @@ python main_train_BTCV_TU.py \
 ```bash
 python main_train_BTCV_TU.py \
   --root /root/autodl-tmp/btcv-synapse --output /root/output/E1 \
-  --dataset BTCV8 --network 3DUXNET_EffiDec3D \
+  --dataset BTCV13 --network 3DUXNET_EffiDec3D \
   --img_size 96 96 96 --n_channels 1 \
   --channels 48 96 192 384 \
   --n_decoder_channels 48 --resolution_factor 2 --skip_aggregation addition \
@@ -303,14 +303,14 @@ O8 needs both E0-Swin and E1-Swin with identical schedules.
 # E0 SwinUNETR
 python main_train_BTCV_TU.py \
   --root /root/autodl-tmp/btcv-synapse --output /root/output/E0_swin \
-  --dataset BTCV8 --network SwinUNETR \
+  --dataset BTCV13 --network SwinUNETR \
   --max_iter 20000 --eval_step 500 --lr 0.001 \
   --cache_rate 1.0 --num_workers 8 --gpu 0
 
 # E1 SwinUNETR_EffiDec3D
 python main_train_BTCV_TU.py \
   --root /root/autodl-tmp/btcv-synapse --output /root/output/E1_swin \
-  --dataset BTCV8 --network SwinUNETR_EffiDec3D \
+  --dataset BTCV13 --network SwinUNETR_EffiDec3D \
   --n_decoder_channels 48 --resolution_factor 2 --skip_aggregation addition \
   --max_iter 20000 --eval_step 500 --lr 0.001 \
   --cache_rate 1.0 --num_workers 8 --gpu 0

@@ -7,7 +7,8 @@ Created on Sat June  21 11:06:19 2025
 python main_train_MSD_Task01_10.py --root /research/data --output output_folder/run1 --dataset Task02_Heart --img_size 96 96 96 --n_channels 1 --network 3DUXNET_EffiDec3D --channels 48 96 192 384 --n_decoder_channels 48 --ds False --mode train --pretrain False --batch_size 1 --crop_sample 2 --lr 0.001 --optim AdamW --max_iter 45000  --eval_step 250 --val_batch 1 --gpu 0 --cache_rate 1.0 --num_workers 4 --overlap 0.5 > output_folder/Task02_Heart_3DUXNET_EffiDec3D_loss_dsFalse_1out_96x96x96_lr1e3_itr45000_overlap050_run1.txt
 
 """
-from torch.cuda.amp import autocast, GradScaler
+from torch.amp import GradScaler
+from torch.cuda.amp import autocast
 
 from monai.utils import set_determinism
 from monai.transforms import AsDiscrete
@@ -440,7 +441,7 @@ elif args.optim == 'Adam':
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 print('Optimizer for training: {}, learning rate: {}'.format(args.optim, args.lr))
 # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.9, patience=1000)
-scaler = GradScaler()
+scaler = GradScaler('cuda')
 
 if '3DUXNET' in args.network and 'EffiDec3D' in args.network:
     args.output = args.output + '_network_' + args.network + '_fc' + str(args.channels[0]) + '_' + str(args.channels[1]) + '_' + str(args.channels[2]) + '_' + str(args.channels[3]) + '_n_decoder_channels' + str(args.n_decoder_channels) + '_rf'+str(args.resolution_factor)+'_skip_aggregation_'+args.skip_aggregation + '_roi' + str(args.img_size[0]) + 'x' + str(args.img_size[1]) + 'x' + str(args.img_size[2])+'_vb'+str(args.val_batch)+'_cs'+str(args.crop_sample)+'_overlap'+str(args.overlap) + '_ds' + str(args.ds) + '_pretrain_'+str(args.pretrain)+'_lr_'+str(args.lr)
@@ -772,10 +773,10 @@ def validation_emcad(epoch_iterator_val):
     with torch.no_grad():
         for step, batch in enumerate(epoch_iterator_val):
             val_inputs, val_labels = (batch["image"].cuda(), batch["label"].cuda())
-            original_affine = batch["label_meta_dict"]["affine"][0].numpy()
+            original_affine = batch["label"].affine[0].numpy()
             _, _, h, w, d = val_labels.shape
             target_shape = (h, w, d)
-            img_name = batch["image_meta_dict"]["filename_or_obj"][0].split("/")[-1]
+            img_name = batch["image"].meta["filename_or_obj"][0].split("/")[-1]
 
             with autocast(enabled=False):
                 val_outputs = sliding_window_inference_1out(

@@ -1325,15 +1325,11 @@ def infer_post_transforms(args, test_transforms, out_classes):
             keys="pred",
             transform=test_transforms,
             orig_keys="image",
-            meta_keys="pred_meta_dict",
-            orig_meta_keys="image_meta_dict",
-            meta_key_postfix="meta_dict",
             nearest_interp=False,
             to_tensor=True,
-            #device="cpu",
         ),
-        AsDiscreted(keys="pred", argmax=True),#, to_onehot=out_classes),#, to_onehot=out_classes
-        SaveImaged(keys="pred", meta_keys="pred_meta_dict", output_dir=args.output,
+        AsDiscreted(keys="pred", argmax=True),
+        SaveImaged(keys="pred", output_dir=args.output,
                    output_postfix="", output_ext=".nii.gz", resample=True),
     ])
     
@@ -1349,15 +1345,11 @@ def infer_post_transforms_brats(args, test_transforms, out_classes):
             keys="pred",
             transform=test_transforms,
             orig_keys="image",
-            meta_keys="pred_meta_dict",
-            orig_meta_keys="image_meta_dict",
-            meta_key_postfix="meta_dict",
             nearest_interp=False,
             to_tensor=True,
-            #device="cpu",
         ),
         AsDiscreted(keys="pred", threshold=0.5),
-        SaveImaged(keys="pred", meta_keys="pred_meta_dict", output_dir=args.output,
+        SaveImaged(keys="pred", output_dir=args.output,
                    output_postfix="", output_ext=".nii.gz", resample=True),
     ])
     

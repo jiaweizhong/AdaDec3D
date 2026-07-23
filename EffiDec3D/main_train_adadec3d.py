@@ -36,7 +36,7 @@ import scipy.ndimage as ndimage
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.cuda.amp import GradScaler
+from torch.amp import GradScaler
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
@@ -221,7 +221,7 @@ else:  # stage 2
     ], weight_decay=1e-5)
     print(f"[Stage 2] backbone lr={backbone_lr:.2e}, new modules lr={args.lr:.2e}")
 
-scaler = GradScaler(enabled=(_amp_dtype == torch.float16))
+scaler = GradScaler('cuda', enabled=(_amp_dtype == torch.float16))
 
 # ---------------------------------------------------------------------------
 # Output directory & checkpoint resumption

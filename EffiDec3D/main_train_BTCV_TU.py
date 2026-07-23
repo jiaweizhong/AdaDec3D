@@ -8,7 +8,7 @@ python main_finetune_BTCV_TU.py --root /research/data/amos_trns/ --output output
 
 """
 
-from torch.cuda.amp import GradScaler
+from torch.amp import GradScaler
 
 from monai.utils import set_determinism
 from monai.transforms import AsDiscrete
@@ -443,7 +443,7 @@ elif args.optim == 'Adam':
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 print('Optimizer for training: {}, learning rate: {}'.format(args.optim, args.lr))
 # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.9, patience=1000)
-scaler = GradScaler(enabled=(_amp_dtype == torch.float16))
+scaler = GradScaler('cuda', enabled=(_amp_dtype == torch.float16))
 
 if '3DUXNET' in args.network and 'EffiDec3D' in args.network:
     args.output = args.output + '_network_' + args.network + '_fc' + str(args.channels[0]) + '_' + str(args.channels[1]) + '_' + str(args.channels[2]) + '_' + str(args.channels[3]) + '_n_decoder_channels' + str(args.n_decoder_channels) + '_rf'+str(args.resolution_factor)+'_skip_aggregation_'+args.skip_aggregation + '_roi' + str(args.img_size[0]) + 'x' + str(args.img_size[1]) + 'x' + str(args.img_size[2])+'_vb'+str(args.val_batch)+'_cs'+str(args.crop_sample)+'_overlap'+str(args.overlap) + '_ds' + str(args.ds) + '_pretrain_'+str(args.pretrain)+'_lr_'+str(args.lr)

@@ -65,7 +65,7 @@ All commands run from `/root/AdaDec3D/EffiDec3D`.
 Common args for every run:
 
 ```
---root /root/autodl-tmp/btcv-synapse --dataset BTCV13
+--root /root/autodl-tmp/btcv-synapse --dataset BTCV8
 --cache_rate 1.0 --num_workers 8 --gpu 0
 ```
 
@@ -76,7 +76,7 @@ python main_train_adadec3d.py \
   --effidec3d_weights /root/output/E1/.../best_metric_model.pth \
   --output /root/output/E4 \
   --stage 1 --max_iter 20000 --eval_step 500 --lr 5e-4 \
-  --root /root/autodl-tmp/btcv-synapse --dataset BTCV13 \
+  --root /root/autodl-tmp/btcv-synapse --dataset BTCV8 \
   --cache_rate 1.0 --num_workers 8 --gpu 0
 ```
 
@@ -95,7 +95,7 @@ python main_train_adadec3d.py \
   --stage1_ckpt /root/output/E4/stage1/.../best_metric_model.pth \
   --output /root/output/E4 \
   --stage 2 --max_iter 25000 --eval_step 500 --lr 5e-4 --backbone_lr_factor 0.1 \
-  --root /root/autodl-tmp/btcv-synapse --dataset BTCV13 \
+  --root /root/autodl-tmp/btcv-synapse --dataset BTCV8 \
   --cache_rate 1.0 --num_workers 8 --gpu 0
 ```
 
@@ -110,7 +110,7 @@ python main_train_adadec3d.py \
   --output /root/output/E2 \
   --stage 1 --use_moe True --use_roi False \
   --max_iter 20000 --lr 5e-4 \
-  --root /root/autodl-tmp/btcv-synapse --dataset BTCV13 \
+  --root /root/autodl-tmp/btcv-synapse --dataset BTCV8 \
   --cache_rate 1.0 --num_workers 8 --gpu 0
 
 python main_train_adadec3d.py \
@@ -118,7 +118,7 @@ python main_train_adadec3d.py \
   --output /root/output/E2 \
   --stage 2 --use_moe True --use_roi False \
   --max_iter 25000 --lr 5e-4 \
-  --root /root/autodl-tmp/btcv-synapse --dataset BTCV13 \
+  --root /root/autodl-tmp/btcv-synapse --dataset BTCV8 \
   --cache_rate 1.0 --num_workers 8 --gpu 0
 
 # E3: ROI only
@@ -127,7 +127,7 @@ python main_train_adadec3d.py \
   --output /root/output/E3 \
   --stage 1 --use_moe False --use_roi True \
   --max_iter 20000 --lr 5e-4 \
-  --root /root/autodl-tmp/btcv-synapse --dataset BTCV13 \
+  --root /root/autodl-tmp/btcv-synapse --dataset BTCV8 \
   --cache_rate 1.0 --num_workers 8 --gpu 0
 
 python main_train_adadec3d.py \
@@ -135,7 +135,7 @@ python main_train_adadec3d.py \
   --output /root/output/E3 \
   --stage 2 --use_moe False --use_roi True \
   --max_iter 25000 --lr 5e-4 \
-  --root /root/autodl-tmp/btcv-synapse --dataset BTCV13 \
+  --root /root/autodl-tmp/btcv-synapse --dataset BTCV8 \
   --cache_rate 1.0 --num_workers 8 --gpu 0
 ```
 

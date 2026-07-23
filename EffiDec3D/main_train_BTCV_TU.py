@@ -712,10 +712,10 @@ def validation_last(epoch_iterator_val):
     with torch.no_grad():
         for step, batch in enumerate(epoch_iterator_val):
             val_inputs, val_labels = (batch["image"].cuda(), batch["label"].cuda())
-            original_affine = batch["label_meta_dict"]["affine"][0].numpy()
+            original_affine = batch["label"].affine[0].numpy()
             _, _, h, w, d = val_labels.shape
             target_shape = (h, w, d)
-            img_name = batch["image_meta_dict"]["filename_or_obj"][0].split("/")[-1]
+            img_name = batch["image"].meta["filename_or_obj"][0].split("/")[-1]
 
             if out_classes == 9:
                 val_labels[val_labels == 5] = 0
@@ -843,10 +843,10 @@ def validation_save(epoch_iterator_val):
     with torch.no_grad():
         for step, batch in enumerate(epoch_iterator_val):
             val_inputs, val_labels = (batch["image"].cuda(), batch["label"].cuda())
-            original_affine = batch["label_meta_dict"]["affine"][0].numpy()
+            original_affine = batch["label"].affine[0].numpy()
             _, _, h, w, d = val_labels.shape
             target_shape = (h, w, d)
-            img_name = batch["image_meta_dict"]["filename_or_obj"][0].split("/")[-1]
+            img_name = batch["image"].meta["filename_or_obj"][0].split("/")[-1]
             volume_name = os.path.splitext(img_name)[0]
             output_folder = os.path.join(root_dir, os.path.join("output_slices", volume_name))
             os.makedirs(output_folder, exist_ok=True)

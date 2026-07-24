@@ -10,8 +10,10 @@ cd /root/AdaDec3D
 git pull
 cd EffiDec3D
 
-COMMON="--root $ROOT --dataset BTCV13 --cache_rate 1.0 --num_workers 8 --gpu 0"
-TRAIN_ARGS="--max_iter 40000 --eval_step 500"
+# Hyperparameters aligned with EffiDec3D paper (README)
+COMMON="--root $ROOT --dataset BTCV13 --cache_rate 1.0 --num_workers 8 --gpu 0 \
+        --lr 0.001 --overlap 0.7 --crop_sample 4"
+TRAIN_ARGS="--max_iter 45000 --eval_step 250"
 
 log() { echo "[$(date '+%H:%M:%S')] $*" | tee -a $LOG; }
 
@@ -37,4 +39,4 @@ python main_train_BTCV_TU.py $COMMON $TRAIN_ARGS \
     --ds False 2>&1 | tee -a $LOG
 log "E1 done"
 
-log "All finished. Results in $OUT  |  Metrics CSV: last_validation_metrics_btcv.csv"
+log "All finished. Results in $OUT  |  Metrics CSV: last_validation_metrics_btcv13.csv"

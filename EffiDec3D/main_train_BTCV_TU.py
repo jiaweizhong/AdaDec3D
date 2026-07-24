@@ -947,8 +947,8 @@ def save_metrics_to_csv(trained_weights, dataset_name, network_name, overlap, ov
               "MACs_GMac", "Params_M",
               "Train_Time_h", "Peak_Train_Mem_GB",
               "Infer_Lat_ms", "Infer_Lat_p95_ms", "Peak_Infer_Mem_GB"]
-    header += [f"Dice_{class_labels[str(i)]}" for i in range(len(class_labels))] + ["Mean_Dice"]
-    header += [f"HD_{class_labels[str(i)]}"   for i in range(len(class_labels))] + ["Mean_HD"]
+    header += [f"Dice_{class_labels[str(i)]}" for i in range(1, len(class_labels))] + ["Mean_Dice"]
+    header += [f"HD_{class_labels[str(i)]}"   for i in range(1, len(class_labels))] + ["Mean_HD"]
 
     def _fmt(v, decimals=2): return f"{v:.{decimals}f}" if v is not None else ""
 
@@ -972,7 +972,7 @@ def save_metrics_to_csv(trained_weights, dataset_name, network_name, overlap, ov
         writer.writerow(row)
 
 # Example usage:
-csv_filename = "last_validation_metrics_btcv.csv"
+csv_filename = f"last_validation_metrics_{args.dataset.lower()}.csv"
 
 # Suppose these are returned from the validation function
 per_class_dice, per_class_hd, mean_dice_val, mean_hd_val = validation_save(epoch_iterator_val)

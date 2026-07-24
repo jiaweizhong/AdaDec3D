@@ -29,6 +29,7 @@ Example – Stage 2:
 
 import os
 import csv
+import time
 import argparse
 
 import numpy as np
@@ -37,6 +38,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.amp import GradScaler
+from ptflops import get_model_complexity_info
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
@@ -421,7 +423,21 @@ def validation_final(val_loader):
             per_class_hd.append(hd_row)
     per_class_dice = np.array(per_class_dice)   # [N_val, n_classes-1]
     per_class_hd   = np.array(per_class_hd)
-    return per_class_dice, per_class_hd
+    # Router usage statistics (fraction of cases routed to each expert)
+    expert_counts = np.zeros(args.n_experts)
+    with torch.no_grad():
+        for batch in val_loader:
+            val_inputs = batch["image"].to(device)
+            with torch.autocast("cuda", dtype=_amp_dtype):
+                sliding_window_inference_1out(
+                    val_inputs, tuple(args.img_size), args.val_batch,
+                    model, overlap=args.overlap, mode=args.overlap_mode,
+                )
+            if hasattr(model, "last_expert_ids"):
+                for eid in model.last_expert_ids.cpu().tolist():
+                    expert_counts[int(eid)] += 1
+    expert_frac = expert_counts / expert_counts.sum() if expert_counts.sum() > 0 else expert_counts
+    return per_class_dice, per_class_hd, expert_frac
 
 # ---------------------------------------------------------------------------
 # Training loop
@@ -508,18 +524,53 @@ def train_one_epoch(global_step, train_loader, dice_val_best, global_step_best):
 print(f"AdaDec3D stage {args.stage} | dataset={args.dataset} | max_iter={args.max_iter}")
 print(f"Output dir: {root_dir}")
 
+torch.cuda.reset_peak_memory_stats()
+train_start_time = time.time()
+
 while global_step < args.max_iter:
     global_step, dice_val_best, global_step_best = train_one_epoch(
         global_step, train_loader, dice_val_best, global_step_best
     )
+
+train_time_sec = time.time() - train_start_time
+peak_train_mem_mb = torch.cuda.max_memory_allocated() / 1024 ** 2
 
 # Final evaluation
 print("\nRunning final per-class evaluation on best checkpoint...")
 best_ckpt = os.path.join(root_dir, "best_metric_model.pth")
 ckpt = torch.load(best_ckpt, map_location=device)
 model.load_state_dict(ckpt["model_state_dict"])
+model.eval()
 
-per_class_dice, per_class_hd = validation_final(val_loader)
+# MACs and params
+_img_size = tuple(args.img_size)
+macs_gmac, params_m = get_model_complexity_info(
+    model, (args.n_channels, *_img_size),
+    as_strings=False, print_per_layer_stat=False, verbose=False,
+)
+macs_gmac /= 1e9
+params_m  /= 1e6
+print(f"MACs: {macs_gmac:.2f} GMac  Params: {params_m:.3f} M")
+
+# Inference latency and peak memory
+_dummy = torch.zeros(1, args.n_channels, *_img_size, device=device)
+with torch.no_grad():
+    for _ in range(10):
+        model(_dummy)
+torch.cuda.synchronize()
+torch.cuda.reset_peak_memory_stats()
+_lat = []
+with torch.no_grad():
+    for _ in range(50):
+        torch.cuda.synchronize(); _t = time.perf_counter()
+        model(_dummy); torch.cuda.synchronize()
+        _lat.append(time.perf_counter() - _t)
+infer_lat_ms     = float(np.mean(_lat)) * 1000
+infer_lat_p95_ms = float(np.percentile(_lat, 95)) * 1000
+peak_infer_mem_mb = torch.cuda.max_memory_allocated() / 1024 ** 2
+del _dummy, _lat
+
+per_class_dice, per_class_hd, expert_frac = validation_final(val_loader)
 
 mean_dice_per_class = np.nanmean(per_class_dice, axis=0)  # [n_classes-1]
 mean_hd_per_class   = np.nanmean(per_class_hd, axis=0)
@@ -540,14 +591,41 @@ for name, d, h in zip(CLASS_NAMES, mean_dice_per_class, mean_hd_per_class):
 print("-" * 35)
 print(f"{'Mean':>15}  {np.nanmean(mean_dice_per_class):.4f}  {np.nanmean(mean_hd_per_class):7.2f}")
 
-# Save CSV
-csv_path = os.path.join(root_dir, "per_class_results.csv")
-with open(csv_path, "w", newline="") as f:
-    writer_csv = csv.writer(f)
-    writer_csv.writerow(["class", "mean_dice", "mean_hd95"])
-    for name, d, h in zip(CLASS_NAMES, mean_dice_per_class, mean_hd_per_class):
-        writer_csv.writerow([name, f"{d:.4f}", f"{h:.2f}"])
-    writer_csv.writerow(["Mean", f"{np.nanmean(mean_dice_per_class):.4f}",
-                          f"{np.nanmean(mean_hd_per_class):.2f}"])
+# Expert usage
+print("\nExpert routing distribution:")
+for i, frac in enumerate(expert_frac):
+    label = ["S", "M", "L"][i] if args.n_experts == 3 else str(i)
+    print(f"  Expert-{label}: {frac:.1%}")
+
+# Save unified CSV (same format as main_train_BTCV_TU.py for easy comparison)
+def _fmt(v, dec=2): return f"{v:.{dec}f}" if v is not None and not np.isnan(v) else ""
+
+mean_dice = np.nanmean(mean_dice_per_class)
+mean_hd   = np.nanmean(mean_hd_per_class)
+
+expert_labels = [f"Expert_{['S','M','L'][i] if args.n_experts==3 else i}_frac"
+                 for i in range(args.n_experts)]
+
+csv_path = f"last_validation_metrics_{args.dataset.lower()}_adadec3d.csv"
+file_exists = os.path.isfile(csv_path)
+with open(csv_path, "a", newline="") as f:
+    w = csv.writer(f)
+    if not file_exists:
+        header = ["Trained_Weights", "Dataset", "Stage", "use_moe", "use_roi",
+                  "MACs_GMac", "Params_M",
+                  "Train_Time_h", "Peak_Train_Mem_GB",
+                  "Infer_Lat_ms", "Infer_Lat_p95_ms", "Peak_Infer_Mem_GB"]
+        header += [f"Dice_{n}" for n in CLASS_NAMES] + ["Mean_Dice"]
+        header += [f"HD_{n}"   for n in CLASS_NAMES] + ["Mean_HD"]
+        header += expert_labels
+        w.writerow(header)
+    row = [root_dir, args.dataset, args.stage, args.use_moe, args.use_roi,
+           _fmt(macs_gmac), _fmt(params_m, 3),
+           _fmt(train_time_sec / 3600), _fmt(peak_train_mem_mb / 1024),
+           _fmt(infer_lat_ms, 1), _fmt(infer_lat_p95_ms, 1), _fmt(peak_infer_mem_mb / 1024)]
+    row += [_fmt(d, 4) for d in mean_dice_per_class] + [_fmt(mean_dice, 4)]
+    row += [_fmt(h, 4) for h in mean_hd_per_class]   + [_fmt(mean_hd, 4)]
+    row += [_fmt(frac, 4) for frac in expert_frac]
+    w.writerow(row)
 print(f"Results saved to {csv_path}")
 writer.close()

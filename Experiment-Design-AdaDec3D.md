@@ -65,7 +65,7 @@ All commands run from `/root/AdaDec3D/EffiDec3D`.
 Common args for every run:
 
 ```
---root /root/autodl-tmp/btcv-synapse --dataset BTCV8
+--root /root/autodl-tmp/btcv-synapse --dataset BTCV13
 --cache_rate 1.0 --num_workers 8 --gpu 0
 ```
 
@@ -76,7 +76,7 @@ python main_train_adadec3d.py \
   --effidec3d_weights /root/output/E1/.../best_metric_model.pth \
   --output /root/output/E4 \
   --stage 1 --max_iter 20000 --eval_step 500 --lr 5e-4 \
-  --root /root/autodl-tmp/btcv-synapse --dataset BTCV8 \
+  --root /root/autodl-tmp/btcv-synapse --dataset BTCV13 \
   --cache_rate 1.0 --num_workers 8 --gpu 0
 ```
 
@@ -95,7 +95,7 @@ python main_train_adadec3d.py \
   --stage1_ckpt /root/output/E4/stage1/.../best_metric_model.pth \
   --output /root/output/E4 \
   --stage 2 --max_iter 25000 --eval_step 500 --lr 5e-4 --backbone_lr_factor 0.1 \
-  --root /root/autodl-tmp/btcv-synapse --dataset BTCV8 \
+  --root /root/autodl-tmp/btcv-synapse --dataset BTCV13 \
   --cache_rate 1.0 --num_workers 8 --gpu 0
 ```
 
@@ -106,36 +106,36 @@ Backbone LR = 5e-4 × 0.1 = 5e-5. New modules LR = 5e-4.
 ```bash
 # E2: MoE only
 python main_train_adadec3d.py \
-  --effidec3d_weights /root/output/E1/best_metric_model.pth \
+  --effidec3d_weights /root/output/E1/.../best_metric_model.pth \
   --output /root/output/E2 \
   --stage 1 --use_moe True --use_roi False \
-  --max_iter 20000 --lr 5e-4 \
-  --root /root/autodl-tmp/btcv-synapse --dataset BTCV8 \
+  --max_iter 20000 --eval_step 500 --lr 5e-4 \
+  --root /root/autodl-tmp/btcv-synapse --dataset BTCV13 \
   --cache_rate 1.0 --num_workers 8 --gpu 0
 
 python main_train_adadec3d.py \
   --stage1_ckpt /root/output/E2/stage1/best_metric_model.pth \
   --output /root/output/E2 \
   --stage 2 --use_moe True --use_roi False \
-  --max_iter 25000 --lr 5e-4 \
-  --root /root/autodl-tmp/btcv-synapse --dataset BTCV8 \
+  --max_iter 25000 --eval_step 500 --lr 5e-4 \
+  --root /root/autodl-tmp/btcv-synapse --dataset BTCV13 \
   --cache_rate 1.0 --num_workers 8 --gpu 0
 
 # E3: ROI only
 python main_train_adadec3d.py \
-  --effidec3d_weights /root/output/E1/best_metric_model.pth \
+  --effidec3d_weights /root/output/E1/.../best_metric_model.pth \
   --output /root/output/E3 \
   --stage 1 --use_moe False --use_roi True \
-  --max_iter 20000 --lr 5e-4 \
-  --root /root/autodl-tmp/btcv-synapse --dataset BTCV8 \
+  --max_iter 20000 --eval_step 500 --lr 5e-4 \
+  --root /root/autodl-tmp/btcv-synapse --dataset BTCV13 \
   --cache_rate 1.0 --num_workers 8 --gpu 0
 
 python main_train_adadec3d.py \
   --stage1_ckpt /root/output/E3/stage1/best_metric_model.pth \
   --output /root/output/E3 \
   --stage 2 --use_moe False --use_roi True \
-  --max_iter 25000 --lr 5e-4 \
-  --root /root/autodl-tmp/btcv-synapse --dataset BTCV8 \
+  --max_iter 25000 --eval_step 500 --lr 5e-4 \
+  --root /root/autodl-tmp/btcv-synapse --dataset BTCV13 \
   --cache_rate 1.0 --num_workers 8 --gpu 0
 ```
 
@@ -301,17 +301,17 @@ foreground, confidence, and organ-size signals at identical selection budgets.
 ```
 Table: BTCV 13-Organ Segmentation (Synapse Dataset)
 
-Method        Params  GFLOPs*  Mean   Aorta  Gallb  Splen  LKid  RKid
-Full 3DUXNET  53M     632.0    79.74
-EffiDec3D     3.16M   51.47    79.25
-E2 +MoE       —       —        —
-E3 +ROI       —       —        —
-E4 AdaDec3D   X.XM    XX.X†    XX.XX
-C0 E1+steps   —       51.47    —
-C1 StaticL    —       —        —
+Method        Params    GMac*     Mean   Aorta  Gallb  Splen  LKid  RKid
+Full 3DUXNET  53.007M   578.74   79.74  (paper; cite directly if E0 calibration passes)
+EffiDec3D     2.955M     41.06   79.25  (paper; cite directly if E1 calibration passes)
+E2 +MoE       —          —        —
+E3 +ROI       —          —        —
+E4 AdaDec3D   X.XM       XX.X†   XX.XX
+C0 E1+steps   —          41.06    —
+C1 StaticL    —          —        —
 
-* static upper-bound MACs
-† executed MACs vary per sample; report mean ± std
+* static upper-bound MACs (ptflops, dense forward pass)
+† executed MACs vary per sample; report mean ± std from hard-routing inference
 ```
 
 Key claims:

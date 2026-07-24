@@ -68,7 +68,7 @@ The practical method is **region-adaptive**, not independent voxel routing. Sele
 
 EffiDec3D showed that the decoder contributes a surprisingly large proportion of overall computation while providing relatively limited performance gain. Two specific decisions drove its 90%+ FLOP reduction:
 
-**Channel reduction** — EffiDec3D sets every decoder stage to a uniform width of `C_reduced = min(C_encoder stages)`. For 3D UX-Net with encoder channels [48, 96, 192, 384], this means C_reduced = 48 across all decoder stages, compressing 53M → 3.16M parameters. The rule is architectural and global: 48 channels are applied identically to every location in every decoder stage.
+**Channel reduction** — EffiDec3D sets every decoder stage to a uniform width of `C_reduced = min(C_encoder stages)`. For 3D UX-Net with encoder channels [48, 96, 192, 384], this means C_reduced = 48 across all decoder stages, compressing 53.007M → 2.955M parameters. The rule is architectural and global: 48 channels are applied identically to every location in every decoder stage.
 
 **Resolution restriction** — EffiDec3D removes the highest-resolution decoder stage (H×W×D) and instead outputs predictions at H/2×W/2×D/2, restoring to full resolution via a single trilinear upsample. An empirical ablation showed this costs only −0.3% DICE on BTCV (79.7% → 79.4%) while saving 368 GFLOPs; on FeTA it actually improves accuracy (+0.44%). The full-resolution stage contributes almost nothing on average and is globally removed.
 
@@ -298,11 +298,14 @@ All λ values are ablated; see `Experiment-Design-AdaDec3D.md`.
 
 **Expected computational cost:**
 
-| Configuration | GFLOPs |
+| Configuration | GMac (ptflops) |
 |--------------|--------|
-| Full 3DUXNET (E0) | 632 |
-| EffiDec3D (E1) | 51.47 |
+| Full 3DUXNET (E0) | 578.74 |
+| EffiDec3D (E1) | 41.06 |
 | AdaDec3D | Measured from hard expert choices + activated ROI tiles |
+
+> Efficiency results are always reported as executed MACs and end-to-end latency; ptflops
+> values above are the static upper bound for the dense forward pass.
 
 Efficiency is reported as executed MACs and end-to-end latency distributions. Static `ptflops` output is labeled as an upper bound only.
 

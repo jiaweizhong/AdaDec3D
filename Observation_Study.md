@@ -29,16 +29,15 @@ Both training scripts auto-detect GPU capability and use BF16 mixed precision on
 ### Timing estimates (RTX 5090 + BF16)
 
 ```
-E0 full 3DUXNET (53M params, 632 GFLOPs):
-  ~0.4-0.7 s/iter → 20 000 iter ≈ 2-4 h
+E0 full 3DUXNET (53.007M params, 578.74 GMac):
+  ~0.4-0.7 s/iter → 45 000 iter ≈ 6-9 h  (measured: ~11.6 h on A100)
 
-E1 EffiDec3D (3.16M params, 51.47 GFLOPs):
-  ~0.1-0.2 s/iter → 20 000 iter ≈ 30-60 min
+E1 EffiDec3D (2.955M params, 41.06 GMac):
+  ~0.1-0.2 s/iter → 45 000 iter ≈ 2-4 h  (measured: ~5.3 h on A100)
 ```
 
-**Matched pilot**: run both models for exactly 20 000 optimizer steps to avoid
-confounding decoder capacity with training exposure. A confirmatory run may
-extend both to 45 000 steps.
+Both models are trained for **45 000 optimizer steps** with `--eval_step 250`
+to match the EffiDec3D paper protocol.
 
 The training script saves `last_model.pth` after every eval step and auto-resumes on restart. Run training inside `tmux` or `screen` so the session persists if the SSH connection drops.
 
@@ -107,31 +106,38 @@ Official source: [synapse.org](https://www.synapse.org) project `syn3193805`.
 **Download to AutoDL**
 
 ```bash
-# Search on Kaggle to confirm the slug, then:
-kaggle datasets download -d tiangexiang/synapse-multi-organ-segmentation \
-    -p /root/autodl-tmp/ --unzip
-# If the extracted folder name differs, rename it:
-mv /root/autodl-tmp/Synapse /root/autodl-tmp/btcv-synapse 2>/dev/null || true
-ls /root/autodl-tmp/btcv-synapse/imagesTr/ | head -3   # expect img0001.nii.gz …
+# Confirmed working source (957 MB, 30 cases, labels 0–13):
+kaggle datasets download -d shinjinidey/synapse-dataset \
+    && unzip synapse-dataset.zip -d /root/autodl-tmp/btcv-raw
+
+# Reorganise into train/val split (run once):
+python convert_synapse.py   # /root/AdaDec3D/EffiDec3D/convert_synapse.py
+ls /root/autodl-tmp/btcv-synapse/imagesTr/ | wc -l   # expect 18
+ls /root/autodl-tmp/btcv-synapse/imagesVal/ | wc -l  # expect 12
 ```
 
 **Expected layout**
 
 ```
 /root/autodl-tmp/btcv-synapse/
-  imagesTr/   img0001.nii.gz … (18 cases)
-  labelsTr/   label0001.nii.gz …
-  imagesVal/  img0021.nii.gz … (12 cases)
-  labelsVal/  label0021.nii.gz …
+  imagesTr/   img0005.nii.gz img0006.nii.gz … (18 training cases)
+  labelsTr/   label0005.nii.gz …
+  imagesVal/  img0001.nii.gz img0002.nii.gz … (12 val cases)
+  labelsVal/  label0001.nii.gz …
 ```
 
-**Standard split** (same as 3D UX-Net paper)
+**Standard split — Kaggle IDs** (mapped from original 3D UX-Net paper split)
+
+> The Kaggle dataset (`shinjinidey/synapse-dataset`) renumbers cases 0001–0030
+> (original IDs skip 0011–0020; Kaggle 0011 = original 0021, …, Kaggle 0030 = original 0040).
+> The split below reflects the paper's original IDs translated to Kaggle IDs and is
+> already hardcoded in `load_datasets_transforms.py` under `BTCV13`.
 
 ```python
-TRAIN = ["0005","0006","0007","0009","0010","0021","0023","0024",
-         "0026","0027","0028","0030","0031","0033","0034","0037","0039","0040"]
-VAL   = ["0001","0002","0003","0004","0008","0022","0025","0029",
-         "0032","0035","0036","0038"]
+TRAIN = ["0005","0006","0007","0009","0010","0011","0013","0014",
+         "0016","0017","0018","0020","0021","0023","0024","0027","0029","0030"]
+VAL   = ["0001","0002","0003","0004","0008","0012","0015","0019",
+         "0022","0025","0026","0028"]
 ```
 
 > **Confirmatory note**: do not tune thresholds, select checkpoints, formulate
@@ -207,15 +213,10 @@ cd /root/AdaDec3D/EffiDec3D
 
 python main_train_BTCV_TU.py \
   --root /root/autodl-tmp/btcv-synapse --output /root/output/E0 \
-  --dataset BTCV8 --network 3DUXNET \
-  --img_size 96 96 96 --n_channels 1 \
-  --channels 48 96 192 384 --feature_size 48 \
-  --ds False --mode train --pretrain False \
-  --batch_size 1 --crop_sample 4 \
-  --lr 0.001 --optim AdamW \
-  --max_iter 20000 --eval_step 500 \
-  --val_batch 1 --gpu 0 \
-  --cache_rate 1.0 --num_workers 8 --overlap 0.7
+  --dataset BTCV13 --network 3DUXNET \
+  --lr 0.001 --overlap 0.7 --crop_sample 4 \
+  --max_iter 45000 --eval_step 250 \
+  --gpu 0 --cache_rate 1.0 --num_workers 8
 ```
 
 ### E1 — EffiDec3D (baseline to beat)
@@ -223,32 +224,30 @@ python main_train_BTCV_TU.py \
 ```bash
 python main_train_BTCV_TU.py \
   --root /root/autodl-tmp/btcv-synapse --output /root/output/E1 \
-  --dataset BTCV8 --network 3DUXNET_EffiDec3D \
-  --img_size 96 96 96 --n_channels 1 \
-  --channels 48 96 192 384 \
-  --n_decoder_channels 48 --resolution_factor 2 --skip_aggregation addition \
-  --ds False --mode train --pretrain False \
-  --batch_size 1 --crop_sample 4 \
-  --lr 0.001 --optim AdamW \
-  --max_iter 20000 --eval_step 500 \
-  --val_batch 1 --gpu 0 \
-  --cache_rate 1.0 --num_workers 8 --overlap 0.7
+  --dataset BTCV13 --network 3DUXNET_EffiDec3D \
+  --ds False \
+  --lr 0.001 --overlap 0.7 --crop_sample 4 \
+  --max_iter 45000 --eval_step 250 \
+  --gpu 0 --cache_rate 1.0 --num_workers 8
 ```
+
+> **Or use the convenience script** (runs E0 then E1 sequentially, resumes from checkpoint if found):
+> ```bash
+> bash run_E0_E1.sh 2>&1 | tee /root/output/run_E0_E1.log
+> ```
 
 **Critical parameters for E1**
 
 | Parameter | Correct | Wrong value effect |
 |---|---|---|
-| `resolution_factor` | **2** | 1 = full resolution = not EffiDec3D |
-| `n_decoder_channels` | **48** | Different channel count |
-| `skip_aggregation` | **addition** | concatenation doubles channels |
-| `overlap` | **0.7** | Lower → worse DICE |
+| `--ds False` | required | ds=True enables deep supervision, changes architecture |
+| `--overlap 0.7` | **0.7** | Lower → worse DICE at inference |
 
 **Verify E1 prints at startup**:
 
 ```
-Computational complexity:   51.47 GMac
-Number of parameters:       3.16 M
+Computational complexity:   41.06 GMac
+Number of parameters:       2.955 M
 ```
 
 **Target BTCV13 mean DICE**: 79.0–79.5% (paper: 79.25%)
@@ -282,16 +281,18 @@ O7 needs both an E0-FeTA and an E1-FeTA run with identical schedules.
 # E0 FeTA
 python main_train_BTCV_TU.py \
   --root /root/autodl-tmp/feta-processed --output /root/output/E0_feta \
-  --dataset feta --network 3DUXNET \
-  --max_iter 20000 --eval_step 500 --lr 0.001 \
+  --dataset FeTA --network 3DUXNET \
+  --lr 0.001 --overlap 0.7 --crop_sample 4 \
+  --max_iter 45000 --eval_step 250 \
   --cache_rate 1.0 --num_workers 8 --gpu 0
 
 # E1 FeTA
 python main_train_BTCV_TU.py \
   --root /root/autodl-tmp/feta-processed --output /root/output/E1_feta \
-  --dataset feta --network 3DUXNET_EffiDec3D \
-  --n_decoder_channels 48 --resolution_factor 2 --skip_aggregation addition \
-  --max_iter 20000 --eval_step 500 --lr 0.001 \
+  --dataset FeTA --network 3DUXNET_EffiDec3D \
+  --ds False \
+  --lr 0.001 --overlap 0.7 --crop_sample 4 \
+  --max_iter 45000 --eval_step 250 \
   --cache_rate 1.0 --num_workers 8 --gpu 0
 ```
 
@@ -303,16 +304,18 @@ O8 needs both E0-Swin and E1-Swin with identical schedules.
 # E0 SwinUNETR
 python main_train_BTCV_TU.py \
   --root /root/autodl-tmp/btcv-synapse --output /root/output/E0_swin \
-  --dataset BTCV8 --network SwinUNETR \
-  --max_iter 20000 --eval_step 500 --lr 0.001 \
+  --dataset BTCV13 --network SwinUNETR \
+  --lr 0.001 --overlap 0.7 --crop_sample 4 \
+  --max_iter 45000 --eval_step 250 \
   --cache_rate 1.0 --num_workers 8 --gpu 0
 
 # E1 SwinUNETR_EffiDec3D
 python main_train_BTCV_TU.py \
   --root /root/autodl-tmp/btcv-synapse --output /root/output/E1_swin \
-  --dataset BTCV8 --network SwinUNETR_EffiDec3D \
-  --n_decoder_channels 48 --resolution_factor 2 --skip_aggregation addition \
-  --max_iter 20000 --eval_step 500 --lr 0.001 \
+  --dataset BTCV13 --network SwinUNETR_EffiDec3D \
+  --ds False \
+  --lr 0.001 --overlap 0.7 --crop_sample 4 \
+  --max_iter 45000 --eval_step 250 \
   --cache_rate 1.0 --num_workers 8 --gpu 0
 ```
 
@@ -1095,10 +1098,10 @@ Week 1: Setup
   [ ] 100-iter sanity run, confirm no OOM
 
 Week 2-3: Baseline training
-  [ ] E0 full 3DUXNET — 20 000 iter, ~4 sessions
-  [ ] E1 EffiDec3D   — 20 000 iter, ~2 sessions (matched budget)
-  [ ] Verify: 51.47 GMac, 3.16M params, mean DICE 79.0–79.5%
-  [ ] Save milestone checkpoints at epochs 5, 10, 20, 30, 50
+  [ ] E0 full 3DUXNET — 45 000 iter (53.007M params, 578.74 GMac)
+  [ ] E1 EffiDec3D   — 45 000 iter (2.955M params, 41.06 GMac)
+  [ ] Verify E1: mean DICE 79.0–79.5% (paper target 79.25%)
+  [ ] Save milestone checkpoints at steps 5k, 10k, 20k, 30k, 45k
 
 Week 4: Observations O1–O5 + O9 (critical gate)
   [ ] O1: boundary >> interior error rate confirmed

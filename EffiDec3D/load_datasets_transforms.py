@@ -442,6 +442,20 @@ def data_transforms(args):
             ]
         )
     elif dataset == 'BTCV13':
+        # Control switch: the TransUNet Synapse (Kaggle) volumes have identity
+        # affines, so Spacingd(pixdim=1.5,1.5,2.0) is a *nominal* resample. Passing
+        # --skip_spatial_resampling drops Orientationd+Spacingd to test whether that
+        # arbitrary resample is what depresses the half-resolution EffiDec3D decoder.
+        # Default False keeps the original EffiDec3D pipeline (do not change silently).
+        _skip_sp = getattr(args, "skip_spatial_resampling", False)
+        _sp_lbl = [] if _skip_sp else [
+            Orientationd(keys=["image", "label"], axcodes="RAS"),
+            Spacingd(keys=["image", "label"], pixdim=(1.5, 1.5, 2.0), mode=("bilinear", "nearest")),
+        ]
+        _sp_img = [] if _skip_sp else [
+            Orientationd(keys=["image"], axcodes="RAS"),
+            Spacingd(keys=["image"], pixdim=(1.5, 1.5, 2.0), mode=("bilinear")),
+        ]
         train_transforms = Compose(
             [
                 LoadImaged(keys=["image", "label"], ensure_channel_first=True),
@@ -460,12 +474,7 @@ def data_transforms(args):
                 ),
                 #ResizeWithPadOrCropd(keys=["image", "label"], spatial_size=(512,512,192), mode=("constant")), # added by me
                 CropForegroundd(keys=["image", "label"], source_key="image"),
-                Orientationd(keys=["image", "label"], axcodes="RAS"),
-                Spacingd(
-                    keys=["image", "label"],
-                    pixdim=(1.5, 1.5, 2.0),
-                    mode=("bilinear", "nearest"),
-                ),
+                *_sp_lbl,
                 EnsureTyped(keys=["image", "label"]),
                 RandCropByPosNegLabeld(
                     keys=["image", "label"],
@@ -523,9 +532,7 @@ def data_transforms(args):
                 #EnsureChannelFirstd(keys=["image", "label"]),
                 ScaleIntensityRanged(keys=["image"], a_min=-175, a_max=250, b_min=0.0, b_max=1.0, clip=True),
                 CropForegroundd(keys=["image", "label"], source_key="image"),
-                Orientationd(keys=["image", "label"], axcodes="RAS"),
-                Spacingd(keys=["image", "label"], pixdim=(
-                    1.5, 1.5, 2.0), mode=("bilinear", "nearest")),
+                *_sp_lbl,
                 #ScaleIntensityRanged(
                 #    keys=["image"], a_min=-125, a_max=275,
                 #    b_min=0.0, b_max=1.0, clip=True,
@@ -540,9 +547,7 @@ def data_transforms(args):
                 #EnsureChannelFirstd(keys=["image", "label"]),
                 ScaleIntensityRanged(keys=["image"], a_min=-175, a_max=250, b_min=0.0, b_max=1.0, clip=True),
                 CropForegroundd(keys=["image"], source_key="image"),
-                Orientationd(keys=["image"], axcodes="RAS"),
-                Spacingd(keys=["image"], pixdim=(
-                    1.5, 1.5, 2.0), mode=("bilinear")),
+                *_sp_img,
                 #ScaleIntensityRanged(
                 #    keys=["image"], a_min=-125, a_max=275,
                 #    b_min=0.0, b_max=1.0, clip=True,

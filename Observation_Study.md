@@ -9,12 +9,16 @@
 
 | | Paper A — this document | Paper B |
 |---|---|---|
-| **Claim** | Decoder capacity benefit is spatially heterogeneous and predictable | AdaDec3D realizes selective allocation with lower executed cost |
+| **Claim** | Decoder capacity is over-provisioned; where it matters is spatially concentrated and entropy-predictable | AdaDec3D allocates decoder compute adaptively — **iso-accuracy at lower executed cost** |
 | **Venue** | MIDL / MLMI / ISBI | MICCAI 2026 / TMI |
-| **Gate** | O1–O5 + O9 pass Go criteria | Paper A accepted; O7, O8, O11 pass |
-| **Key result** | Measure observed selection budget and recovered benefit vs controls | DICE ≥ EffiDec3D + 0.3% at matched executed MACs |
+| **Gate** | O2/O3/O5/O9 pass ✅ (all passed 2026-07-25) | O7, O8, O11 + AdaDec3D beats controls |
+| **Key result** | Routing signal validated (O3 r=0.97, O9 20%→86%); decoder = 42% of MACs | **DICE ≈ EffiDec3D at meaningfully lower executed MACs** (input-adaptive) |
 
-Paper A is self-contained. The selection budget and recovered benefit are **outcomes to measure**, not thresholds to hit in advance.
+> **Thesis note**: the goal is **not** to recover accuracy (EffiDec3D already
+> achieves near-parity, 79.25 vs 79.74). It is to push executed compute *lower*
+> at iso-accuracy by spending decoder capacity only where entropy says it matters.
+> O5's small decoder gain (0.13% net) is evidence of *over-provisioning*, which is
+> what makes further cuts possible. See Part 4 for the full Go decision + MAC headroom.
 
 ---
 

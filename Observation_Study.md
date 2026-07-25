@@ -271,7 +271,7 @@ Computational complexity:   41.06 GMac
 Number of parameters:       2.955 M
 ```
 
-**Target BTCV13 mean DICE**: 79.0–79.5% (paper: 79.25%)
+**E1 target BTCV13 mean DICE**: 79.0–79.5% (paper EffiDec3D 79.25%; the full 3DUX-Net E0 target is 79.74%)
 
 ### E0 measured baseline (calibration ✓)
 

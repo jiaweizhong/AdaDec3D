@@ -77,7 +77,8 @@ parser.add_argument("--n_decoder_channels", type=int, default=48)
 parser.add_argument("--skip_aggregation",   type=str, default="addition")
 parser.add_argument("--n_experts",          type=int, default=3)
 parser.add_argument("--expert_channels",    type=int, nargs="+", default=[32, 64, 96])
-parser.add_argument("--roi_quantile",       type=float, default=0.1)
+parser.add_argument("--roi_fraction",        type=float, default=0.1,
+                    help="Fraction of voxels selected for ROI refinement (top-k by uncertainty)")
 parser.add_argument("--use_moe",  type=lambda x: x.lower() != "false", default=True,
                     help="Enable MoE router (False = ablation E3)")
 parser.add_argument("--use_roi",  type=lambda x: x.lower() != "false", default=True,
@@ -171,7 +172,7 @@ model = AdaDec3D_UXNET(
     skip_aggregation=args.skip_aggregation,
     n_experts=args.n_experts,
     expert_channels=args.expert_channels,
-    roi_quantile=args.roi_quantile,
+    roi_fraction=args.roi_fraction,
     use_moe=args.use_moe,
     use_roi=args.use_roi,
 ).to(device)
@@ -516,21 +517,14 @@ def train_one_epoch(global_step, train_loader, dice_val_best, global_step_best):
         writer.add_scalar("Loss/router",     loss_dict["L_router"],     global_step)
         writer.add_scalar("Loss/load_bal",   loss_dict["L_lb"],         global_step)
 
+        global_step += 1  # increment BEFORE eval so == max_iter check fires correctly
+
         # Periodic validation
         if global_step % args.eval_step == 0 or global_step == args.max_iter:
             dice_val = validation(val_loader)
             writer.add_scalar("Val/mean_dice", dice_val, global_step)
 
-            # Always overwrite last_model.pth for checkpoint resumption
-            torch.save({
-                "model_state_dict":     model.state_dict(),
-                "optimizer_state_dict": optimizer.state_dict(),
-                "scaler_state_dict":    scaler.state_dict(),
-                "global_step":          global_step,
-                "dice_val_best":        dice_val_best,
-                "global_step_best":     global_step_best,
-            }, last_ckpt_path)
-
+            # Update best BEFORE saving last checkpoint so the saved best is never stale
             if dice_val > dice_val_best:
                 dice_val_best    = dice_val
                 global_step_best = global_step
@@ -542,8 +536,19 @@ def train_one_epoch(global_step, train_loader, dice_val_best, global_step_best):
             else:
                 print(f"[Val]   step={global_step}  dice={dice_val:.4f}  best={dice_val_best:.4f}")
 
-        global_step += 1
-        if global_step > args.max_iter:
+            # Always overwrite last_model.pth (atomic) — now with up-to-date best
+            _last_tmp = last_ckpt_path + ".tmp"
+            torch.save({
+                "model_state_dict":     model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "scaler_state_dict":    scaler.state_dict(),
+                "global_step":          global_step,
+                "dice_val_best":        dice_val_best,
+                "global_step_best":     global_step_best,
+            }, _last_tmp)
+            os.replace(_last_tmp, last_ckpt_path)
+
+        if global_step >= args.max_iter:
             break
 
     return global_step, dice_val_best, global_step_best
@@ -640,10 +645,16 @@ def profile_executed_cost(model, val_loader):
         except Exception:
             roi_dense_gmac = float("nan")
 
+    # Use a center crop matching the training patch size so the model sees the right
+    # spatial dimensions (full val volumes would OOM and differ from inference patches).
+    from monai.transforms import CenterSpatialCropd
+    _crop = CenterSpatialCropd(keys=["image"], roi_size=list(args.img_size))
+
     sample_overhead, crop_fracs, sel_experts = [], [], []
     with torch.no_grad():
         for batch in val_loader:
-            img = batch["image"].to(device)
+            batch_cropped = _crop({"image": batch["image"][0]})  # [C,D,H,W]
+            img = batch_cropped["image"].unsqueeze(0).to(device)  # [1,C,D,H,W]
             _, extras = model(img, return_router=True, return_roi=True)
             exp_idx = int(extras["expert_ids"].item())
             crop_f  = float(extras.get("roi_crop_fraction", 0.0))

@@ -327,10 +327,10 @@ Key claims:
 Run after E4 is stable.
 
 ```bash
-# ROI coverage threshold: fraction of voxels refined
-python main_train_adadec3d.py --roi_quantile 0.25 ...  # top 75% (broad)
-python main_train_adadec3d.py --roi_quantile 0.50 ...  # default: top 50%
-python main_train_adadec3d.py --roi_quantile 0.75 ...  # top 25% (tight)
+# ROI coverage: fraction of voxels selected (top-k by uncertainty)
+python main_train_adadec3d.py --roi_fraction 0.25 ...  # top 25% (tight)
+python main_train_adadec3d.py --roi_fraction 0.10 ...  # default: top 10%
+python main_train_adadec3d.py --roi_fraction 0.50 ...  # top 50% (broad)
 
 # Resource penalty
 python main_train_adadec3d.py --lambda_resource 0.01 ...  # accuracy priority
@@ -414,6 +414,6 @@ Week 13-14: Paper B writing
 |---|---|---|
 | DICE < EffiDec3D | Expert collapse | Increase `--lambda_router` |
 | All samples → Expert-S | Load imbalance | Increase `--lambda_router` |
-| ROI coverage < 50% | ROI threshold too tight | Decrease `--roi_quantile` |
+| ROI coverage < 5% | Fraction too low | Increase `--roi_fraction` |
 | E4 ≤ C0 (continued training) | Gains from steps, not adaptation | Re-examine routing effectiveness |
 | No latency saving | Routing overhead dominates | Profile crop extraction and scatter ops |

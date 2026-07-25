@@ -166,7 +166,7 @@ class AdaDec3D_UXNET(nn.Module):
         # AdaDec3D-specific
         n_experts: int = 3,
         expert_channels: list = [32, 64, 96],
-        roi_quantile: float = 0.5,
+        roi_fraction: float = 0.5,   # fraction of voxels selected (top-k by uncertainty)
         # Ablation flags (disable individual modules for E2/E3 experiments)
         use_moe: bool = True,   # False → always use middle expert (Expert-M)
         use_roi: bool = True,   # False → skip ROI refinement
@@ -178,7 +178,7 @@ class AdaDec3D_UXNET(nn.Module):
 
         self.n_decoder_channels = n_decoder_channels
         self.n_experts = n_experts
-        self.roi_quantile = roi_quantile
+        self.roi_fraction = roi_fraction
         self.use_moe = use_moe
         self.use_roi = use_roi
 
@@ -245,7 +245,9 @@ class AdaDec3D_UXNET(nn.Module):
     def _roi_mask(self, uncertainty: torch.Tensor) -> torch.Tensor:
         B = uncertainty.shape[0]
         flat = uncertainty.view(B, -1)
-        threshold = flat.quantile(self.roi_quantile, dim=-1).view(B, 1, 1, 1)
+        # Select top roi_fraction of voxels (highest uncertainty).
+        # quantile(1 - fraction) is the threshold below which voxels are excluded.
+        threshold = flat.quantile(1.0 - self.roi_fraction, dim=-1).view(B, 1, 1, 1)
         return (uncertainty > threshold).unsqueeze(1).float()  # [B, 1, D/2, H/2, W/2]
 
     def _route_and_combine(

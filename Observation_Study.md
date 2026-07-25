@@ -295,7 +295,7 @@ O7 needs both an E0-FeTA and an E1-FeTA run with identical schedules.
 # E0 FeTA
 python main_train_BTCV_TU.py \
   --root /root/autodl-tmp/feta-processed --output /root/output/E0_feta \
-  --dataset FeTA --network 3DUXNET \
+  --dataset feta --network 3DUXNET \
   --lr 0.001 --overlap 0.7 --crop_sample 4 \
   --max_iter 45000 --eval_step 250 \
   --cache_rate 1.0 --num_workers 8 --gpu 0
@@ -303,7 +303,7 @@ python main_train_BTCV_TU.py \
 # E1 FeTA
 python main_train_BTCV_TU.py \
   --root /root/autodl-tmp/feta-processed --output /root/output/E1_feta \
-  --dataset FeTA --network 3DUXNET_EffiDec3D \
+  --dataset feta --network 3DUXNET_EffiDec3D \
   --ds False \
   --lr 0.001 --overlap 0.7 --crop_sample 4 \
   --max_iter 45000 --eval_step 250 \
@@ -378,8 +378,9 @@ def load_model(network_name, ckpt_path, device="cuda"):
             n_decoder_channels=48, resolution_factor=2,
             skip_aggregation="addition").to(device)
     elif network_name == "SwinUNETR":
-        from networks.swin_unetr import SwinUNETR
-        model = SwinUNETR(in_channels=1, out_channels=14).to(device)
+        from monai.networks.nets import SwinUNETR
+        model = SwinUNETR(img_size=(96, 96, 96), in_channels=1, out_channels=14,
+                          feature_size=48).to(device)
     else:
         from networks.UXNet_3D.network_backbone import UXNET
         model = UXNET(in_chans=1, out_chans=14, depths=[2,2,2,2],
@@ -677,12 +678,17 @@ print(f"Mean positive rate={mean_pos:.5f}  negative rate={mean_neg:.5f}")
 print(f"(Pooled Pearson is descriptive only — bins within subject are correlated)")
 
 # Figure: global net gain curve (descriptive) with per-subject r in title
-pairs = sorted(zip(global_bin_ent, global_bin_net))
-x_plot, y_plot = zip(*pairs)
+# Sort ALL four arrays together by entropy to keep curves aligned
+_sort_idx = np.argsort(global_bin_ent)
+x_plot = np.array(global_bin_ent)[_sort_idx]
+y_plot = np.array(global_bin_net)[_sort_idx]
+y_pos  = np.array(global_bin_pos)[_sort_idx]
+y_neg  = np.array(global_bin_neg)[_sort_idx]
+
 plt.figure(figsize=(8, 5))
-plt.plot(list(x_plot), [b for b in global_bin_pos], "g--o", markersize=3, alpha=0.6, label="Positive rate")
-plt.plot(list(x_plot), [b for b in global_bin_neg], "r--o", markersize=3, alpha=0.6, label="Negative rate")
-plt.plot(list(x_plot), list(y_plot), "b-o", markersize=4,
+plt.plot(x_plot, y_pos, "g--o", markersize=3, alpha=0.6, label="Positive rate")
+plt.plot(x_plot, y_neg, "r--o", markersize=3, alpha=0.6, label="Negative rate")
+plt.plot(x_plot, y_plot, "b-o", markersize=4,
          label=f"Net gain (subj-r={r_subj_mean:.2f} [{r_ci_lo:.2f},{r_ci_hi:.2f}])")
 plt.axhline(0, color="k", linewidth=0.8, linestyle=":")
 plt.xlabel("Mean entropy (bin)"); plt.ylabel("Rate")
@@ -691,9 +697,9 @@ plt.legend(); plt.tight_layout()
 plt.savefig("/root/obs/O5_decoder_gain.png", dpi=150)
 plt.show()
 
-# Store bin_ent / bin_net in module scope for O11
-bin_ent = list(x_plot)
-bin_net = list(y_plot)
+# Store bin_ent / bin_net in module scope for O11 (already sorted by entropy)
+bin_ent = x_plot.tolist()
+bin_net = y_plot.tolist()
 
 save_obs("O5", {
     "subj_pearson_r_mean":  r_subj_mean,
@@ -765,7 +771,7 @@ save_obs("O6", {"epoch_mean_entropy": epoch_ent})
 FETA_NAMES = ["IS","WM","CGM","DGM","CE","BS","CSF"]
 
 feta_args = argparse.Namespace(
-    root="/root/autodl-tmp/feta-processed", dataset="FeTA",
+    root="/root/autodl-tmp/feta-processed", dataset="feta",
     mode="validation", crop_sample=4, img_size=[96,96,96]
 )
 _, feta_val, n_cls_feta = data_loader(feta_args)
@@ -1017,8 +1023,17 @@ if 'dice_summary' in dir():
     dice_err = np.array([1 - dice_summary.get(n, np.nan) for n in names_o10])
     valid = ~np.isnan(dice_err)
     if valid.sum() >= 4:
-        r_partial, _ = pearsonr(entropy_resid[valid], dice_err[valid])
-        print(f"Partial correlation (entropy | size) with dice-error: r={r_partial:.3f}")
+        # True partial correlation: residualize BOTH entropy and dice_error on log_size,
+        # then correlate the two sets of residuals.
+        A_valid = np.column_stack([np.ones(valid.sum()), log_sizes[valid]])
+        # entropy residuals (already computed on full array; re-fit on valid subset)
+        coef_e_v, _, _, _ = np.linalg.lstsq(A_valid, ent_arr_o10[valid], rcond=None)
+        ent_resid_v = ent_arr_o10[valid] - A_valid @ coef_e_v
+        # dice_error residuals
+        coef_d, _, _, _ = np.linalg.lstsq(A_valid, dice_err[valid], rcond=None)
+        dice_resid = dice_err[valid] - A_valid @ coef_d
+        r_partial, _ = pearsonr(ent_resid_v, dice_resid)
+        print(f"Partial correlation r(entropy, dice-error | log-size): r={r_partial:.3f}")
         print(f"→ entropy {'does' if abs(r_partial) > 0.3 else 'does NOT'} capture difficulty beyond organ size")
     else:
         r_partial = float("nan")
@@ -1123,12 +1138,15 @@ signal_results["Confidence"] = {
 }
 
 # ---------- MC Dropout (T=10 forward passes) ----------
-# Requires dropout layers to be active (model.train() mode during inference)
+# Requires dropout layers to be active (model.train() mode during inference).
+# UXNET/EffiDec3D uses DropPath (stochastic depth), not standard Dropout — at T=10
+# DropPath variance may be near-zero at test time. Check before trusting the signal.
 mc_bins_signal, mc_bins_gain = [], []
 t0 = time.perf_counter()
-effi_model.train()   # enable dropout
+effi_model.train()   # enable stochastic depth / dropout
+_mc_dropout_valid = True
 with torch.no_grad():
-    for batch in val_loader:
+    for _step_mc, batch in enumerate(val_loader):
         img = batch["image"].cuda()
         lbl = batch["label"].squeeze(1).long().cpu().squeeze()
         T = 10
@@ -1137,6 +1155,15 @@ with torch.no_grad():
             for _ in range(T)
         ])
         mc_var = preds.var(0).sum(1).squeeze()   # sum of per-class variance
+
+        # First subject: sanity-check that variance is non-trivial
+        if _step_mc == 0 and mc_var.max().item() < 1e-7:
+            print("[WARN] MC Dropout variance ≈ 0 on first subject.")
+            print("       EffiDec3D likely lacks active Dropout/DropPath at train() mode.")
+            print("       MC signal will be meaningless — skipping MC Dropout comparison.")
+            _mc_dropout_valid = False
+            break
+
         pred_effi_mc = preds.mean(0).argmax(1).cpu().squeeze()
         pred_full_mc = sliding_window_inference_1out(img, (96,96,96), 4, full_model,
                                                       overlap=0.7).argmax(1).cpu().squeeze()
@@ -1150,12 +1177,19 @@ with torch.no_grad():
             if mask.sum() > 100:
                 mc_bins_signal.append(mc_var[mask].mean().item())
                 mc_bins_gain.append(net_mc[mask].mean().item())
-lat_mc = (time.perf_counter() - t0) / len(val_loader) * 1000
+lat_mc = (time.perf_counter() - t0) / max(1, len(val_loader)) * 1000
 effi_model.eval()
-signal_results["MC Dropout"] = {
-    "corr_btcv": float(pearsonr(mc_bins_signal, mc_bins_gain)[0]) if len(mc_bins_signal) > 2 else float('nan'),
-    "latency_ms": round(lat_mc, 1),
-}
+if not _mc_dropout_valid:
+    signal_results["MC Dropout"] = {
+        "corr_btcv": float("nan"),
+        "latency_ms": round(lat_mc, 1),
+        "warn": "dropout_inactive",
+    }
+else:
+    signal_results["MC Dropout"] = {
+        "corr_btcv": float(pearsonr(mc_bins_signal, mc_bins_gain)[0]) if len(mc_bins_signal) > 2 else float("nan"),
+        "latency_ms": round(lat_mc, 1),
+    }
 
 # ---------- Print summary table ----------
 print(f"\n{'Signal':15s} {'Corr (BTCV)':>12} {'Latency ms':>12}")

@@ -580,12 +580,13 @@ def train(global_step, train_loader, dice_val_best, global_step_best):
         
         epoch_loss += loss.item()
         optimizer.zero_grad()
+        writer.add_scalar('Training Segmentation Loss', loss.data, global_step)
+        global_step += 1  # increment BEFORE eval so == max_iterations check fires correctly
+
         epoch_iterator.set_description(
             "Training (%d / %d Steps) (loss=%2.5f)" % (global_step, max_iterations, loss)
         )
-        if (
-            global_step % eval_num == 0 and global_step != 0
-        ) or global_step == max_iterations:
+        if (global_step % eval_num == 0) or global_step == max_iterations:
             epoch_iterator_val = tqdm(
                 val_loader, desc="Validate (X / X Steps) (dice=X.X)", dynamic_ncols=True
             )
@@ -610,7 +611,7 @@ def train(global_step, train_loader, dice_val_best, global_step_best):
                         dice_val_best, dice_val
                     )
                 )
-            # Always overwrite last_model.pth for checkpoint resumption
+            # Always overwrite last_model.pth (atomic) for checkpoint resumption
             _last_tmp = os.path.join(root_dir, "last_model.pth.tmp")
             torch.save({
                 "model_state_dict":     model.state_dict(),
@@ -629,8 +630,9 @@ def train(global_step, train_loader, dice_val_best, global_step_best):
                         os.path.join(root_dir, f"milestone_{_ms:05d}.pth")
                     )
                     print(f"[Milestone] Saved checkpoint at step {_ms}")
-        writer.add_scalar('Training Segmentation Loss', loss.data, global_step)
-        global_step += 1
+
+        if global_step >= max_iterations:
+            break
     return global_step, dice_val_best, global_step_best
 
 max_iterations = args.max_iter
@@ -639,9 +641,12 @@ eval_num = args.eval_step
 post_label = AsDiscrete(to_onehot=out_classes)
 post_pred = AsDiscrete(argmax=True, to_onehot=out_classes)
 dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
-global_step = 1 
-dice_val_best = 0.0
-global_step_best = 1
+if ckpt is None:
+    # Fresh run — start from step 1 (not 0) so first eval fires at step eval_num
+    global_step = 1
+    dice_val_best = 0.0
+    global_step_best = 1
+# Otherwise global_step / dice_val_best / global_step_best were restored from ckpt above
 epoch_loss_values = []
 metric_values = []
 

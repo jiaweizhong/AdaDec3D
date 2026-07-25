@@ -604,6 +604,80 @@ del _dummy, _lat
 
 per_class_dice, per_class_hd, expert_frac = validation_final(val_loader)
 
+# ---------------------------------------------------------------------------
+# Executed-MACs profiler (#5 fix)
+# ptflops gives a static upper bound (soft routing + dense ROI).
+# This profiler measures ACTUAL executed cost at inference with hard routing.
+# ---------------------------------------------------------------------------
+def profile_executed_cost(model, val_loader):
+    """
+    Per-sample executed MACs at inference = base_coarse + selected_expert + roi_crop.
+    Reports overhead above base EffiDec3D for each val case.
+    """
+    model.eval()
+    half_res = tuple(s // 2 for s in args.img_size)
+    in_ch = args.n_decoder_channels
+
+    # MACs for each expert (dense, full half-res feature)
+    expert_gmacs = []
+    for exp in model.experts:
+        try:
+            m, _ = get_model_complexity_info(
+                exp, (in_ch, *half_res),
+                as_strings=False, print_per_layer_stat=False, verbose=False)
+            expert_gmacs.append(m / 1e9)
+        except Exception:
+            expert_gmacs.append(float("nan"))
+
+    # MACs for ROI refiner (dense pass on full half-res feature)
+    roi_dense_gmac = 0.0
+    if args.use_roi and hasattr(model, "roi_refiner"):
+        try:
+            m, _ = get_model_complexity_info(
+                model.roi_refiner.conv, (in_ch, *half_res),
+                as_strings=False, print_per_layer_stat=False, verbose=False)
+            roi_dense_gmac = m / 1e9
+        except Exception:
+            roi_dense_gmac = float("nan")
+
+    sample_overhead, crop_fracs, sel_experts = [], [], []
+    with torch.no_grad():
+        for batch in val_loader:
+            img = batch["image"].to(device)
+            _, extras = model(img, return_router=True, return_roi=True)
+            exp_idx = int(extras["expert_ids"].item())
+            crop_f  = float(extras.get("roi_crop_fraction", 0.0))
+            exp_mac = expert_gmacs[exp_idx] if not np.isnan(expert_gmacs[exp_idx]) else 0.0
+            roi_mac = roi_dense_gmac * crop_f if not np.isnan(roi_dense_gmac) else 0.0
+            sel_experts.append(exp_idx)
+            crop_fracs.append(crop_f)
+            sample_overhead.append(exp_mac + roi_mac)
+
+    n = len(expert_gmacs)
+    labels = (["S", "M", "L"] * n)[:n]
+    expert_sel_frac = [sel_experts.count(i) / max(len(sel_experts), 1) for i in range(n)]
+
+    print("\n=== Executed-MACs Profile (hard routing) ===")
+    for lbl, m, f in zip(labels, expert_gmacs, expert_sel_frac):
+        print(f"  Expert-{lbl}: {m:.3f} GMac  selected {f:.1%} of val cases")
+    if args.use_roi:
+        print(f"  ROI dense:   {roi_dense_gmac:.3f} GMac  mean crop fraction: {np.mean(crop_fracs):.1%}")
+    print(f"  Overhead vs E1 base: {np.mean(sample_overhead):.3f} ± {np.std(sample_overhead):.3f} GMac")
+    print(f"  (ptflops static upper bound with soft routing: {macs_gmac:.2f} GMac)")
+
+    return {
+        "expert_gmacs": [round(m, 3) for m in expert_gmacs],
+        "roi_dense_gmac": round(roi_dense_gmac, 3),
+        "expert_sel_frac": [round(f, 3) for f in expert_sel_frac],
+        "mean_crop_frac": round(float(np.mean(crop_fracs)), 4),
+        "p95_crop_frac":  round(float(np.percentile(crop_fracs, 95) if crop_fracs else 0), 4),
+        "mean_overhead_gmac": round(float(np.mean(sample_overhead)), 3),
+        "std_overhead_gmac":  round(float(np.std(sample_overhead)), 3),
+        "p95_overhead_gmac":  round(float(np.percentile(sample_overhead, 95) if sample_overhead else 0), 3),
+    }
+
+exec_profile = profile_executed_cost(model, val_loader)
+
 mean_dice_per_class = np.nanmean(per_class_dice, axis=0)  # [n_classes-1]
 mean_hd_per_class   = np.nanmean(per_class_hd, axis=0)
 
@@ -644,20 +718,27 @@ with open(csv_path, "a", newline="") as f:
     w = csv.writer(f)
     if not file_exists:
         header = ["Trained_Weights", "Dataset", "Stage", "use_moe", "use_roi",
-                  "MACs_GMac", "Params_M",
+                  "MACs_GMac_static", "Params_M",
+                  "Overhead_Mean_GMac", "Overhead_Std_GMac", "Overhead_p95_GMac",
+                  "Mean_CropFrac", "p95_CropFrac",
                   "Train_Time_h", "Peak_Train_Mem_GB",
                   "Infer_Lat_ms", "Infer_Lat_p95_ms", "Peak_Infer_Mem_GB"]
         header += [f"Dice_{n}" for n in CLASS_NAMES] + ["Mean_Dice"]
         header += [f"HD_{n}"   for n in CLASS_NAMES] + ["Mean_HD"]
         header += expert_labels
+        header += [f"ExpertMAC_{l}" for l in (["S","M","L"] * len(expert_labels))[:len(expert_labels)]]
         w.writerow(header)
     row = [root_dir, args.dataset, args.stage, args.use_moe, args.use_roi,
            _fmt(macs_gmac), _fmt(params_m, 3),
+           _fmt(exec_profile["mean_overhead_gmac"]), _fmt(exec_profile["std_overhead_gmac"]),
+           _fmt(exec_profile["p95_overhead_gmac"]),
+           _fmt(exec_profile["mean_crop_frac"], 4), _fmt(exec_profile["p95_crop_frac"], 4),
            _fmt(train_time_sec / 3600), _fmt(peak_train_mem_mb / 1024),
            _fmt(infer_lat_ms, 1), _fmt(infer_lat_p95_ms, 1), _fmt(peak_infer_mem_mb / 1024)]
     row += [_fmt(d, 4) for d in mean_dice_per_class] + [_fmt(mean_dice, 4)]
     row += [_fmt(h, 4) for h in mean_hd_per_class]   + [_fmt(mean_hd, 4)]
     row += [_fmt(frac, 4) for frac in expert_frac]
+    row += [_fmt(m, 3) for m in exec_profile["expert_gmacs"]]
     w.writerow(row)
 print(f"Results saved to {csv_path}")
 writer.close()

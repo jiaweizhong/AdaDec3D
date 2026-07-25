@@ -140,9 +140,23 @@ VAL   = ["0001","0002","0003","0004","0008","0012","0015","0019",
          "0022","0025","0026","0028"]
 ```
 
-> **Confirmatory note**: do not tune thresholds, select checkpoints, formulate
-> the Paper A headline, and report final evidence on the same 12 cases.
-> For confirmatory results reserve a held-out fold or use nested cross-validation.
+> **Data reuse / Paper A → Paper B plan**
+>
+> These same 12 val cases are used for (a) O1–O11 exploratory observations,
+> (b) Go/No-Go threshold selection (O5 quantile, O9 budget), and
+> (c) AdaDec3D final Dice / HD95 table.  Using the same split for all three
+> introduces optimistic bias (selection-then-confirm on the same data).
+>
+> Mitigation plan:
+> - **Paper A** treats O1–O5 + O9 as exploratory/discovery; no hold-out needed
+>   because these are observational claims (entropy is informative) not
+>   hyperparameter-tuned predictive claims.
+> - **Paper B** (AdaDec3D paper): retrain on a 5-fold CV split over all 30 cases
+>   so the same cases are never simultaneously in the observation set and the
+>   final evaluation fold.  Report mean ± std Dice across folds.
+> - Until Paper B training begins, clearly mark all Dice numbers in Paper A as
+>   "calibration / not final" to avoid reviewer confusion.
+>
 > All confidence intervals must resample subjects, not individual voxels.
 
 **BTCV13 label mapping**
@@ -601,7 +615,11 @@ save_obs("O4", {"dice": dice_summary, "entropy": ent_summary})
 Report **positive** and **negative** transitions separately — positive alone overstates benefit.
 
 ```python
-bin_ent, bin_pos, bin_neg, bin_net = [], [], [], []
+from scipy.stats import pearsonr, spearmanr
+
+# Per-subject binned analysis (avoids pseudo-replication from pooling bins across subjects)
+subj_r_pearson, subj_r_spearman = [], []
+global_bin_ent, global_bin_pos, global_bin_neg, global_bin_net = [], [], [], []
 
 with torch.no_grad():
     for batch in val_loader:
@@ -619,30 +637,53 @@ with torch.no_grad():
         neg = ((pred_full != lbl) & (pred_effi == lbl)).float()
         net = pos - neg
 
+        # Per-subject binning
+        s_ent, s_net, s_pos, s_neg = [], [], [], []
         for b in range(20):
             q_lo = ent.quantile(b/20).item()
             q_hi = ent.quantile((b+1)/20).item()
             mask = (ent >= q_lo) & (ent < q_hi)
             if mask.sum() > 100:
-                bin_ent.append(ent[mask].mean().item())
-                bin_pos.append(pos[mask].mean().item())
-                bin_neg.append(neg[mask].mean().item())
-                bin_net.append(net[mask].mean().item())
+                s_ent.append(ent[mask].mean().item())
+                s_net.append(net[mask].mean().item())
+                s_pos.append(pos[mask].mean().item())
+                s_neg.append(neg[mask].mean().item())
+                global_bin_ent.append(s_ent[-1])
+                global_bin_net.append(s_net[-1])
+                global_bin_pos.append(s_pos[-1])
+                global_bin_neg.append(s_neg[-1])
 
-from scipy.stats import pearsonr
-pairs = sorted(zip(bin_ent, bin_net))
-x, y = zip(*pairs)
-r, p = pearsonr(x, y)
-print(f"Net-gain/entropy Pearson r={r:.3f} (descriptive; bins are correlated)")
-mean_pos = float(np.mean(bin_pos))
-mean_neg = float(np.mean(bin_neg))
+        if len(s_ent) >= 5:
+            subj_r_pearson.append(pearsonr(s_ent, s_net)[0])
+            subj_r_spearman.append(spearmanr(s_ent, s_net)[0])
+
+# Subject-level statistics (avoid pseudo-replication)
+r_subj_mean = float(np.mean(subj_r_pearson))
+r_subj_std  = float(np.std(subj_r_pearson))
+rho_subj_mean = float(np.mean(subj_r_spearman))
+
+# Bootstrap CI over subject-level Pearson r
+rng = np.random.default_rng(0)
+boot_r = [np.mean(rng.choice(subj_r_pearson, len(subj_r_pearson), replace=True))
+          for _ in range(2000)]
+r_ci_lo, r_ci_hi = np.percentile(boot_r, [2.5, 97.5])
+
+mean_pos = float(np.mean(global_bin_pos))
+mean_neg = float(np.mean(global_bin_neg))
+
+print(f"Per-subject Pearson r: {r_subj_mean:.3f} ± {r_subj_std:.3f}  95% CI [{r_ci_lo:.3f}, {r_ci_hi:.3f}]")
+print(f"Per-subject Spearman ρ: {rho_subj_mean:.3f}")
 print(f"Mean positive rate={mean_pos:.5f}  negative rate={mean_neg:.5f}")
+print(f"(Pooled Pearson is descriptive only — bins within subject are correlated)")
 
-# Figure: net gain curve with positive/negative lines
+# Figure: global net gain curve (descriptive) with per-subject r in title
+pairs = sorted(zip(global_bin_ent, global_bin_net))
+x_plot, y_plot = zip(*pairs)
 plt.figure(figsize=(8, 5))
-plt.plot(list(x), [p_ for p_ in bin_pos], "g--o", markersize=4, label="Positive rate")
-plt.plot(list(x), [n_ for n_ in bin_neg], "r--o", markersize=4, label="Negative rate")
-plt.plot(list(x), list(y), "b-o", markersize=5, label=f"Net gain (r={r:.2f})")
+plt.plot(list(x_plot), [b for b in global_bin_pos], "g--o", markersize=3, alpha=0.6, label="Positive rate")
+plt.plot(list(x_plot), [b for b in global_bin_neg], "r--o", markersize=3, alpha=0.6, label="Negative rate")
+plt.plot(list(x_plot), list(y_plot), "b-o", markersize=4,
+         label=f"Net gain (subj-r={r_subj_mean:.2f} [{r_ci_lo:.2f},{r_ci_hi:.2f}])")
 plt.axhline(0, color="k", linewidth=0.8, linestyle=":")
 plt.xlabel("Mean entropy (bin)"); plt.ylabel("Rate")
 plt.title("O5: Decoder Gain vs Uncertainty")
@@ -650,13 +691,20 @@ plt.legend(); plt.tight_layout()
 plt.savefig("/root/obs/O5_decoder_gain.png", dpi=150)
 plt.show()
 
+# Store bin_ent / bin_net in module scope for O11
+bin_ent = list(x_plot)
+bin_net = list(y_plot)
+
 save_obs("O5", {
-    "net_gain_entropy_pearson_r": float(r),
-    "mean_positive_rate": mean_pos,
-    "mean_negative_rate": mean_neg,
-    "bin_ent": [float(v) for v in x],
-    "bin_net": [float(v) for v in y],
-    "go": r > 0.0 and mean_pos > mean_neg,
+    "subj_pearson_r_mean":  r_subj_mean,
+    "subj_pearson_r_std":   r_subj_std,
+    "subj_pearson_r_ci":    [float(r_ci_lo), float(r_ci_hi)],
+    "subj_spearman_rho":    rho_subj_mean,
+    "mean_positive_rate":   mean_pos,
+    "mean_negative_rate":   mean_neg,
+    "bin_ent": [float(v) for v in bin_ent],
+    "bin_net": [float(v) for v in bin_net],
+    "go": r_ci_lo > 0.0 and mean_pos > mean_neg,
 })
 ```
 
@@ -727,15 +775,42 @@ feta_files = [{"image": im, "label": lb}
 feta_loader = DataLoader(Dataset(data=feta_files, transform=feta_transform),
                          batch_size=1, shuffle=False, num_workers=2)
 
-full_feta  = load_model("3DUXNET",           "/root/output/E0_feta/.../best_metric_model.pth")
-effi_feta  = load_model("3DUXNET_EffiDec3D", "/root/output/E1_feta/.../best_metric_model.pth")
+# Resolve checkpoint paths
+import glob as _glob
+_e0f = sorted(_glob.glob("/root/output/E0_feta*/3DUXNET/*/best_metric_model.pth"))
+_e1f = sorted(_glob.glob("/root/output/E1_feta*/3DUXNET_EffiDec3D/*/best_metric_model.pth"))
+assert _e0f and _e1f, "Run E0_feta and E1_feta training first (Observation_Study.md Part 2)"
+full_feta  = load_model("3DUXNET",           _e0f[-1])
+effi_feta  = load_model("3DUXNET_EffiDec3D", _e1f[-1])
 
-# Run identical O5 analysis using feta_loader, full_feta, effi_feta, n_cls=8
-# ... (same code as O5 above, replace val_loader / full_model / effi_model)
-print(f"FeTA Net-gain/entropy r={r_feta:.3f}")
+# Run identical O5 per-subject analysis for FeTA
+feta_subj_r = []
+with torch.no_grad():
+    for batch in feta_loader:
+        img = batch["image"].cuda()
+        lbl = batch["label"].squeeze(1).long().cpu().squeeze()
+        pred_full = sliding_window_inference_1out(img,(96,96,96),4,full_feta,overlap=0.7).argmax(1).cpu().squeeze()
+        logits_e  = sliding_window_inference_1out(img,(96,96,96),4,effi_feta,overlap=0.7)
+        prob_e    = logits_e.softmax(1).cpu()
+        pred_effi = logits_e.argmax(1).cpu().squeeze()
+        ent = -(prob_e * torch.log(prob_e + 1e-8)).sum(1).squeeze()
+        pos = ((pred_full==lbl) & (pred_effi!=lbl)).float()
+        neg = ((pred_full!=lbl) & (pred_effi==lbl)).float()
+        net = pos - neg
+        s_ent, s_net = [], []
+        for b in range(20):
+            mask = (ent >= ent.quantile(b/20)) & (ent < ent.quantile((b+1)/20))
+            if mask.sum() > 100:
+                s_ent.append(ent[mask].mean().item())
+                s_net.append(net[mask].mean().item())
+        if len(s_ent) >= 5:
+            feta_subj_r.append(pearsonr(s_ent, s_net)[0])
+
+r_feta = float(np.mean(feta_subj_r))
+print(f"FeTA per-subject Pearson r={r_feta:.3f}  (n={len(feta_subj_r)} subjects)")
 print(f"{'GO ✓' if r_feta > 0.40 else 'NO-GO ✗'}  (threshold r > 0.40)")
 
-save_obs("O7", {"feta_gain_entropy_pearson_r": float(r_feta), "go": r_feta > 0.40})
+save_obs("O7", {"feta_gain_entropy_subj_pearson_r": r_feta, "n_subjects": len(feta_subj_r), "go": r_feta > 0.40})
 ```
 
 ---
@@ -747,15 +822,41 @@ save_obs("O7", {"feta_gain_entropy_pearson_r": float(r_feta), "go": r_feta > 0.4
 *Requires E0_swin and E1_swin from Part 2.*
 
 ```python
-full_swin = load_model("SwinUNETR",          "/root/output/E0_swin/.../best_metric_model.pth")
-effi_swin = load_model("SwinUNETR_EffiDec3D","/root/output/E1_swin/.../best_metric_model.pth")
+import glob as _glob
+_e0s = sorted(_glob.glob("/root/output/E0_swin*/SwinUNETR/*/best_metric_model.pth"))
+_e1s = sorted(_glob.glob("/root/output/E1_swin*/SwinUNETR_EffiDec3D/*/best_metric_model.pth"))
+assert _e0s and _e1s, "Run E0_swin and E1_swin training first (Observation_Study.md Part 2)"
+full_swin = load_model("SwinUNETR",           _e0s[-1])
+effi_swin = load_model("SwinUNETR_EffiDec3D", _e1s[-1])
 
-# Run identical O5 analysis using val_loader, full_swin, effi_swin
-# ... (same code as O5 above, replace full_model / effi_model)
-print(f"SwinUNETR Net-gain/entropy r={r_swin:.3f}")
+# Run identical O5 per-subject analysis for SwinUNETR
+swin_subj_r = []
+with torch.no_grad():
+    for batch in val_loader:
+        img = batch["image"].cuda()
+        lbl = batch["label"].squeeze(1).long().cpu().squeeze()
+        pred_full = sliding_window_inference_1out(img,(96,96,96),4,full_swin,overlap=0.7).argmax(1).cpu().squeeze()
+        logits_e  = sliding_window_inference_1out(img,(96,96,96),4,effi_swin,overlap=0.7)
+        prob_e    = logits_e.softmax(1).cpu()
+        pred_effi = logits_e.argmax(1).cpu().squeeze()
+        ent = -(prob_e * torch.log(prob_e + 1e-8)).sum(1).squeeze()
+        pos = ((pred_full==lbl) & (pred_effi!=lbl)).float()
+        neg = ((pred_full!=lbl) & (pred_effi==lbl)).float()
+        net = pos - neg
+        s_ent, s_net = [], []
+        for b in range(20):
+            mask = (ent >= ent.quantile(b/20)) & (ent < ent.quantile((b+1)/20))
+            if mask.sum() > 100:
+                s_ent.append(ent[mask].mean().item())
+                s_net.append(net[mask].mean().item())
+        if len(s_ent) >= 5:
+            swin_subj_r.append(pearsonr(s_ent, s_net)[0])
+
+r_swin = float(np.mean(swin_subj_r))
+print(f"SwinUNETR per-subject Pearson r={r_swin:.3f}  (n={len(swin_subj_r)} subjects)")
 print(f"{'GO ✓' if r_swin > 0.45 else 'NO-GO ✗'}  (threshold r > 0.45)")
 
-save_obs("O8", {"swin_gain_entropy_pearson_r": float(r_swin), "go": r_swin > 0.45})
+save_obs("O8", {"swin_gain_entropy_subj_pearson_r": r_swin, "n_subjects": len(swin_subj_r), "go": r_swin > 0.45})
 ```
 
 ---
@@ -858,7 +959,8 @@ save_obs("O9", {
     "random_recovery_mean":  rand_arr.mean(0).round(4).tolist(),
     "ci_lower_95": lo.round(4).tolist(),
     "ci_upper_95": hi.round(4).tolist(),
-    "go": bool((lo > 0).any()),   # any budget where lower CI > 0
+    # Go: lower CI > 0 for at least one budget in the 10–30% range (as stated in criterion)
+    "go": bool(lo[np.isin(budgets, [10, 20, 30])].max() > 0),
 })
 ```
 
@@ -898,19 +1000,53 @@ for name in BTCV_NAMES:
 r_size, _ = spearmanr(sizes, diffs)
 print(f"\nOrgan size vs difficulty  Spearman ρ={r_size:.3f}")
 
-# Figure: scatter size vs difficulty
+# Partial correlation: does entropy predict difficulty beyond log(volume)?
+# OLS: entropy ~ log(size) + intercept; residuals are the size-independent component.
+import numpy as np
+log_sizes = np.log(np.array(sizes))
+ent_arr_o10 = np.array(diffs)
+# Fit log(size) → entropy, get residuals
+A = np.column_stack([np.ones(len(log_sizes)), log_sizes])
+coef, _, _, _ = np.linalg.lstsq(A, ent_arr_o10, rcond=None)
+entropy_resid = ent_arr_o10 - A @ coef   # entropy unexplained by organ size
+
+# Partial correlation: correlation of residuals with a complexity proxy
+# Use per-organ mean dice error (1-dice) from O4 as the ground-truth difficulty
+# (requires organ_dice from O4 to be in scope)
+if 'dice_summary' in dir():
+    dice_err = np.array([1 - dice_summary.get(n, np.nan) for n in names_o10])
+    valid = ~np.isnan(dice_err)
+    if valid.sum() >= 4:
+        r_partial, _ = pearsonr(entropy_resid[valid], dice_err[valid])
+        print(f"Partial correlation (entropy | size) with dice-error: r={r_partial:.3f}")
+        print(f"→ entropy {'does' if abs(r_partial) > 0.3 else 'does NOT'} capture difficulty beyond organ size")
+    else:
+        r_partial = float("nan")
+        print("(dice_summary from O4 not available — run O4 first for partial correlation)")
+else:
+    r_partial = float("nan")
+    print("(dice_summary from O4 not in scope — run O4 before O10 for partial correlation)")
+
+# Figure: scatter size vs difficulty with OLS trend
 plt.figure(figsize=(7, 5))
 plt.scatter(sizes, diffs, zorder=3)
 for n, s, d in zip(names_o10, sizes, diffs):
     plt.annotate(n, (s, d), fontsize=7, xytext=(4, 2), textcoords="offset points")
-plt.xlabel("Mean organ size (voxels)"); plt.ylabel("Mean entropy (difficulty)")
-plt.title(f"O10: Organ Size vs Difficulty  ρ={r_size:.2f}")
-plt.tight_layout()
+x_line = np.linspace(min(log_sizes), max(log_sizes), 100)
+y_line = coef[0] + coef[1] * x_line
+plt.plot(np.exp(x_line), y_line, "k--", linewidth=1, label="OLS(log size)")
+plt.xlabel("Mean organ size (voxels, log scale)"); plt.xscale("log")
+plt.ylabel("Mean entropy (difficulty)")
+plt.title(f"O10: Organ Size vs Difficulty  ρ={r_size:.2f}  partial-r={r_partial:.2f}")
+plt.legend(); plt.tight_layout()
 plt.savefig("/root/obs/O10_size_vs_difficulty.png", dpi=150)
 plt.show()
 
 save_obs("O10", {
     "spearman_rho_size_vs_difficulty": float(r_size),
+    "partial_r_entropy_given_size": float(r_partial) if not np.isnan(r_partial) else None,
+    "ols_coef_intercept": float(coef[0]),
+    "ols_coef_log_size":  float(coef[1]),
     "organ_size": {n: round(s, 0) for n, s in zip(names_o10, sizes)},
     "organ_difficulty": {n: round(d, 4) for n, d in zip(names_o10, diffs)},
 })

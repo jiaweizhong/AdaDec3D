@@ -92,6 +92,7 @@ parser.add_argument('--overlap_mode', type=str, default='constant', help='overla
 parser.add_argument('--gpu', type=str, default='0', help='your GPU number')
 parser.add_argument('--cache_rate', type=float, default=0.1, help='Cache rate to cache your dataset into GPUs')
 parser.add_argument('--num_workers', type=int, default=2, help='Number of workers')
+parser.add_argument('--seed', type=int, default=0, help='Determinism seed (default 0 = original EffiDec3D)')
 
 args = parser.parse_args()
 
@@ -113,7 +114,8 @@ val_files = [
 print(train_files)
 print(val_files)
 
-set_determinism(seed=0)
+set_determinism(seed=args.seed)
+print(f"Determinism seed: {args.seed}")
 
 train_transforms, val_transforms = data_transforms(args)
 

@@ -182,8 +182,9 @@ hd95_metric = HausdorffDistanceMetric(include_background=False, percentile=95)
 
 per_dice = dice_metric.aggregate()
 per_hd95 = hd95_metric.aggregate()
-BTCV_NAMES = ["Aorta","Gallbladder","Spleen","L.Kidney","R.Kidney",
-              "Liver","Stomach","IVC","Port.Vein","Pancreas","R.Adrenal","L.Adrenal","Duodenum"]
+# Standard BTCV/Synapse 13-organ order (class 1..13), matches CSV columns
+BTCV_NAMES = ["Spleen","R.Kidney","L.Kidney","Gallbladder","Esophagus",
+              "Liver","Stomach","Aorta","IVC","Veins","Pancreas","R.Adrenal","L.Adrenal"]
 for name, d, h in zip(BTCV_NAMES, per_dice, per_hd95):
     print(f"{name:15s}: DICE={d:.4f}  HD95={h:.2f}mm")
 ```
@@ -249,8 +250,8 @@ average expert is too expensive, increase `--lambda_budget` or reduce
 ```python
 import torch.nn.functional as F
 
-SMALL_ORGANS = {"Gallbladder":2, "Pancreas":10, "R.Adrenal":11,
-                "L.Adrenal":12, "Duodenum":13}
+SMALL_ORGANS = {"Gallbladder":4, "Esophagus":5, "Veins":10,
+                "Pancreas":11, "R.Adrenal":12, "L.Adrenal":13}
 coverage, missed = {n: [] for n in SMALL_ORGANS}, {n: 0 for n in SMALL_ORGANS}
 
 with torch.no_grad():

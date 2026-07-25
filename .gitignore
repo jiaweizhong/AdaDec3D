@@ -42,7 +42,6 @@ processed_data/
 *.pkl
 output*/
 outputs/
-results/
 checkpoints/
 saved_models/
 

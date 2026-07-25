@@ -162,11 +162,14 @@ VAL   = ["0001","0002","0003","0004","0008","0012","0015","0019",
 **BTCV13 label mapping**
 
 ```
-0 Background  1 Aorta      2 Gallbladder  3 Spleen      4 L.Kidney
-5 R.Kidney    6 Liver      7 Stomach      8 IVC         9 Port.Vein
-10 Pancreas*  11 R.Adrenal* 12 L.Adrenal* 13 Duodenum*
+0 Background  1 Spleen     2 R.Kidney    3 L.Kidney    4 Gallbladder
+5 Esophagus   6 Liver      7 Stomach     8 Aorta       9 IVC
+10 Veins*     11 Pancreas* 12 R.Adrenal* 13 L.Adrenal*
 ```
-\* small structures — primary metric for Paper A/B.
+\* smallest / hardest structures (Dice < 0.70 for E0) — primary metric for Paper A/B.
+This is the standard BTCV/Synapse 13-organ order, matching the CSV column names
+(`Spl, Rkid, Lkid, Gall, Eso, Liver, Sto, Aorta, IVC, Veins, Pan, Rad, Lad`)
+emitted by `main_train_BTCV_TU.py`.
 
 **Verify loading**
 
@@ -265,6 +268,29 @@ Number of parameters:       2.955 M
 ```
 
 **Target BTCV13 mean DICE**: 79.0–79.5% (paper: 79.25%)
+
+### E0 measured baseline (calibration ✓)
+
+E0 (full 3DUXNET, 45 000 iter) reproduces the paper: **Mean DICE 0.7918** (paper 79.25%),
+Mean HD95 9.04, 578.74 GMac / 53.007 M params, train 11.65 h, infer 40.6 ms/vol,
+peak infer mem 1.84 GB (A100/5090 run). Per-organ (standard BTCV order):
+
+| Organ | DICE | HD95 | | Organ | DICE | HD95 |
+|---|---|---|---|---|---|---|
+| Spleen | 0.913 | 2.53 | | IVC | 0.853 | 3.62 |
+| R.Kidney | 0.850 | 20.35 | | Veins* | 0.673 | 11.80 |
+| L.Kidney | 0.899 | 9.70 | | Pancreas* | 0.690 | 10.97 |
+| Gallbladder | 0.722 | 12.40 | | R.Adrenal* | 0.669 | 5.96 |
+| Esophagus | 0.743 | 4.29 | | L.Adrenal* | 0.631 | 9.10 |
+| Liver | 0.951 | 9.48 | | **Mean** | **0.792** | **9.04** |
+| Stomach | 0.792 | 14.46 | | | | |
+| Aorta | 0.908 | 2.92 | | | | |
+
+\* The four hardest organs (DICE < 0.70) are exactly the small/thin structures —
+Veins, Pancreas, R.Adrenal, L.Adrenal — which validates the AdaDec3D premise that
+decoder capacity should be spent adaptively where difficulty concentrates.
+(R.Kidney HD95 = 20.35 is a single-case spatial outlier despite DICE 0.850.)
+Numbers are "calibration / not final" — see the Paper A → Paper B data-reuse note.
 
 ### Checkpoint resumption
 
@@ -388,8 +414,9 @@ def load_model(network_name, ckpt_path, device="cuda"):
     model.eval()
     return model
 
-BTCV_NAMES = ["Aorta","Gallbladder","Spleen","L.Kidney","R.Kidney",
-              "Liver","Stomach","IVC","Port.Vein","Pancreas","R.Adrenal","L.Adrenal","Duodenum"]
+# Standard BTCV/Synapse 13-organ order (class 1..13), matches CSV columns
+BTCV_NAMES = ["Spleen","R.Kidney","L.Kidney","Gallbladder","Esophagus",
+              "Liver","Stomach","Aorta","IVC","Veins","Pancreas","R.Adrenal","L.Adrenal"]
 
 args = argparse.Namespace(
     root="/root/autodl-tmp/btcv-synapse", dataset="BTCV13",
@@ -1282,8 +1309,8 @@ Week 1: Setup
   [x] 100-iter sanity run, confirm no OOM
 
 Week 2-3: Baseline training
-  [ ] E0 full 3DUXNET — 45 000 iter (53.007M params, 578.74 GMac)
-        run: bash run_E0_E1.sh E0
+  [x] E0 full 3DUXNET — 45 000 iter (53.007M params, 578.74 GMac)
+        run: bash run_E0_E1.sh E0   ✓ Mean DICE 0.7918 / HD95 9.04 (paper 79.25%)
   [ ] E1 EffiDec3D   — 45 000 iter (2.955M params, 41.06 GMac)
         run: bash run_E0_E1.sh E1   (after E0 finishes; git pull first for milestone code)
   [ ] Verify E1: mean DICE 79.0–79.5% (paper target 79.25%)

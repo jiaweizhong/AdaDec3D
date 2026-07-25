@@ -726,10 +726,12 @@ expert_frac = np.asarray(exec_profile["expert_sel_frac"])
 mean_dice_per_class = np.nanmean(per_class_dice, axis=0)  # [n_classes-1]
 mean_hd_per_class   = np.nanmean(per_class_hd, axis=0)
 
+# Standard BTCV/Synapse 13-organ order (class 1..13), matches main_train_BTCV_TU.py
+# class_labels and the E0/E1 CSV columns (Spl, Rkid, Lkid, Gall, Eso, ...).
 BTCV13_NAMES = [
-    "Aorta", "Gallbladder", "Spleen", "L.Kidney", "R.Kidney",
-    "Liver", "Stomach", "IVC", "Port.Vein",
-    "Pancreas", "R.Adrenal", "L.Adrenal", "Duodenum",
+    "Spleen", "R.Kidney", "L.Kidney", "Gallbladder", "Esophagus",
+    "Liver", "Stomach", "Aorta", "IVC", "Veins",
+    "Pancreas", "R.Adrenal", "L.Adrenal",
 ]
 CLASS_NAMES = BTCV13_NAMES if args.dataset == "BTCV13" else \
               [f"class_{i}" for i in range(1, out_classes)]

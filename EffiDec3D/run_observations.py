@@ -136,8 +136,8 @@ def O4_per_organ(val_loader, effi, post_pred, post_lbl):
         for batch in val_loader:
             img = batch["image"].cuda()
             lbl = batch["label"].cpu()
-            logits = infer(effi, img)
-            prob = logits.softmax(1).cpu()
+            logits = infer(effi, img).cpu()   # cpu so DiceMetric y_pred/y share device
+            prob = logits.softmax(1)
             ent = -(prob * torch.log(prob + 1e-8)).sum(1).squeeze()
             dvals = dm(post_pred(logits.squeeze(0)).unsqueeze(0),
                        post_lbl(lbl.squeeze(0)).unsqueeze(0))[0]

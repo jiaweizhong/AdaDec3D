@@ -205,10 +205,12 @@ def O5_decoder_gain(val_loader, effi, full):
     plt.axhline(0, color="k", lw=.8, ls=":")
     plt.xlabel("Mean entropy (bin)"); plt.ylabel("Rate"); plt.title("O5: Decoder Gain vs Uncertainty")
     plt.legend(); plt.tight_layout(); plt.savefig(f"{OBS_DIR}/O5_decoder_gain.png", dpi=150); plt.close()
+    bin_net = np.array(g_net)[idx].tolist()
     save_obs("O5", {"subj_pearson_r_mean": r_mean, "subj_pearson_r_ci": [float(ci_lo), float(ci_hi)],
                     "mean_positive_rate": mean_pos, "mean_negative_rate": mean_neg,
-                    "bin_ent": xe.tolist(), "bin_net": np.array(g_net)[idx].tolist(),
+                    "bin_ent": xe.tolist(), "bin_net": bin_net,
                     "go": bool(ci_lo > 0 and mean_pos > mean_neg)})
+    return xe.tolist(), bin_net
 
 
 def O9_opportunity(val_loader, effi, full):
@@ -265,6 +267,118 @@ def O9_opportunity(val_loader, effi, full):
                     "diff_ci_lower": lo.round(4).tolist(), "go": go})
 
 
+def O6_difficulty_evolution(val_loader, output, dataset, device):
+    steps = [5000, 10000, 20000, 30000, 45000]
+    step_ent = {}
+    for s in steps:
+        paths = sorted(glob.glob(f"{output}/E1*/3DUXNET_EffiDec3D/{dataset}/milestone_{s:05d}.pth"))
+        if not paths:
+            print(f"[O6] milestone {s:05d} not found; skipping")
+            continue
+        m = load_ckpt(build_model("effi", device), paths[-1], device)
+        ents = []
+        with torch.no_grad():
+            for batch in val_loader:
+                prob = infer(m, batch["image"].cuda()).softmax(1).cpu()
+                ents.append((-(prob * torch.log(prob + 1e-8)).sum(1)).mean().item())
+        step_ent[s] = float(np.mean(ents))
+        print(f"[O6] step {s:5d}: mean_entropy={step_ent[s]:.4f}")
+    if step_ent:
+        plt.figure(figsize=(7, 4))
+        plt.plot(list(step_ent.keys()), list(step_ent.values()), "o-")
+        plt.xlabel("Training iteration"); plt.ylabel("Mean entropy")
+        plt.title("O6: Entropy Evolution During Training")
+        plt.tight_layout(); plt.savefig(f"{OBS_DIR}/O6_entropy_evolution.png", dpi=150); plt.close()
+        save_obs("O6", {"step_mean_entropy": step_ent})
+    else:
+        print("[O6] no milestones found — skipped")
+
+
+def O10_organ_size(val_loader, dice_summary, organ_ent):
+    from scipy.stats import spearmanr
+    sizes_all = {n: [] for n in BTCV_NAMES}
+    for batch in val_loader:
+        lbl = batch["label"].cpu().squeeze()
+        for c, name in enumerate(BTCV_NAMES):
+            mask = (lbl == c + 1)
+            if mask.sum() > 0:
+                sizes_all[name].append(float(mask.float().sum()))
+    sizes, diffs, names = [], [], []
+    for name in BTCV_NAMES:
+        if sizes_all[name] and organ_ent.get(name):
+            sizes.append(float(np.mean(sizes_all[name])))
+            diffs.append(float(np.nanmean(organ_ent[name])))
+            names.append(name)
+    r_size = float(spearmanr(sizes, diffs)[0])
+    # partial correlation: residualize both entropy and dice-error on log(size)
+    log_sizes = np.log(np.array(sizes)); ent_arr = np.array(diffs)
+    r_partial = float("nan")
+    dice_err = np.array([1 - dice_summary.get(n, np.nan) for n in names])
+    valid = ~np.isnan(dice_err)
+    if valid.sum() >= 4:
+        A = np.column_stack([np.ones(int(valid.sum())), log_sizes[valid]])
+        ce, *_ = np.linalg.lstsq(A, ent_arr[valid], rcond=None)
+        cd, *_ = np.linalg.lstsq(A, dice_err[valid], rcond=None)
+        r_partial = float(pearsonr(ent_arr[valid] - A @ ce, dice_err[valid] - A @ cd)[0])
+    print(f"[O10] size~difficulty Spearman={r_size:.3f}  partial-r(ent,err|size)={r_partial:.3f}")
+    save_obs("O10", {"spearman_rho_size_vs_difficulty": r_size,
+                     "partial_r_entropy_given_size": None if np.isnan(r_partial) else r_partial,
+                     "organ_size": {n: round(s, 0) for n, s in zip(names, sizes)}})
+
+
+def O11_routing_signals(val_loader, effi, full, bin_ent, bin_net):
+    res = {"Entropy": {"corr_btcv": float(pearsonr(bin_ent, bin_net)[0]), "latency_ms": 0.0}}
+
+    # Confidence = 1 - max(softmax)
+    cs, cg = [], []
+    with torch.no_grad():
+        for batch in val_loader:
+            img = batch["image"].cuda(); lbl = batch["label"].squeeze(1).long().cpu().squeeze()
+            le = infer(effi, img); pe = le.softmax(1).cpu(); pred_e = le.argmax(1).cpu().squeeze()
+            pred_f = infer(full, img).argmax(1).cpu().squeeze()
+            conf = 1 - pe.max(1).values.squeeze()
+            net = (((pred_f == lbl) & (pred_e != lbl)).float()
+                   - ((pred_f != lbl) & (pred_e == lbl)).float())
+            edges = np.quantile(conf.flatten().numpy(), np.linspace(0, 1, 21))
+            for b in range(20):
+                mask = (conf >= float(edges[b])) & (conf < float(edges[b + 1]))
+                if mask.sum() > 100:
+                    cs.append(conf[mask].mean().item()); cg.append(net[mask].mean().item())
+    res["Confidence"] = {"corr_btcv": float(pearsonr(cs, cg)[0]) if len(cs) > 2 else float("nan"),
+                         "latency_ms": 0.0}
+
+    # MC Dropout (T=10) — sanity-check variance first (UXNET uses DropPath, may be ~0)
+    effi.train()
+    mc_ok = True
+    ms, mg = [], []
+    with torch.no_grad():
+        for i, batch in enumerate(val_loader):
+            img = batch["image"].cuda(); lbl = batch["label"].squeeze(1).long().cpu().squeeze()
+            preds = torch.stack([infer(effi, img).softmax(1).cpu() for _ in range(10)])
+            mc_var = preds.var(0).sum(1).squeeze()
+            if i == 0 and mc_var.max().item() < 1e-7:
+                print("[O11] MC Dropout variance ~0 (no active dropout) — skipping MC signal")
+                mc_ok = False
+                break
+            pred_e = preds.mean(0).argmax(1).cpu().squeeze()
+            pred_f = infer(full, img).argmax(1).cpu().squeeze()
+            net = (((pred_f == lbl) & (pred_e != lbl)).float()
+                   - ((pred_f != lbl) & (pred_e == lbl)).float())
+            edges = np.quantile(mc_var.flatten().numpy(), np.linspace(0, 1, 21))
+            for b in range(20):
+                mask = (mc_var >= float(edges[b])) & (mc_var < float(edges[b + 1]))
+                if mask.sum() > 100:
+                    ms.append(mc_var[mask].mean().item()); mg.append(net[mask].mean().item())
+    effi.eval()
+    res["MC Dropout"] = {"corr_btcv": (float(pearsonr(ms, mg)[0]) if (mc_ok and len(ms) > 2) else float("nan")),
+                         "latency_ms": None, "warn": None if mc_ok else "dropout_inactive"}
+
+    print(f"\n[O11] {'Signal':12s} {'corr(BTCV)':>12}")
+    for sig, v in res.items():
+        print(f"      {sig:12s} {v['corr_btcv']:12.3f}")
+    save_obs("O11", res)
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--root", default="/root/autodl-tmp/btcv-synapse")
@@ -297,9 +411,12 @@ def main():
 
     O2_entropy_distribution(val_loader, effi)
     O3_unc_error_corr(val_loader, effi)
-    O4_per_organ(val_loader, effi, post_pred, post_lbl)
-    O5_decoder_gain(val_loader, effi, full)
+    dice_summary, organ_ent = O4_per_organ(val_loader, effi, post_pred, post_lbl)
+    bin_ent, bin_net = O5_decoder_gain(val_loader, effi, full)
     O9_opportunity(val_loader, effi, full)
+    O6_difficulty_evolution(val_loader, args_ns.output, args_ns.dataset, device)
+    O10_organ_size(val_loader, dice_summary, organ_ent)
+    O11_routing_signals(val_loader, effi, full, bin_ent, bin_net)
     print(f"\nDone. Figures + results.json in {OBS_DIR}")
 
 

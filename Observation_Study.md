@@ -9,16 +9,18 @@
 
 | | Paper A — this document | Paper B |
 |---|---|---|
-| **Claim** | Decoder capacity is over-provisioned; where it matters is spatially concentrated and entropy-predictable | AdaDec3D allocates decoder compute adaptively — **iso-accuracy at lower executed cost** |
+| **Claim** | The marginal utility of decoder capacity is spatially concentrated and entropy-predictable (**observation only**) | AdaDec3D realizes region-adaptive decoding — **iso-accuracy at lower executed cost** |
 | **Venue** | MIDL / MLMI / ISBI | MICCAI 2026 / TMI |
 | **Gate** | O2/O3/O5/O9 pass ✅ (all passed 2026-07-25) | O7, O8, O11 + AdaDec3D beats controls |
-| **Key result** | Routing signal validated (O3 r=0.97, O9 20%→86%); decoder = 42% of MACs | **DICE ≈ EffiDec3D at meaningfully lower executed MACs** (input-adaptive) |
+| **Key result** | Routing signal validated (O3 r=0.97, O9 20%→86%); decoder gain is small & concentrated | **DICE ≈ EffiDec3D at meaningfully lower executed MACs** (input-adaptive) |
 
-> **Thesis note**: the goal is **not** to recover accuracy (EffiDec3D already
-> achieves near-parity, 79.25 vs 79.74). It is to push executed compute *lower*
-> at iso-accuracy by spending decoder capacity only where entropy says it matters.
-> O5's small decoder gain (0.13% net) is evidence of *over-provisioning*, which is
-> what makes further cuts possible. See Part 4 for the full Go decision + MAC headroom.
+> **Scope note**: Paper A is an **observation paper** — it characterizes *where*
+> extra decoder capacity has marginal utility (concentrated, entropy-predictable)
+> and does **not** claim realizable efficiency (that is Paper B). O5's small,
+> concentrated decoder gain (0.13% net) is read here as evidence that decoder
+> capacity is *over-provisioned* — a finding that **motivates** the Paper B
+> efficiency direction, but is not itself an efficiency claim. The MAC-headroom
+> analysis in Part 4 is likewise Paper B motivation, reported here for context.
 
 ---
 
@@ -1302,22 +1304,28 @@ perfectly (O3) and selects the decoder-relevant region with high precision
 
 ---
 
-### ⚠️ Interpretation update — thesis is **efficiency**, not accuracy recovery
+### Interpretation — decoder capacity is over-provisioned (Paper A finding)
 
 O5's decoder gain is **small**: full 3DUX-Net (E0) beats EffiDec3D (E1) by only
 **0.13% net voxels** (pos 0.339% − neg 0.209%), and it is a messy trade (for every
 3 voxels fixed, ~2 are broken). This matches the paper's near-parity (79.74 vs
-79.25). Under a *recovery* framing this would be a weak result.
+79.25).
 
-**But the project's thesis is: EffiDec3D already gets accuracy for free; AdaDec3D
-pushes compute *lower* at iso-accuracy.** Under that framing the same data is
-*supporting* evidence:
+As a **Paper A observation**, this reads as: the *marginal utility* of extra
+decoder capacity is small in aggregate, concentrated where entropy is high, and
+predictable (O9). The three observations line up:
 
-- O2: 98.7% of voxels are easy (low-entropy) → decoder capacity is unneeded almost everywhere.
-- O5: even the *full* decoder's extra capacity nets ~0% → decoder is over-provisioned; there is room to cut.
-- O9: entropy pinpoints the ~20% region where decoder capacity matters (86% of benefit) → an efficient routing signal.
+- O2: 98.7% of voxels are easy (low-entropy) → extra decoder capacity is unused almost everywhere.
+- O5: the full decoder's extra capacity nets ~0% overall, concentrated in high-entropy voxels (over-provisioned).
+- O9: entropy identifies the ~20% region carrying 86% of the gain → a predictable, deployable signal.
 
-### Compute-headroom gate (MAC profiling of EffiDec3D, `profile_macs.py`)
+> **These are observations, not an efficiency claim.** They *motivate* the Paper B
+> efficiency direction (region-adaptive decoding) but do not themselves demonstrate
+> lower executed cost — that requires the AdaDec3D method (Experiment-Design-AdaDec3D).
+
+### MAC headroom (Paper B motivation, `profile_macs.py`)
+
+*Reported here for context; efficiency realization belongs to Paper B.*
 
 | Group | GMac | % |
 |---|---|---|
@@ -1325,14 +1333,14 @@ pushes compute *lower* at iso-accuracy.** Under that framing the same data is
 | ENCODER (uxnet_3d + encoder2–5) | 24.74 | 57.8% |
 | — `decoder3` alone (finest half-res block) | 15.80 | 36.9% |
 
-Decoder = 42% of compute, dominated by `decoder3` (37%) — exactly where ROI/MoE
-act. Rough ceiling: running `decoder3` at full capacity on ~20% of voxels and a
-cheap path elsewhere → **41 → ~33 GMac (~20–25% total reduction) at iso-accuracy**.
-The encoder (57.8%) is untouchable by decoder-only routing → a further
-"patch-level whole-model adaptivity" direction is needed to go beyond this.
+Decoder = 42% of compute, dominated by `decoder3` (37%) — where a Paper B
+region-adaptive decoder would act. Rough ceiling: full `decoder3` on ~20% of
+voxels + cheap elsewhere → 41 → ~33 GMac. Encoder (57.8%) is untouched by
+decoder-only routing.
 
-**Go decision: PASS** → proceed to [Experiment-Design-AdaDec3D.md](Experiment-Design-AdaDec3D.md)
-(E2/E3/E4), targeting iso-accuracy with E1 (77.0%) at lower MACs.
+**Paper A Go decision: PASS** (O2/O3/O5/O9). The efficiency application proceeds in
+[Experiment-Design-AdaDec3D.md](Experiment-Design-AdaDec3D.md), with E1 (77.0%) as
+the iso-accuracy target.
 
 ---
 

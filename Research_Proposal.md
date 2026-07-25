@@ -29,7 +29,7 @@ This project is structured as two sequential publications that build on each oth
 | **Contribution** | Empirical analysis (O1–O11) | Adaptive decoder architecture |
 | **Target venue** | MIDL / MLMI / ISBI | MICCAI 2026 / TMI |
 | **Prerequisite** | E0 + E1 baselines | Paper A accepted |
-| **Key test** | Deployable signal outperforms random/boundary controls at 10–30% budget | DICE ≥ EffiDec3D + 0.3% at matched executed compute |
+| **Key test** | Deployable signal outperforms random/boundary controls at 10–30% budget | DICE ≈ EffiDec3D (iso-accuracy) at **lower** executed MACs (input-adaptive) |
 
 **Paper A is self-contained** and can be completed before any AdaDec3D implementation. Its pre-experiment hypothesis is:
 
@@ -168,10 +168,10 @@ Pearson and Spearman correlation between voxel-wise entropy and prediction error
 Per-organ mean entropy and Dice are expected to rank small organs (pancreas, adrenal glands, esophagus) as harder than large organs (liver, spleen, kidney). This motivates structure-aware computation allocation rather than uniform treatment.
 
 **O5 — Decoder Gain is Spatially Heterogeneous** *(most important observation)*
-Comparing a full decoder (E0) and EffiDec3D (E1) trained with matched budgets (shared encoder, equal 20k iterations), the voxel-wise gain map is expected to concentrate in high-entropy regions. Both positive transitions (full decoder better) and negative transitions (EffiDec3D better) are reported; the net gain–entropy curve is the primary Paper A figure.
+Comparing a full decoder (E0) and EffiDec3D (E1) trained with matched budgets (same UX-Net encoder architecture, equal 45 000 iterations; **note:** current E0/E1 are trained independently — a weight-shared-encoder control is a known Paper A limitation), the voxel-wise gain map is expected to concentrate in high-entropy regions. Both positive transitions (full decoder better) and negative transitions (EffiDec3D better) are reported; the net gain–entropy curve is the primary Paper A figure.
 
 **O6 — Difficulty Persists During Training**
-Checkpoints at iterations {5k, 10k, 20k, 30k, 50k} are analyzed to confirm that high-entropy voxels do not disappear as training progresses — they stabilize at boundaries and hard organs. This establishes that entropy-based routing reflects a structural property of the data, not an early-training artifact.
+Checkpoints at iterations {5k, 10k, 20k, 30k, 45k} are analyzed to confirm that high-entropy voxels do not disappear as training progresses — they stabilize at boundaries and hard organs. This establishes that entropy-based routing reflects a structural property of the data, not an early-training artifact.
 
 **O7 — Cross-Dataset Consistency**
 The O1–O5 pipeline is repeated on FeTA 2021 (fetal brain MRI). A Gain–Entropy r > 0.40 on FeTA confirms the finding is modality-agnostic. Cross-dataset replication is a standard criterion for MIDL/MLMI acceptance.

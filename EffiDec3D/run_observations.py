@@ -81,6 +81,44 @@ def infer(model, img):
 
 
 # --------------------------------------------------------------------------- #
+def O1_error_distribution(val_loader, effi):
+    from scipy.ndimage import binary_erosion
+    boundary_err, interior_err = [], []
+    organ_err = {n: [] for n in BTCV_NAMES}
+    with torch.no_grad():
+        for batch in val_loader:
+            img = batch["image"].cuda()
+            lbl = batch["label"].squeeze(1).long().cpu()
+            pred = infer(effi, img).argmax(1).cpu()
+            error = (pred != lbl).float().squeeze()
+            lbl_sq = lbl.squeeze()
+            for c, name in enumerate(BTCV_NAMES, start=1):
+                mask = (lbl_sq == c)
+                if mask.sum() > 0:
+                    organ_err[name].append(error[mask].mean().item())
+            fg = (lbl_sq > 0).numpy()
+            interior = torch.from_numpy(binary_erosion(fg, iterations=3).astype(np.float32))
+            boundary = torch.from_numpy(fg.astype(np.float32)) - interior
+            if boundary.sum() > 0:
+                boundary_err.append(((error * boundary).sum() / boundary.sum()).item())
+            if interior.sum() > 0:
+                interior_err.append(((error * interior).sum() / interior.sum()).item())
+    b_err = float(np.mean(boundary_err)); i_err = float(np.mean(interior_err))
+    ratio = b_err / i_err if i_err > 0 else float("nan")
+    print(f"[O1] boundary err={b_err:.3f}  interior err={i_err:.3f}  ratio={ratio:.1f}x")
+    names_o1 = [n for n, v in organ_err.items() if v]
+    vals_o1 = [float(np.mean(organ_err[n])) for n in names_o1]
+    plt.figure(figsize=(11, 4))
+    plt.bar(range(len(names_o1)), vals_o1)
+    plt.xticks(range(len(names_o1)), names_o1, rotation=45, ha="right")
+    plt.ylabel("Mean pixel error rate"); plt.title("O1: Per-Organ Error Rate")
+    plt.tight_layout(); plt.savefig(f"{OBS_DIR}/O1_organ_error.png", dpi=150); plt.close()
+    save_obs("O1", {"boundary_error": b_err, "interior_error": i_err,
+                    "boundary_interior_ratio": round(ratio, 2),
+                    "organ_error": {n: round(float(np.mean(v)), 4) for n, v in organ_err.items() if v}})
+
+
+# --------------------------------------------------------------------------- #
 def O2_entropy_distribution(val_loader, effi):
     all_entropy, high_unc_frac = [], []
     with torch.no_grad():
@@ -409,6 +447,7 @@ def main():
     post_lbl = AsDiscrete(to_onehot=14)
     print(f"Val cases: {len(val_files)}\n")
 
+    O1_error_distribution(val_loader, effi)
     O2_entropy_distribution(val_loader, effi)
     O3_unc_error_corr(val_loader, effi)
     dice_summary, organ_ent = O4_per_organ(val_loader, effi, post_pred, post_lbl)

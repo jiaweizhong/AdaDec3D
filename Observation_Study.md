@@ -1277,15 +1277,18 @@ save_obs("O11", signal_results)
 
 ```
 Week 1: Setup
-  [ ] Environment install and verify
-  [ ] BTCV dataset download and sanity check (18 train, 12 val)
-  [ ] 100-iter sanity run, confirm no OOM
+  [x] Environment install and verify
+  [x] BTCV dataset download and sanity check (18 train, 12 val)
+  [x] 100-iter sanity run, confirm no OOM
 
 Week 2-3: Baseline training
   [ ] E0 full 3DUXNET — 45 000 iter (53.007M params, 578.74 GMac)
+        run: bash run_E0_E1.sh E0
   [ ] E1 EffiDec3D   — 45 000 iter (2.955M params, 41.06 GMac)
+        run: bash run_E0_E1.sh E1   (after E0 finishes; git pull first for milestone code)
   [ ] Verify E1: mean DICE 79.0–79.5% (paper target 79.25%)
-  [ ] Save milestone checkpoints at steps 5k, 10k, 20k, 30k, 45k
+  [ ] Confirm E1 milestone_{05000,10000,20000,30000,45000}.pth auto-saved
+      (O6 reads E1 milestones only; needs current code + --eval_step 250, which divides each)
 
 Week 4: Observations O1–O5 + O9 (critical gate)
   [ ] O1: boundary >> interior error rate confirmed

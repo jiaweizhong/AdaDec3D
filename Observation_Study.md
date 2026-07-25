@@ -371,7 +371,9 @@ def load_model(network_name, ckpt_path, device="cuda"):
         model = UXNET(in_chans=1, out_chans=14, depths=[2,2,2,2],
                       feat_size=[48,96,192,384]).to(device)
     ckpt = torch.load(ckpt_path, map_location=device)
-    model.load_state_dict(ckpt["model_state_dict"])
+    # Support both bare state_dict (main_train_BTCV_TU.py) and wrapped dict
+    state_dict = ckpt.get("model_state_dict", ckpt) if isinstance(ckpt, dict) else ckpt
+    model.load_state_dict(state_dict)
     model.eval()
     return model
 
@@ -825,10 +827,24 @@ lo, hi = np.percentile(diffs, [2.5, 97.5], axis=0)
 print("Entropy vs Random 95% CI lower:", lo.round(3))
 print("Entropy vs Random 95% CI upper:", hi.round(3))
 
+# lo/hi are CIs on the DIFFERENCE (entropy - random), not on entropy mean.
+# Bootstrap separate CIs for each curve for plotting.
+B = 2000
+ent_boots, rnd_boots = [], []
+for _ in range(B):
+    idx = rng.integers(len(ent_arr), size=len(ent_arr))
+    ent_boots.append(ent_arr[idx].mean(0))
+    rnd_boots.append(rand_arr[idx].mean(0))
+ent_boots = np.array(ent_boots)
+rnd_boots = np.array(rnd_boots)
+ent_lo, ent_hi = np.percentile(ent_boots, [2.5, 97.5], axis=0)
+rnd_lo, rnd_hi = np.percentile(rnd_boots, [2.5, 97.5], axis=0)
+
 plt.figure(figsize=(7,5))
-plt.plot(budgets, ent_arr.mean(0)*100, "o-", label="Entropy")
-plt.fill_between(budgets, (ent_arr.mean(0)+lo)*100, (ent_arr.mean(0)+hi)*100, alpha=0.2)
+plt.plot(budgets, ent_arr.mean(0)*100, "o-", label="Entropy", color="steelblue")
+plt.fill_between(budgets, ent_lo*100, ent_hi*100, alpha=0.2, color="steelblue")
 plt.plot(budgets, rand_arr.mean(0)*100, "o--", label="Random (100 repeats)", color="gray")
+plt.fill_between(budgets, rnd_lo*100, rnd_hi*100, alpha=0.15, color="gray")
 plt.xlabel("Selected union-foreground voxels (%)")
 plt.ylabel("Positive decoder transitions recovered (%)")
 plt.title("O9: Selective-Allocation Opportunity")

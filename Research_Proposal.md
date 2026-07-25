@@ -196,7 +196,7 @@ This shifts the optimization objective from *"how can we build a smaller decoder
 
 **H1** — Prediction uncertainty reflects segmentation difficulty well enough to serve as a practical routing signal: parameter-free, differentiable, and stable across datasets and backbones.
 
-**H2** — Larger decoder capacity benefits only uncertain voxels, boundary regions, and small organs; its benefit for easy voxels is near zero. Verifying this requires measured executed cost from a realizable conditional implementation, not static FLOPs.
+**H2** — Larger decoder capacity benefits only uncertain voxels, boundary regions, and small organs; its benefit for easy voxels is near zero. Verifying this requires measured executed cost from a realizable conditional implementation, not static FLOPs (ptflops is used as a static upper bound only).
 
 **H3** — Adaptive decoder computation achieves a better efficiency–accuracy trade-off than static decoders by concentrating computation where it provides the greatest benefit.
 
@@ -271,7 +271,9 @@ Each expert is a two-layer residual conv block (conv → IN → ReLU → conv �
 
 **Stage 3 — Selective ROI Refinement**
 
-A residual refinement block applies only within a difficulty mask (top-50% most uncertain voxels). Voxels outside the ROI pass through unchanged, avoiding expensive full-volume refinement while preserving high-resolution detail around hard structures. ROI coverage is reported including `missed_scans` count, since confidently missing an entire organ is the worst failure mode.
+A residual refinement block applies only within a difficulty mask (top-10–20% most uncertain voxels by default). Voxels outside the ROI pass through unchanged. Refinement operates on the half-resolution feature map produced by EffiDec3D's coarse decoder — it selectively deepens feature processing in uncertain regions at D/2 spatial scale before the final trilinear upsample. ROI coverage is reported including `missed_scans` count, since confidently missing an entire organ is the worst failure mode.
+
+> **Note**: The MoE router uses global average-pooled encoder features to select one expert per sample (patch-level routing). The ROI refiner applies within-patch spatial selection (region-level routing). These are two complementary levels of adaptation: MoE adapts compute at the sample granularity; ROI adapts compute within a sample at the spatial granularity.
 
 ## 6.4 Concrete Implementation
 
@@ -353,7 +355,9 @@ Paper A Accepted
 Paper B Draft → MICCAI 2026 / TMI Submission
 ```
 
-Paper A is the Go/No-Go gate for Paper B. Stages 3–4 begin in parallel with Paper A writing once O1–O5 pass, avoiding idle time during the review period (typically 3–6 months).
+Paper A core observations (O1–O5 + O9) passing is the Go/No-Go gate for Paper B development. Stages 3–4 begin in parallel with Paper A writing once these pass — do not wait for formal peer-review acceptance before starting implementation.
+
+**Data provenance note**: experiments use the TransUNet preprocessed Synapse split (available on Kaggle as `shinjinidey/synapse-dataset`), which stores volumes as reconstructed NIfTI files with identity affine (`np.eye(4)`). Real voxel spacing is not preserved. Consequently: (a) HD95 values are reported in voxel-space, not mm; (b) results should be compared against other methods using the same TransUNet preprocessed split, not against methods using the original raw BTCV DICOM pipeline.
 
 ## 7.2 Stage 1 — Baseline Reproduction
 

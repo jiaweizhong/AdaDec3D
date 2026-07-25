@@ -77,7 +77,7 @@ parser.add_argument("--n_decoder_channels", type=int, default=48)
 parser.add_argument("--skip_aggregation",   type=str, default="addition")
 parser.add_argument("--n_experts",          type=int, default=3)
 parser.add_argument("--expert_channels",    type=int, nargs="+", default=[32, 64, 96])
-parser.add_argument("--roi_quantile",       type=float, default=0.5)
+parser.add_argument("--roi_quantile",       type=float, default=0.1)
 parser.add_argument("--use_moe",  type=lambda x: x.lower() != "false", default=True,
                     help="Enable MoE router (False = ablation E3)")
 parser.add_argument("--use_roi",  type=lambda x: x.lower() != "false", default=True,
@@ -307,11 +307,33 @@ def budget_loss(router_weights: torch.Tensor) -> torch.Tensor:
     return F.relu(expected_cost - target).square()
 
 
+def load_balance_loss(router_weights: torch.Tensor) -> torch.Tensor:
+    """Switch-Transformer-style load-balance loss to prevent expert collapse.
+
+    L_lb = n_experts * sum_i(f_i * P_i)
+    where f_i = fraction of tokens routed to expert i (hard, stop-gradient)
+          P_i = mean soft routing weight for expert i (differentiable)
+
+    Minimised when routing is perfectly uniform (f_i = P_i = 1/n for all i).
+    Unlike resource_penalty this does NOT prefer small experts — it only
+    prevents collapse to a single expert.
+    """
+    n = router_weights.shape[1]
+    # f_i: fraction of batch routed to each expert (hard argmax, no gradient)
+    hard = torch.zeros_like(router_weights)
+    hard.scatter_(1, router_weights.argmax(dim=1, keepdim=True), 1.0)
+    f = hard.detach().mean(dim=0)           # [n_experts]
+    # P_i: mean soft weight per expert (differentiable)
+    P = router_weights.mean(dim=0)          # [n_experts]
+    return n * (f * P).sum()
+
+
 def compute_loss(
     final_pred: torch.Tensor,
     coarse_pred: torch.Tensor,
     router_weights: torch.Tensor,
     label: torch.Tensor,
+    stage: int = 2,
 ) -> tuple:
     label_for_loss = label.long()
 
@@ -321,18 +343,26 @@ def compute_loss(
     # Auxiliary coarse decoder loss
     L_coarse = seg_loss_fn(interpolate_to_label(coarse_pred, label), label_for_loss)
 
-    # Uncertainty calibration
-    L_unc = uncertainty_calibration_loss(coarse_pred, label)
+    # Uncertainty calibration: disabled in Stage 1 because the coarse decoder is
+    # frozen — its logits don't change, so L_unc would backprop into nothing.
+    lam_unc = 0.0 if stage == 1 else args.lambda_uncertainty
+    L_unc = uncertainty_calibration_loss(coarse_pred, label) if lam_unc > 0 else torch.tensor(0.0, device=final_pred.device)
 
-    # Efficiency losses
-    L_res    = resource_penalty(router_weights)
+    # Efficiency: push router toward lighter experts when accuracy allows
+    L_res = resource_penalty(router_weights)
+
+    # Budget: penalise exceeding declared expert cost target
     L_router = budget_loss(router_weights)
 
+    # Load-balance: Switch-style auxiliary loss to prevent expert collapse
+    L_lb = load_balance_loss(router_weights)
+
     total = (L_seg
-             + args.lambda_coarse       * L_coarse
-             + args.lambda_uncertainty  * L_unc
-             + args.lambda_resource     * L_res
-             + args.lambda_router       * L_router)
+             + args.lambda_coarse  * L_coarse
+             + lam_unc             * L_unc
+             + args.lambda_resource * L_res
+             + args.lambda_router   * L_router
+             + args.lambda_router   * L_lb)   # reuse lambda_router weight for L_lb
 
     return total, {
         "L_seg":    L_seg.item(),
@@ -340,6 +370,7 @@ def compute_loss(
         "L_unc":    L_unc.item(),
         "L_res":    L_res.item(),
         "L_router": L_router.item(),
+        "L_lb":     L_lb.item(),
     }
 
 # ---------------------------------------------------------------------------
@@ -459,7 +490,7 @@ def train_one_epoch(global_step, train_loader, dice_val_best, global_step_best):
             coarse_pred   = outputs[1]
             router_weights = outputs[2]
 
-            loss, loss_dict = compute_loss(final_pred, coarse_pred, router_weights, y)
+            loss, loss_dict = compute_loss(final_pred, coarse_pred, router_weights, y, stage=args.stage)
 
         scaler.scale(loss).backward()
         scaler.step(optimizer)
@@ -477,12 +508,13 @@ def train_one_epoch(global_step, train_loader, dice_val_best, global_step_best):
         )
 
         # Tensorboard
-        writer.add_scalar("Loss/total",    loss.item(),               global_step)
-        writer.add_scalar("Loss/seg",      loss_dict["L_seg"],        global_step)
-        writer.add_scalar("Loss/coarse",   loss_dict["L_coarse"],     global_step)
-        writer.add_scalar("Loss/unc",      loss_dict["L_unc"],        global_step)
-        writer.add_scalar("Loss/resource", loss_dict["L_res"],        global_step)
-        writer.add_scalar("Loss/router",   loss_dict["L_router"],     global_step)
+        writer.add_scalar("Loss/total",      loss.item(),               global_step)
+        writer.add_scalar("Loss/seg",        loss_dict["L_seg"],        global_step)
+        writer.add_scalar("Loss/coarse",     loss_dict["L_coarse"],     global_step)
+        writer.add_scalar("Loss/unc",        loss_dict["L_unc"],        global_step)
+        writer.add_scalar("Loss/resource",   loss_dict["L_res"],        global_step)
+        writer.add_scalar("Loss/router",     loss_dict["L_router"],     global_step)
+        writer.add_scalar("Loss/load_bal",   loss_dict["L_lb"],         global_step)
 
         # Periodic validation
         if global_step % args.eval_step == 0 or global_step == args.max_iter:

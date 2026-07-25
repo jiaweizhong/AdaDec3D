@@ -610,6 +610,25 @@ def train(global_step, train_loader, dice_val_best, global_step_best):
                         dice_val_best, dice_val
                     )
                 )
+            # Always overwrite last_model.pth for checkpoint resumption
+            _last_tmp = os.path.join(root_dir, "last_model.pth.tmp")
+            torch.save({
+                "model_state_dict":     model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "scaler_state_dict":    scaler.state_dict(),
+                "global_step":          global_step,
+                "dice_val_best":        dice_val_best,
+                "global_step_best":     global_step_best,
+            }, _last_tmp)
+            os.replace(_last_tmp, os.path.join(root_dir, "last_model.pth"))
+            # Milestone checkpoints for O6 (difficulty evolution analysis)
+            for _ms in [5000, 10000, 20000, 30000, 45000]:
+                if global_step == _ms:
+                    torch.save(
+                        model.state_dict(),
+                        os.path.join(root_dir, f"milestone_{_ms:05d}.pth")
+                    )
+                    print(f"[Milestone] Saved checkpoint at step {_ms}")
         writer.add_scalar('Training Segmentation Loss', loss.data, global_step)
         global_step += 1
     return global_step, dice_val_best, global_step_best
@@ -619,7 +638,7 @@ print('Maximum Iterations for training: {}'.format(str(args.max_iter)))
 eval_num = args.eval_step
 post_label = AsDiscrete(to_onehot=out_classes)
 post_pred = AsDiscrete(argmax=True, to_onehot=out_classes)
-dice_metric = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
+dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
 global_step = 1 
 dice_val_best = 0.0
 global_step_best = 1

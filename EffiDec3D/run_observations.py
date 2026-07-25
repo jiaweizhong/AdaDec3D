@@ -251,12 +251,77 @@ def O5_decoder_gain(val_loader, effi, full):
     return xe.tolist(), bin_net
 
 
-def O9_opportunity(val_loader, effi, full):
-    rng = np.random.default_rng(0)
+def O9_opportunity(val_loader, effi, full, block_size=16, halo=4, primary_budget=20,
+                   provenance=None):
+    """Estimate selective-decoding opportunity without overstating the result.
+
+    Two selectors are reported:
+      1. voxel oracle: an intentionally non-deployable upper bound;
+      2. region selector: non-overlapping 3-D blocks ranked by mean entropy and
+         expanded by ``halo`` voxels to approximate convolutional context.
+
+    Utility is (positive transitions - negative transitions), normalized by all
+    positive E0-over-E1 transitions in that subject. Random and entropy policies
+    are compared with a paired subject bootstrap.
+    """
+    if block_size <= 0 or halo < 0:
+        raise ValueError("block_size must be > 0 and halo must be >= 0")
+    selection_rng = np.random.default_rng(0)
+    bootstrap_rng = np.random.default_rng(1)
     budgets = np.array([5, 10, 20, 30, 50])
-    ent_rec, rnd_rec = [], []
+    n_random = 100
+    n_bootstrap = 2000
+
+    voxel_entropy, voxel_random = [], []
+    region_entropy, region_random, region_executed = [], [], []
+    voxel_positive, voxel_negative = [], []
+    region_positive, region_negative = [], []
+    subject_results = []
+
+    def paired_summary(selected, random):
+        selected = np.asarray(selected, dtype=np.float64)
+        random = np.asarray(random, dtype=np.float64)
+        n_subjects = len(selected)
+        boot_selected, boot_random, boot_diff = [], [], []
+        for _ in range(n_bootstrap):
+            indices = bootstrap_rng.integers(n_subjects, size=n_subjects)
+            selected_mean = selected[indices].mean(0)
+            random_mean = random[indices].mean(0)
+            boot_selected.append(selected_mean)
+            boot_random.append(random_mean)
+            boot_diff.append(selected_mean - random_mean)
+        selected_ci = np.percentile(boot_selected, [2.5, 97.5], axis=0)
+        random_ci = np.percentile(boot_random, [2.5, 97.5], axis=0)
+        diff_ci = np.percentile(boot_diff, [2.5, 97.5], axis=0)
+        return {
+            "selected_mean": selected.mean(0),
+            "random_mean": random.mean(0),
+            "selected_ci": selected_ci,
+            "random_ci": random_ci,
+            "diff_ci": diff_ci,
+        }
+
+    def block_slices(shape):
+        blocks = []
+        for z in range(0, shape[0], block_size):
+            for y in range(0, shape[1], block_size):
+                for x in range(0, shape[2], block_size):
+                    core = (slice(z, min(z + block_size, shape[0])),
+                            slice(y, min(y + block_size, shape[1])),
+                            slice(x, min(x + block_size, shape[2])))
+                    expanded = (slice(max(0, z - halo), min(z + block_size + halo, shape[0])),
+                                slice(max(0, y - halo), min(y + block_size + halo, shape[1])),
+                                slice(max(0, x - halo), min(x + block_size + halo, shape[2])))
+                    blocks.append((core, expanded))
+        return blocks
+
     with torch.no_grad():
-        for batch in val_loader:
+        for subject_idx, batch in enumerate(val_loader):
+            meta = batch.get("image_meta_dict", {})
+            source = meta.get("filename_or_obj", f"subject_{subject_idx:02d}")
+            if isinstance(source, (list, tuple)):
+                source = source[0]
+            subject_id = os.path.basename(str(source))
             img = batch["image"].cuda()
             lbl = batch["label"].squeeze(1).long().cpu().squeeze()
             pred_full = infer(full, img).argmax(1).cpu().squeeze()
@@ -264,45 +329,198 @@ def O9_opportunity(val_loader, effi, full):
             pred_effi = logits_e.argmax(1).cpu().squeeze()
             prob_e = logits_e.softmax(1).cpu()
             ent = -(prob_e * torch.log(prob_e + 1e-8)).sum(1).squeeze()
-            pos = ((pred_full == lbl) & (pred_effi != lbl)).float()
-            body = (lbl > 0) | (pred_full > 0) | (pred_effi > 0)
-            eb = ent[body].numpy(); pb = pos[body].numpy()
-            total = pb.sum()
-            if total == 0:
+
+            pos = ((pred_full == lbl) & (pred_effi != lbl)).numpy().astype(np.float32)
+            neg = ((pred_full != lbl) & (pred_effi == lbl)).numpy().astype(np.float32)
+            net = pos - neg
+            body = ((lbl > 0) | (pred_full > 0) | (pred_effi > 0)).numpy()
+            entropy = ent.numpy()
+            total_positive = float(pos[body].sum())
+            if total_positive == 0:
                 continue
-            order = np.argsort(eb)[::-1]
-            ent_rec.append([pb[order[:max(1, int(len(order) * q / 100))]].sum() / total for q in budgets])
-            rnd_rec.append(np.mean([[pb[rng.choice(len(pb), max(1, int(len(pb) * q / 100)), replace=False)].sum() / total
-                                     for q in budgets] for _ in range(100)], axis=0))
-    ent_arr = np.asarray(ent_rec); rnd_arr = np.asarray(rnd_rec)
-    if ent_arr.size == 0:
-        print("[O9] no positive decoder transitions found; skipping"); return
-    diffs = np.array([(ent_arr[rng.integers(len(ent_arr), size=len(ent_arr))]
-                       - rnd_arr[rng.integers(len(rnd_arr), size=len(rnd_arr))]).mean(0) for _ in range(2000)])
-    lo, hi = np.percentile(diffs, [2.5, 97.5], axis=0)
-    print(f"[O9] budgets={budgets.tolist()}")
-    print(f"     entropy_recovery={ent_arr.mean(0).round(3).tolist()}")
-    print(f"     random_recovery ={rnd_arr.mean(0).round(3).tolist()}")
-    print(f"     diff CI lower   ={lo.round(3).tolist()}")
-    go = bool(lo[np.isin(budgets, [10, 20, 30])].max() > 0)
-    print(f"     {'GO' if go else 'NO-GO'} (entropy beats random at 10-30% budget, CI_lo>0)")
-    eb2, rb2 = [], []
-    for _ in range(2000):
-        i = rng.integers(len(ent_arr), size=len(ent_arr))
-        eb2.append(ent_arr[i].mean(0)); rb2.append(rnd_arr[i].mean(0))
-    elo, ehi = np.percentile(eb2, [2.5, 97.5], axis=0); rlo, rhi = np.percentile(rb2, [2.5, 97.5], axis=0)
-    plt.figure(figsize=(7, 5))
-    plt.plot(budgets, ent_arr.mean(0) * 100, "o-", color="steelblue", label="Entropy")
-    plt.fill_between(budgets, elo * 100, ehi * 100, alpha=.2, color="steelblue")
-    plt.plot(budgets, rnd_arr.mean(0) * 100, "o--", color="gray", label="Random")
-    plt.fill_between(budgets, rlo * 100, rhi * 100, alpha=.15, color="gray")
-    plt.xlabel("Selected union-foreground voxels (%)")
-    plt.ylabel("Positive transitions recovered (%)"); plt.title("O9: Selective-Allocation Opportunity")
-    plt.legend(); plt.tight_layout(); plt.savefig(f"{OBS_DIR}/O9_opportunity.png", dpi=150); plt.close()
-    save_obs("O9", {"budgets_pct": budgets.tolist(),
-                    "entropy_recovery_mean": ent_arr.mean(0).round(4).tolist(),
-                    "random_recovery_mean": rnd_arr.mean(0).round(4).tolist(),
-                    "diff_ci_lower": lo.round(4).tolist(), "go": go})
+
+            # Voxel-wise oracle upper bound.
+            body_indices = np.flatnonzero(body)
+            body_entropy = entropy.flat[body_indices]
+            body_pos = pos.flat[body_indices]
+            body_neg = neg.flat[body_indices]
+            body_net = net.flat[body_indices]
+            voxel_order = np.argsort(body_entropy)[::-1]
+            subject_voxel_entropy, subject_voxel_random = [], []
+            subject_voxel_positive, subject_voxel_negative = [], []
+            for budget in budgets:
+                k = max(1, int(np.ceil(len(body_indices) * budget / 100)))
+                selected_voxels = voxel_order[:k]
+                subject_voxel_positive.append(
+                    float(body_pos[selected_voxels].sum() / total_positive))
+                subject_voxel_negative.append(
+                    float(body_neg[selected_voxels].sum() / total_positive))
+                subject_voxel_entropy.append(
+                    subject_voxel_positive[-1] - subject_voxel_negative[-1])
+                random_values = [
+                    float(body_net[selection_rng.choice(len(body_net), k, replace=False)].sum()
+                          / total_positive)
+                    for _ in range(n_random)
+                ]
+                subject_voxel_random.append(float(np.mean(random_values)))
+
+            # Contiguous block selector. Block count is the compute-budget proxy;
+            # halo-expanded volume is saved as the actual executed-volume proxy.
+            blocks = block_slices(entropy.shape)
+            scores = np.array([
+                float(entropy[core][body[core]].mean()) if body[core].any() else -np.inf
+                for core, _ in blocks
+            ])
+            block_utilities = np.array([
+                float(net[core][body[core]].sum() / total_positive)
+                for core, _ in blocks
+            ])
+            block_positive = np.array([
+                float(pos[core][body[core]].sum() / total_positive)
+                for core, _ in blocks
+            ])
+            block_negative = np.array([
+                float(neg[core][body[core]].sum() / total_positive)
+                for core, _ in blocks
+            ])
+            ranked_blocks = np.argsort(scores)[::-1]
+            subject_region_entropy, subject_region_random = [], []
+            subject_region_positive, subject_region_negative = [], []
+            subject_executed = []
+            for budget in budgets:
+                n_selected = max(1, int(np.ceil(len(blocks) * budget / 100)))
+
+                def executed_fraction(block_ids):
+                    selected_mask = np.zeros(entropy.shape, dtype=bool)
+                    for block_id in block_ids:
+                        selected_mask[blocks[int(block_id)][1]] = True
+                    return float(selected_mask.mean())
+
+                selected_ids = ranked_blocks[:n_selected]
+                positive_utility = float(block_positive[selected_ids].sum())
+                negative_utility = float(block_negative[selected_ids].sum())
+                utility = positive_utility - negative_utility
+                executed = executed_fraction(selected_ids)
+                subject_region_positive.append(positive_utility)
+                subject_region_negative.append(negative_utility)
+                subject_region_entropy.append(utility)
+                subject_executed.append(executed)
+                random_values = [
+                    float(block_utilities[selection_rng.choice(
+                        len(blocks), n_selected, replace=False)].sum())
+                    for _ in range(n_random)
+                ]
+                subject_region_random.append(float(np.mean(random_values)))
+
+            voxel_entropy.append(subject_voxel_entropy)
+            voxel_random.append(subject_voxel_random)
+            voxel_positive.append(subject_voxel_positive)
+            voxel_negative.append(subject_voxel_negative)
+            region_entropy.append(subject_region_entropy)
+            region_random.append(subject_region_random)
+            region_positive.append(subject_region_positive)
+            region_negative.append(subject_region_negative)
+            region_executed.append(subject_executed)
+            subject_results.append({
+                "subject_index": subject_idx,
+                "subject_id": subject_id,
+                "positive_transitions": int(pos[body].sum()),
+                "negative_transitions": int(neg[body].sum()),
+                "voxel_entropy_positive_utility": subject_voxel_positive,
+                "voxel_entropy_negative_utility": subject_voxel_negative,
+                "voxel_entropy_net_utility": subject_voxel_entropy,
+                "voxel_random_net_utility": subject_voxel_random,
+                "region_entropy_positive_utility": subject_region_positive,
+                "region_entropy_negative_utility": subject_region_negative,
+                "region_entropy_net_utility": subject_region_entropy,
+                "region_random_net_utility": subject_region_random,
+                "region_executed_volume_fraction": subject_executed,
+            })
+
+    if not subject_results:
+        print("[O9] no positive decoder transitions found; skipping")
+        return
+
+    voxel_stats = paired_summary(voxel_entropy, voxel_random)
+    region_stats = paired_summary(region_entropy, region_random)
+    primary_idx = int(np.where(budgets == primary_budget)[0][0])
+    go = bool(
+        region_stats["diff_ci"][0, primary_idx] > 0
+        and region_stats["selected_mean"][primary_idx] > 0
+    )
+
+    print(f"[O9] budgets={budgets.tolist()}  block={block_size}  halo={halo}")
+    print(f"     voxel oracle net ={voxel_stats['selected_mean'].round(3).tolist()}")
+    print(f"     region net       ={region_stats['selected_mean'].round(3).tolist()}")
+    print(f"     region random    ={region_stats['random_mean'].round(3).tolist()}")
+    print(f"     paired diff CI-lo={region_stats['diff_ci'][0].round(3).tolist()}")
+    print(f"     executed volume  ={np.mean(region_executed, axis=0).round(3).tolist()}")
+    print(f"     {'GO' if go else 'NO-GO'} at predeclared {primary_budget}% block budget")
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+    for ax, title, stats in [
+        (axes[0], "Voxel oracle (upper bound)", voxel_stats),
+        (axes[1], f"{block_size}³ blocks + {halo}-voxel halo", region_stats),
+    ]:
+        ax.plot(budgets, stats["selected_mean"] * 100, "o-", color="steelblue",
+                label="Entropy")
+        ax.fill_between(budgets, stats["selected_ci"][0] * 100,
+                        stats["selected_ci"][1] * 100, alpha=.2, color="steelblue")
+        ax.plot(budgets, stats["random_mean"] * 100, "o--", color="gray",
+                label="Matched random")
+        ax.fill_between(budgets, stats["random_ci"][0] * 100,
+                        stats["random_ci"][1] * 100, alpha=.15, color="gray")
+        ax.axhline(0, color="black", lw=.8, ls=":")
+        ax.set_xlabel("Selection budget (%)")
+        ax.set_title(title)
+        ax.legend()
+    axes[0].set_ylabel("Net utility / all positive transitions (%)")
+    fig.suptitle("O9: Net Selective-Allocation Opportunity")
+    fig.tight_layout()
+    fig.savefig(f"{OBS_DIR}/O9_opportunity_corrected.png", dpi=150)
+    plt.close(fig)
+
+    def serialise_stats(stats):
+        return {
+            "entropy_net_utility_mean": stats["selected_mean"].round(6).tolist(),
+            "entropy_net_utility_ci_lower": stats["selected_ci"][0].round(6).tolist(),
+            "entropy_net_utility_ci_upper": stats["selected_ci"][1].round(6).tolist(),
+            "random_net_utility_mean": stats["random_mean"].round(6).tolist(),
+            "random_net_utility_ci_lower": stats["random_ci"][0].round(6).tolist(),
+            "random_net_utility_ci_upper": stats["random_ci"][1].round(6).tolist(),
+            "paired_diff_ci_lower": stats["diff_ci"][0].round(6).tolist(),
+            "paired_diff_ci_upper": stats["diff_ci"][1].round(6).tolist(),
+        }
+
+    save_obs("O9_corrected", {
+        "budgets_pct": budgets.tolist(),
+        "primary_budget_pct": int(primary_budget),
+        "utility_definition": "(positive-negative)/all_positive_transitions",
+        "n_subjects": len(subject_results),
+        "n_random_repeats": n_random,
+        "n_bootstrap": n_bootstrap,
+        "provenance": provenance or {},
+        "voxel_oracle": {
+            "entropy_positive_utility_mean":
+                np.mean(voxel_positive, axis=0).round(6).tolist(),
+            "entropy_negative_utility_mean":
+                np.mean(voxel_negative, axis=0).round(6).tolist(),
+            **serialise_stats(voxel_stats),
+        },
+        "region_selector": {
+            "block_size": int(block_size),
+            "halo": int(halo),
+            "executed_volume_fraction_mean":
+                np.mean(region_executed, axis=0).round(6).tolist(),
+            "entropy_positive_utility_mean":
+                np.mean(region_positive, axis=0).round(6).tolist(),
+            "entropy_negative_utility_mean":
+                np.mean(region_negative, axis=0).round(6).tolist(),
+            **serialise_stats(region_stats),
+        },
+        "subject_results": subject_results,
+        "go": go,
+    })
 
 
 def O6_difficulty_evolution(val_loader, output, dataset, device):
@@ -418,17 +636,37 @@ def O11_routing_signals(val_loader, effi, full, bin_ent, bin_net):
 
 
 def main():
+    global OBS_DIR, RESULTS_FILE
     p = argparse.ArgumentParser()
     p.add_argument("--root", default="/root/autodl-tmp/btcv-synapse")
     p.add_argument("--output", default="/root/output")
     p.add_argument("--dataset", default="BTCV13")
+    p.add_argument("--obs_dir", default="/root/obs",
+                   help="Directory for figures and results.json")
+    p.add_argument("--e0_ckpt", default=None,
+                   help="Explicit E0 checkpoint; recommended for reproducible comparisons")
+    p.add_argument("--e1_ckpt", default=None,
+                   help="Explicit E1 checkpoint; recommended for seed-specific comparisons")
+    p.add_argument("--only_o9", action="store_true",
+                   help="Run only the corrected O9 analysis")
+    p.add_argument("--o9_block_size", type=int, default=16,
+                   help="O9 contiguous selector core block edge length in voxels")
+    p.add_argument("--o9_halo", type=int, default=4,
+                   help="O9 context halo added around each selected block")
+    p.add_argument("--o9_primary_budget", type=int, default=20,
+                   choices=[5, 10, 20, 30, 50],
+                   help="Predeclared O9 block budget used for the Go/No-Go test")
     args_ns = p.parse_args()
+    OBS_DIR = args_ns.obs_dir
+    RESULTS_FILE = os.path.join(OBS_DIR, "results.json")
     set_determinism(seed=0)
     os.makedirs(OBS_DIR, exist_ok=True)
     device = torch.device("cuda:0")
 
-    e0 = sorted(glob.glob(f"{args_ns.output}/E0*/3DUXNET/{args_ns.dataset}/best_metric_model.pth"))
-    e1 = sorted(glob.glob(f"{args_ns.output}/E1*/3DUXNET_EffiDec3D/{args_ns.dataset}/best_metric_model.pth"))
+    e0 = ([args_ns.e0_ckpt] if args_ns.e0_ckpt else
+          sorted(glob.glob(f"{args_ns.output}/E0*/3DUXNET/{args_ns.dataset}/best_metric_model.pth")))
+    e1 = ([args_ns.e1_ckpt] if args_ns.e1_ckpt else
+          sorted(glob.glob(f"{args_ns.output}/E1*/3DUXNET_EffiDec3D/{args_ns.dataset}/best_metric_model.pth")))
     assert e0, f"No E0 checkpoint under {args_ns.output}/E0*/3DUXNET/{args_ns.dataset}/"
     assert e1, f"No E1 checkpoint under {args_ns.output}/E1*/3DUXNET_EffiDec3D/{args_ns.dataset}/"
     print(f"E0: {e0[-1]}\nE1: {e1[-1]}")
@@ -447,12 +685,29 @@ def main():
     post_lbl = AsDiscrete(to_onehot=14)
     print(f"Val cases: {len(val_files)}\n")
 
+    if args_ns.only_o9:
+        O9_opportunity(
+            val_loader, effi, full,
+            block_size=args_ns.o9_block_size,
+            halo=args_ns.o9_halo,
+            primary_budget=args_ns.o9_primary_budget,
+            provenance={"dataset": args_ns.dataset, "e0_checkpoint": e0[-1],
+                        "e1_checkpoint": e1[-1]},
+        )
+        print(f"\nDone. Corrected O9 figure + results.json in {OBS_DIR}")
+        return
+
     O1_error_distribution(val_loader, effi)
     O2_entropy_distribution(val_loader, effi)
     O3_unc_error_corr(val_loader, effi)
     dice_summary, organ_ent = O4_per_organ(val_loader, effi, post_pred, post_lbl)
     bin_ent, bin_net = O5_decoder_gain(val_loader, effi, full)
-    O9_opportunity(val_loader, effi, full)
+    O9_opportunity(val_loader, effi, full,
+                   block_size=args_ns.o9_block_size,
+                   halo=args_ns.o9_halo,
+                   primary_budget=args_ns.o9_primary_budget,
+                   provenance={"dataset": args_ns.dataset, "e0_checkpoint": e0[-1],
+                               "e1_checkpoint": e1[-1]})
     O6_difficulty_evolution(val_loader, args_ns.output, args_ns.dataset, device)
     O10_organ_size(val_loader, dice_summary, organ_ent)
     O11_routing_signals(val_loader, effi, full, bin_ent, bin_net)

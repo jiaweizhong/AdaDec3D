@@ -1,0 +1,50 @@
+\section{Discussion and Limitations}
+\label{sec:discussion}
+
+\paragraph{What the evidence supports.}
+Across two efficient-decoder seeds, the direction of the central observation is
+stable: additional decoder capacity produces a small, bidirectional aggregate
+effect, and its net benefit increases with an uncertainty proxy.  Boundary and
+organ analyses further show that segmentation difficulty is spatially
+heterogeneous.  Together, these findings justify testing selective regional
+decoding rather than applying a uniformly expensive decoder.
+
+\paragraph{What it does not yet support.}
+The current study does not demonstrate lower \emph{executed} compute for an
+adaptive model.  The legacy top-20\% result is a voxel oracle, not a realizable
+router.  Even a block opportunity curve uses full-model predictions only to
+define retrospective utility; it does not account for errors introduced by a
+learned refinement module.  Dynamic FLOPs, latency, memory, and final Dice must
+therefore be evaluated in a separate method study.
+
+\paragraph{Reproduction gap.}
+Our efficient baseline remains 1.70--2.25 Dice points below the published
+result, while the full baseline is much closer.  The most plausible unresolved
+difference is data preprocessing: our reconstructed files have identity affine
+metadata, whereas the original work used a processed dataset not distributed
+with the repository.  The enlarged local full--efficient gap could inflate the
+amount of apparent decoder opportunity.  We mitigate this by disclosing all
+values, analyzing two efficient seeds, and limiting claims to controlled local
+comparisons.  A paper-equivalent preprocessing run and matched multi-seed full
+baseline remain important controls.
+
+\paragraph{Statistical limitations.}
+The dataset contains only 12 validation subjects.  Confidence intervals are
+therefore wide, and millions of voxels must not be interpreted as independent
+observations.  Our early entropy--error coefficient pooled bins across subjects
+and is retained only as a descriptive diagnostic.  Final error predictability
+will use subject-level AUROC/AUPRC and calibration.  Budgets and primary
+endpoints must be declared before examining the corrected O9 results.
+
+\paragraph{Generalization.}
+All completed results currently use one CT dataset and one backbone family.
+Without cross-backbone and cross-modality replication, the finding may be
+specific to 3D UX-Net, the Synapse split, or EffiDec3D's resolution restriction.
+The final claim will be narrowed if O7/O8 do not reproduce the direction.
+
+\paragraph{Clinical interpretation.}
+High uncertainty and small-organ difficulty do not imply clinical safety.
+Entropy can miss confidently wrong predictions, and improving average Dice
+does not guarantee preservation of clinically important boundaries.  Any
+future adaptive decoder should therefore retain a conservative fallback and be
+evaluated per organ and per subject, not only by average compute.

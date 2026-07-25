@@ -1,0 +1,61 @@
+\section{Introduction}
+\label{sec:intro}
+
+Volumetric medical image segmentation relies on decoders to fuse multi-scale
+features and restore spatial detail.  This restoration is expensive: every
+high-resolution 3D convolution operates over millions of voxels, often with
+wide feature maps.  Modern architectures therefore face a tension between
+anatomical accuracy and the memory, latency, and energy required for deployment.
+This tension has motivated efficient architectures and automated configuration
+pipelines such as nnU-Net~\cite{isensee2021nnunet}, as well as transformer and
+large-kernel models including UNETR~\cite{hatamizadeh2022unetr}, Swin
+UNETR~\cite{tang2022swinunetr}, and 3D UX-Net~\cite{lee20233duxnet}.
+
+EffiDec3D~\cite{rahman2025effidec3d} recently showed that decoder channels and
+high-resolution stages can be aggressively reduced while retaining competitive
+aggregate Dice.  Its 3D UX-Net variant reports a 96.4\% reduction in decoder
+parameters and a 93.0\% reduction in decoder FLOPs.  This is strong evidence
+that conventional decoders are over-provisioned in aggregate.  Aggregate
+metrics, however, cannot reveal whether the remaining utility is uniformly
+distributed.  A static decoder assigns the same architecture to every subject,
+organ, and location, although the need for detail restoration may vary sharply.
+
+This distinction matters.  A difficult or uncertain voxel is not necessarily a
+voxel that benefits from a stronger decoder: both models may fail there.
+Conversely, model disagreement is not necessarily improvement, because the full
+decoder can destroy a prediction that the efficient decoder got right.  We
+therefore ask:
+\begin{quote}
+\emph{Where is the marginal utility of additional decoder capacity, how
+concentrated is it, and can it be identified without access to ground truth?}
+\end{quote}
+
+We answer this question with a controlled marginal-utility study.  We compare a
+full 3D UX-Net decoder (\fullmodel) with an EffiDec3D-compressed decoder
+(\effimodel) under a common dataset, split, preprocessing pipeline, training
+schedule, and evaluation protocol.  At each voxel we distinguish positive,
+negative, and net transitions between their predictions.  We then analyze this
+utility by anatomy, boundary proximity, uncertainty, training stage, and
+selection budget.  Statistical comparisons are performed at the subject level
+to avoid treating millions of correlated voxels as independent samples.
+
+Our current contributions are:
+\begin{itemize}
+    \item We formulate \emph{decoder marginal utility}, separating additional
+    decoder capacity from generic segmentation error and explicitly accounting
+    for both corrected and damaged predictions.
+    \item We provide a controlled audit of full and efficient 3D UX-Net decoders
+    across two efficient-decoder seeds, reporting accuracy, HD95, parameters,
+    MACs, latency, and memory together with the observed reproduction gap.
+    \item We characterize the anatomical and temporal distribution of decoder
+    opportunity, including boundary/interior error, organ size, uncertainty,
+    and training-checkpoint evolution.
+    \item We define a selective-allocation protocol with predeclared budgets,
+    paired subject bootstrap, net utility, and contiguous 3D regions.  This
+    protocol distinguishes a voxel oracle from a selector that could motivate
+    an adaptive decoder.
+\end{itemize}
+
+The study intentionally stops short of claiming an efficient adaptive method.
+Measured dynamic compute savings belong to a subsequent method study; here our
+goal is to establish whether the empirical premise for such a method is sound.

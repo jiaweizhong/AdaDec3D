@@ -1,0 +1,18 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+We presented a marginal-utility perspective on efficient 3D segmentation
+decoders.  A controlled full-versus-efficient comparison shows that additional
+decoder capacity has a small and bidirectional aggregate effect, while its
+remaining utility is associated with a spatially concentrated subset of
+difficult regions.  These trends are stable across two efficient-decoder seeds,
+despite an unresolved absolute reproduction gap.  More broadly, our results
+show why aggregate Dice/FLOPs tables are insufficient for reasoning about
+decoder redundancy: error, uncertainty, and decoder-specific utility are
+distinct quantities.  The proposed net-utility, paired-bootstrap, and
+contiguous-region protocol provides a stricter test of whether selective
+allocation is empirically justified.
+
+\todo{Update the conclusion after corrected O9 and O7/O8. If region-level net
+utility or generalization fails, narrow the claim to heterogeneity and report
+the negative result rather than retaining ``predictable.''}

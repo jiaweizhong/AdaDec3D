@@ -1,0 +1,76 @@
+\section{Marginal-Utility Study}
+\label{sec:study}
+
+\subsection{Matched Decoder Comparison}
+
+Let $f_{\mathrm{E}}$ denote the efficient decoder and $f_{\mathrm{F}}$ the full
+decoder.  For input volume $x$, their hard predictions at voxel $v$ are
+$\hat y_{\mathrm{E}}(v)$ and $\hat y_{\mathrm{F}}(v)$, with reference label
+$y(v)$.  The positive and negative transitions are
+\begin{align}
+P(v) &= \mathbb{1}[\hat y_{\mathrm{E}}(v)\ne y(v)]
+        \mathbb{1}[\hat y_{\mathrm{F}}(v)=y(v)],\\
+N(v) &= \mathbb{1}[\hat y_{\mathrm{E}}(v)=y(v)]
+        \mathbb{1}[\hat y_{\mathrm{F}}(v)\ne y(v)].
+\end{align}
+We define discrete net marginal utility as
+\begin{equation}
+U(v)=P(v)-N(v).
+\label{eq:utility}
+\end{equation}
+This definition prevents every model disagreement from being counted as an
+improvement.  For a selected region $S$, normalized net utility is
+\begin{equation}
+R_{\mathrm{net}}(S)=
+\frac{\sum_{v\in S} U(v)}
+     {\sum_v P(v)}.
+\label{eq:recovery}
+\end{equation}
+The denominator makes positive recovery interpretable while allowing negative
+values when selection damages more predictions than it repairs.  We report
+positive and negative components alongside their difference.
+
+\subsection{Difficulty, Utility, and Predictability}
+
+We separate three maps that are often conflated:
+\emph{error} indicates where \effimodel{} is wrong;
+\emph{uncertainty} is computed from its predictive distribution; and
+\emph{utility} indicates where replacing its output with \fullmodel{} changes
+correctness.  Error concentration alone does not establish an opportunity for
+additional decoding.
+
+For \effimodel{} class probabilities $p_c(v)$, predictive entropy is
+\begin{equation}
+H(v)=-\sum_c p_c(v)\log(p_c(v)+\epsilon).
+\end{equation}
+We measure the association between entropy and net utility within each subject
+and aggregate subject-level coefficients with a nonparametric bootstrap.  The
+final analysis will additionally report subject-level AUROC/AUPRC and
+calibration for predicting positive and net-beneficial regions.
+
+\subsection{Selective-Allocation Opportunity}
+
+We evaluate budgets $\mathcal{B}=\{5,10,20,30,50\}\%$ in two settings.
+First, entropy ranks individual foreground-union voxels, yielding a
+non-deployable oracle upper bound.  Second, the volume is partitioned into
+$16^3$ blocks, each scored by mean entropy.  Selected blocks receive a
+four-voxel context halo; the halo-expanded volume is recorded as an executed
+volume proxy.  Utility is evaluated on each selected core, reflecting a
+patch-based refiner that consumes context but writes only its core prediction.
+
+At each budget, entropy selection is compared with 100 matched random
+selections.  Confidence is a second zero-forward-pass baseline.  The primary
+budget is declared as 20\%; 10\% and 30\% are sensitivity analyses.  A paired
+bootstrap resamples the same subject indices for entropy and random policies.
+The opportunity criterion is met only if mean region-level net utility is
+positive and the lower 95\% confidence bound for entropy minus random exceeds
+zero at the primary budget.
+
+\subsection{Anatomical and Training Analyses}
+
+We compare errors at a three-voxel foreground boundary band and eroded
+interior.  Per-organ Dice, entropy, volume, and error characterize anatomical
+heterogeneity.  Spearman correlation measures the relation between organ size
+and difficulty; a partial correlation tests whether entropy explains
+difficulty beyond log organ volume.  Finally, checkpoints at 5k, 10k, 20k,
+30k, and 45k iterations measure how uncertainty changes during training.

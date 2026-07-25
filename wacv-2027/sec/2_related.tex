@@ -1,0 +1,43 @@
+\section{Related Work}
+\label{sec:related}
+
+\paragraph{3D medical image segmentation.}
+U-shaped encoder--decoder networks remain the dominant design for volumetric
+segmentation.  UNETR~\cite{hatamizadeh2022unetr} uses a transformer encoder and
+a convolutional decoder connected by multi-scale skips, while Swin
+UNETR~\cite{tang2022swinunetr} introduces hierarchical shifted-window
+representations.  3D UX-Net~\cite{lee20233duxnet} instead approximates
+hierarchical transformer behavior with large-kernel depthwise convolutions.
+nnU-Net~\cite{isensee2021nnunet} demonstrates that data-dependent pipeline
+configuration and rigorous evaluation can be as important as architectural
+novelty.  These works primarily optimize segmentation accuracy; our study
+instead examines the spatial utility of the decoder computation already
+present in such systems.
+
+\paragraph{Efficient decoders.}
+EffiDec3D~\cite{rahman2025effidec3d} observes that wide, high-resolution
+decoder stages dominate the cost of several 3D models.  It uses a uniform
+reduced channel width and removes stages whose aggregate accuracy contribution
+is small.  Across 12 tasks, the resulting static decoder preserves competitive
+accuracy at much lower cost.  We take this result as a starting point and ask a
+different question: whether the small residual benefit of the full decoder is
+spatially uniform.  Our work is an evaluation of decoder utility, not a new
+compression block.
+
+\paragraph{Uncertainty and selective computation.}
+Predictive entropy and confidence are widely used as uncertainty proxies.
+They identify ambiguous predictions, but ambiguity and decoder utility are not
+equivalent: an uncertain location may remain wrong after additional decoding,
+whereas a confident error may still be correctable.  Accordingly, we evaluate
+signals against held-out \emph{net transitions} between matched decoders rather
+than against error alone.  We also distinguish arbitrary voxel ranking from
+contiguous region selection, since sparse isolated voxels cannot be processed
+efficiently by standard 3D convolutions.
+
+\paragraph{Evaluation and reproducibility.}
+Small medical datasets create substantial seed and split variance, while
+voxel-level statistical tests can produce severe pseudo-replication.
+Our protocol therefore reports seed-level results, discloses deviations from
+published baselines, and bootstraps subjects rather than voxels.  This emphasis
+on auditing what aggregate metrics conceal aligns with the goals of the WACV
+Evaluations \& Datasets track.

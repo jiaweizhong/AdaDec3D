@@ -12,7 +12,7 @@
 | **Claim** | The marginal utility of decoder capacity is spatially concentrated and entropy-predictable (**observation only**) | AdaDec3D realizes region-adaptive decoding — **iso-accuracy at lower executed cost** |
 | **Venue** | MIDL / MLMI / ISBI | MICCAI 2026 / TMI |
 | **Gate** | O2/O3/O5/O9 pass ✅ (all passed 2026-07-25) | O7, O8, O11 + AdaDec3D beats controls |
-| **Key result** | Routing signal validated (O3 r=0.97, O9 20%→86%); decoder gain is small & concentrated | **DICE ≈ EffiDec3D at meaningfully lower executed MACs** (input-adaptive) |
+| **Key result** | Preliminary cross-seed evidence that decoder gain is small, concentrated and predictable; corrected regional analysis still required | **DICE ≈ EffiDec3D at meaningfully lower executed MACs** (input-adaptive) |
 
 > **Scope note**: Paper A is an **observation paper** — it characterizes *where*
 > extra decoder capacity has marginal utility (concentrated, entropy-predictable)
@@ -323,8 +323,9 @@ Per-organ (our E1 | paper EffiDec3D):
 - **BF16 is innocent**: re-validating the same weights in FP32 vs BF16 gives
   Δ = 0.0000 (`revalidate_fp32.py`). Precision is not the cause.
 - Remaining gap is most likely the **data source** (we use the TransUNet Synapse
-  Kaggle split with identity affine; the paper uses `btcv_trns`) and/or 12-case
-  variance. A different-seed run is in progress to bound the variance.
+  Kaggle split with identity affine; the paper uses `btcv_trns`). Seed 1 improves
+  the result, but does not close the reproduction gap (see below), so random-seed
+  variance alone is not a sufficient explanation.
 - The **CSV/paper-protocol metric is 0.7700**, not the 0.7549 shown mid-training
   (that periodic MONAI metric uses a running-aggregate average on the resampled
   grid; the final `validation_save` resamples to original resolution + medpy dice,
@@ -333,6 +334,75 @@ Per-organ (our E1 | paper EffiDec3D):
 Numbers are "calibration / not final" — see the Paper A → Paper B data-reuse note.
 For the AdaDec3D efficiency thesis, **E1 (77.0%) is the iso-accuracy target**;
 its exact absolute value is not a gate.
+
+### E1 seed-1 replication and completed observation run
+
+The second E1 training run is stored in
+`results/E1_metrics_btcv13_seed1.csv`; its observations and figures are in
+`results/obs-seed1/`.
+
+| Run | Mean DICE | Mean HD95 | Train time | Inference | Difference from paper E1 |
+|---|---:|---:|---:|---:|---:|
+| E1 seed 0 | 0.7700 | 14.41 | 5.36 h | 7.5 ms | −2.25 DICE points |
+| E1 seed 1 | **0.7755** | **10.17** | 5.27 h | 7.6 ms | −1.70 DICE points |
+| Paper E1 | 0.7925 | 10.12 | — | — | — |
+
+Seed 1 nearly reproduces the reported mean HD95 and improves DICE by 0.55 points,
+but the two-seed mean DICE is only **0.7728**. The E0–E1 DICE gap is 2.18 points
+for seed 0 and 1.63 points for seed 1, both larger than the paper's 0.49-point
+gap. Therefore:
+
+- The implementation is adequate for a **controlled internal observation study**:
+  E0 and E1 share the same data, split, transforms and evaluation protocol.
+- It is not yet an exact reproduction of the paper's absolute E1 accuracy.
+- Paper A must call these runs a *controlled reimplementation*, report both
+  seeds, and avoid attributing the enlarged E0–E1 gap entirely to decoder
+  compression.
+- Before the final manuscript, obtain or reconstruct the paper's `btcv_trns`
+  preprocessing and run at least one matched E0/E1 seed pair. Three seeds are
+  preferred for the primary BTCV table.
+
+#### Seed-1 observation results
+
+| Observation | Seed-1 result | Current interpretation |
+|---|---|---|
+| O1 | Boundary error 0.1892 vs interior 0.0481 (**3.93×**) | Supports boundary-concentrated difficulty |
+| O2 | Median entropy 0.00035; 1.18% voxels have entropy > 0.5 | Uncertainty is strongly spatially sparse |
+| O3 | Pearson 0.973; Spearman 0.975 | Descriptive only; current pooled-bin estimator overstates inferential strength |
+| O5 | Subject mean Pearson **0.646**, bootstrap CI [0.158, 0.994]; positive 0.290% vs negative 0.225% | Direction replicates seed 0, but net effect is only about **0.065% of voxels** |
+| O6 | Mean entropy falls 0.0279 → 0.0104 from 5k to 45k | Difficulty contracts during training but does not disappear |
+| O9 | Top 10/20/30% entropy voxels recover 58.7/86.4/95.2% of positive transitions | Strong oracle opportunity; not yet deployable regional compute evidence |
+| O10 | Size–difficulty Spearman −0.544; partial entropy–difficulty r 0.810 | Small organs are harder, while entropy retains information beyond size |
+| O11 | Entropy r 0.655; confidence r 0.663; MC dropout inactive | Confidence is a valid cheap baseline; MC-dropout result is missing |
+
+The most important result is **cross-seed stability**: O5 changes from about
+0.665 to 0.646 and O9's 20% recovery remains about 86%. This supports Paper A's
+core narrative that useful decoder corrections are predictable and spatially
+concentrated. It does **not** yet prove that a realizable adaptive decoder can
+obtain the same recovery at lower measured FLOPs.
+
+#### Statistical audit before Paper A submission
+
+The current JSON `go` flags are engineering checks, not publication-ready
+hypothesis tests. The following corrections are mandatory before treating O3/O9
+as final evidence:
+
+1. **O3:** the current implementation pools entropy bins from all subjects and
+   correlates their bin means. Report subject-level AUROC/AUPRC for voxel error,
+   calibration curves, and a subject-bootstrap confidence interval instead.
+2. **O9 utility:** the current recovery curve counts only positive E0-over-E1
+   transitions. Add a **net utility** curve (`positive − negative`) so selecting
+   a region that also destroys correct E1 voxels is penalized.
+3. **O9 bootstrap:** resample the same subject indices for entropy and random
+   policies (paired bootstrap). Store both CI bounds and require the lower bound
+   to exceed zero at each pre-declared primary budget, rather than selecting the
+   best budget after inspection.
+4. **Deployability:** repeat O9 using contiguous 3D blocks/connected regions plus
+   the refinement halo required by the implementation. Voxel-wise oracle ranking
+   is an upper bound, not a realizable routing policy.
+5. **Multiplicity and provenance:** predeclare the primary budget and endpoint,
+   save subject-level values, checkpoint hashes, split IDs and run configuration
+   alongside `results.json`.
 
 ### Checkpoint resumption
 
@@ -779,8 +849,9 @@ save_obs("O5", {
 })
 ```
 
-**Go criterion**: net benefit rises with entropy AND a deployable signal beats
-matched random at 10–30% budgets with a subject-level 95% CI (see O9).
+**Go criterion**: net benefit rises with entropy AND a contiguous-region selector
+beats matched random at a predeclared 10–30% budget with a paired subject-level
+95% CI (see O9). The current voxel-wise result is an oracle upper bound only.
 
 ---
 
@@ -936,110 +1007,55 @@ save_obs("O8", {"swin_gain_entropy_subj_pearson_r": r_swin, "n_subjects": len(sw
 
 ### O9 — Selective-Allocation Opportunity *(headline result for Paper A)*
 
-**Question**: At fixed selection budgets, does entropy recover more positive decoder
-transitions than matched random selection?
+**Question**: At a predeclared compute budget, can entropy select contiguous
+regions with greater **net decoder utility** than matched random regions?
 
-This is an **opportunity analysis** — it measures the potential for selective
-allocation but does not prove computational savings (Paper B must show that).
+The corrected implementation is in `EffiDec3D/run_observations.py`. It reports:
 
-```python
-rng = np.random.default_rng(0)
-budgets = np.array([5, 10, 20, 30, 50])
+1. A voxel-wise entropy oracle as a non-deployable upper bound.
+2. Non-overlapping 16³ blocks ranked by mean entropy.
+3. A 4-voxel context halo around every selected block.
+4. Net utility
+   `(E0-correct/E1-wrong − E0-wrong/E1-correct) / all positive transitions`.
+5. A paired subject bootstrap: entropy and random use exactly the same resampled
+   subject indices.
+6. Both CI bounds, actual halo-expanded volume and subject-level values.
 
-entropy_recovery, random_recovery = [], []
+Run seed 0 and seed 1 separately with explicit checkpoints:
 
-with torch.no_grad():
-    for batch in val_loader:
-        img = batch["image"].cuda()
-        lbl = batch["label"].squeeze(1).long().cpu().squeeze()
+```bash
+cd /root/AdaDec3D/EffiDec3D
 
-        pred_full = sliding_window_inference_1out(
-            img, (96,96,96), 4, full_model, overlap=0.7).argmax(1).cpu().squeeze()
-        logits_e  = sliding_window_inference_1out(
-            img, (96,96,96), 4, effi_model, overlap=0.7)
-        prob_e    = logits_e.softmax(1).cpu()
-        pred_effi = logits_e.argmax(1).cpu().squeeze()
-        ent = -(prob_e * torch.log(prob_e + 1e-8)).sum(1).squeeze()
-
-        pos = ((pred_full == lbl) & (pred_effi != lbl)).float()
-        # Budget denominator = union of foreground predictions and labels
-        body = (lbl > 0) | (pred_full > 0) | (pred_effi > 0)
-        ent_body = ent[body].numpy()
-        pos_body = pos[body].numpy()
-
-        total = pos_body.sum()
-        if total == 0:
-            continue
-
-        # Entropy ranking
-        order = np.argsort(ent_body)[::-1]
-        entropy_recovery.append([
-            pos_body[order[:max(1, int(len(order)*q/100))]].sum() / total
-            for q in budgets
-        ])
-        # 100 random selections per subject
-        random_recovery.append(np.mean([
-            [pos_body[rng.choice(len(pos_body), max(1, int(len(pos_body)*q/100)),
-                                 replace=False)].sum() / total for q in budgets]
-            for _ in range(100)
-        ], axis=0))
-
-ent_arr  = np.asarray(entropy_recovery)
-rand_arr = np.asarray(random_recovery)
-print("Budget (%):       ", budgets)
-print("Entropy recovery: ", ent_arr.mean(0).round(3))
-print("Random recovery:  ", rand_arr.mean(0).round(3))
-
-# Subject-level 95% CI via bootstrap
-B = 2000
-diffs = []
-for _ in range(B):
-    idx = rng.integers(len(ent_arr), size=len(ent_arr))
-    diffs.append((ent_arr[idx] - rand_arr[idx]).mean(0))
-diffs = np.array(diffs)
-lo, hi = np.percentile(diffs, [2.5, 97.5], axis=0)
-print("Entropy vs Random 95% CI lower:", lo.round(3))
-print("Entropy vs Random 95% CI upper:", hi.round(3))
-
-# lo/hi are CIs on the DIFFERENCE (entropy - random), not on entropy mean.
-# Bootstrap separate CIs for each curve for plotting.
-B = 2000
-ent_boots, rnd_boots = [], []
-for _ in range(B):
-    idx = rng.integers(len(ent_arr), size=len(ent_arr))
-    ent_boots.append(ent_arr[idx].mean(0))
-    rnd_boots.append(rand_arr[idx].mean(0))
-ent_boots = np.array(ent_boots)
-rnd_boots = np.array(rnd_boots)
-ent_lo, ent_hi = np.percentile(ent_boots, [2.5, 97.5], axis=0)
-rnd_lo, rnd_hi = np.percentile(rnd_boots, [2.5, 97.5], axis=0)
-
-plt.figure(figsize=(7,5))
-plt.plot(budgets, ent_arr.mean(0)*100, "o-", label="Entropy", color="steelblue")
-plt.fill_between(budgets, ent_lo*100, ent_hi*100, alpha=0.2, color="steelblue")
-plt.plot(budgets, rand_arr.mean(0)*100, "o--", label="Random (100 repeats)", color="gray")
-plt.fill_between(budgets, rnd_lo*100, rnd_hi*100, alpha=0.15, color="gray")
-plt.xlabel("Selected union-foreground voxels (%)")
-plt.ylabel("Positive decoder transitions recovered (%)")
-plt.title("O9: Selective-Allocation Opportunity")
-plt.legend()
-plt.savefig("/root/obs/O9_opportunity_curve.png", dpi=150)
-plt.show()
-
-save_obs("O9", {
-    "budgets_pct": budgets.tolist(),
-    "entropy_recovery_mean": ent_arr.mean(0).round(4).tolist(),
-    "random_recovery_mean":  rand_arr.mean(0).round(4).tolist(),
-    "ci_lower_95": lo.round(4).tolist(),
-    "ci_upper_95": hi.round(4).tolist(),
-    # Go: lower CI > 0 for at least one budget in the 10–30% range (as stated in criterion)
-    "go": bool(lo[np.isin(budgets, [10, 20, 30])].max() > 0),
-})
+python run_observations.py \
+  --root /root/autodl-tmp/btcv-synapse \
+  --dataset BTCV13 \
+  --e0_ckpt /root/output/E0.../3DUXNET/BTCV13/best_metric_model.pth \
+  --e1_ckpt /root/output/E1_seed1.../3DUXNET_EffiDec3D/BTCV13/best_metric_model.pth \
+  --obs_dir /root/obs-seed1-corrected \
+  --only_o9 \
+  --o9_block_size 16 \
+  --o9_halo 4 \
+  --o9_primary_budget 20
 ```
 
-**Go criterion**: entropy outperforms matched random at 10–30% budgets and the
-lower bound of the 95% CI is above zero. Report the actual budget/recovery pair;
-do not assume a specific concentration ratio in advance.
+Outputs:
+
+- `/root/obs-seed1-corrected/O9_opportunity_corrected.png`
+- `results.json["O9_corrected"]`
+- Per-subject positive/negative counts, net utilities and executed-volume fractions
+  under `O9_corrected.subject_results`
+
+The old `results.json["O9"]` is retained only as a legacy positive-transition
+oracle and must not be used as the final Paper A result.
+
+Repeat the command with the seed-0 E1 checkpoint and a separate
+`--obs_dir /root/obs-seed0-corrected`; do not overwrite or merge the two runs
+before checking their subject-level results.
+
+**Predeclared Go criterion**: at the 20% block budget, the entropy region selector
+has positive mean net utility and the lower bound of the paired 95% CI for
+`entropy − matched random` is above zero. The same direction must hold for both
+E1 seeds. The 10% and 30% budgets are secondary sensitivity analyses.
 
 ---
 
@@ -1275,53 +1291,61 @@ save_obs("O11", signal_results)
 | MC Dropout | | | | |
 | Boundary | | | | |
 
-**Expected winner**: entropy (best corr/overhead ratio). O11 informs the AdaDec3D routing signal choice (Paper B).
+**Current BTCV result**: confidence (r=0.663) and entropy (r=0.655) are effectively
+tied as zero-extra-forward-pass signals. MC dropout is invalid because dropout is
+inactive in the evaluated model. O11 therefore supports keeping both entropy and
+confidence as Paper B baselines; it does not establish entropy as uniquely best.
 
 ---
 
 ## Part 4: Go / No-Go Decision
 
-### Minimum criteria for Paper A submission — **ALL PASS** (measured 2026-07-25)
+### Prototype gate — **direction replicated; submission gate remains open**
 
-| Obs | Criterion | Result | Pass? |
-|-----|-----------|--------|-------|
-| O3 | Entropy–Error Pearson r > 0.60 | **r = 0.971** (Spearman 0.976) | ✅ |
-| O5 | Net benefit rises with entropy; positive > negative | subj-r 0.665, 95% CI **[0.171, 0.996]**; pos 0.339% > neg 0.209% | ✅ |
-| O9 | Entropy beats matched random at 10–30% budgets (CI lower > 0) | diff CI-lo **[0.359, 0.590, 0.606]** at 10/20/30% | ✅ |
-| O2 | Entropy distribution skewed (most voxels low entropy) | median 0.0011; only **1.31%** voxels > 0.5 | ✅ |
+| Obs | Intended criterion | Seed 0 | Seed 1 | Status |
+|-----|--------------------|--------|--------|--------|
+| O2 | Strongly skewed entropy | median 0.0011; 1.31% > 0.5 | median 0.00035; 1.18% > 0.5 | ✅ replicated |
+| O3 | Entropy predicts voxel error | pooled-bin r = 0.971 | pooled-bin r = 0.973 | ⚠ estimator audit required |
+| O5 | Net benefit rises with entropy | subj-r 0.665, CI [0.171, 0.996] | subj-r 0.646, CI [0.158, 0.994] | ✅ direction replicated |
+| O9 | Entropy beats matched random | 20% recovers 86.4% positive transitions | 20% recovers 86.4% | ⚠ oracle/net/paired audit required |
 
-**All four pass.** Routing signal (entropy) is validated: it predicts error almost
-perfectly (O3) and selects the decoder-relevant region with high precision
-(O9: 20% budget recovers 86% of positive transitions).
+These results pass the **prototype gate**: uncertainty-guided regional refinement
+is sufficiently motivated to prototype Paper B. They do not yet pass the final
+Paper A submission gate. O3 needs a subject-level discrimination/calibration
+analysis; O9 needs paired subject bootstrap, net utility and contiguous-region
+routing. The corrected analyses must retain a positive subject-bootstrap lower
+bound at a predeclared budget.
 
-### Additional criteria for Paper B (not yet run — need FeTA / SwinUNETR)
+### Generalization criteria (not yet run — need FeTA / SwinUNETR)
 
 | Obs | Criterion | Result | Pass? |
 |-----|-----------|--------|-------|
 | O7 | FeTA replication: net-gain/entropy r > 0.40 | pending E0/E1-FeTA | ☐ |
 | O8 | SwinUNETR backbone: net-gain/entropy r > 0.45 | pending E0/E1-Swin | ☐ |
-| O11 | Entropy is best or tied-best routing signal | pending | ☐ |
+| O11 | Entropy is best or tied-best cheap routing signal | confidence 0.663 vs entropy 0.655; MC dropout inactive | ◐ partial |
 
 ---
 
 ### Interpretation — decoder capacity is over-provisioned (Paper A finding)
 
-O5's decoder gain is **small**: full 3DUX-Net (E0) beats EffiDec3D (E1) by only
-**0.13% net voxels** (pos 0.339% − neg 0.209%), and it is a messy trade (for every
-3 voxels fixed, ~2 are broken). This matches the paper's near-parity (79.74 vs
-79.25).
+O5's decoder gain is **small**: for seed 0 the positive/negative transition rates
+are 0.339%/0.209% (about 0.130% net), while for seed 1 they are
+0.290%/0.225% (about 0.065% net). The direction is stable, although our enlarged
+E0–E1 DICE gap means the magnitude cannot yet be claimed as an exact reproduction
+of the paper's near-parity (79.74 vs 79.25).
 
 As a **Paper A observation**, this reads as: the *marginal utility* of extra
 decoder capacity is small in aggregate, concentrated where entropy is high, and
 predictable (O9). The three observations line up:
 
-- O2: 98.7% of voxels are easy (low-entropy) → extra decoder capacity is unused almost everywhere.
-- O5: the full decoder's extra capacity nets ~0% overall, concentrated in high-entropy voxels (over-provisioned).
-- O9: entropy identifies the ~20% region carrying 86% of the gain → a predictable, deployable signal.
+- O2: only about 1.2–1.3% of voxels have entropy above 0.5; difficulty is spatially sparse.
+- O5: the full decoder's extra capacity has a small net voxel effect, concentrated in high-entropy bins.
+- O9: voxel-wise entropy ranking identifies a 20% oracle region carrying about 86% of positive transitions.
 
 > **These are observations, not an efficiency claim.** They *motivate* the Paper B
 > efficiency direction (region-adaptive decoding) but do not themselves demonstrate
-> lower executed cost — that requires the AdaDec3D method (Experiment-Design-AdaDec3D).
+> lower executed cost or a deployable selector. That requires contiguous-region
+> analysis followed by the AdaDec3D method (`Experiment-Design-AdaDec3D.md`).
 
 ### MAC headroom (Paper B motivation, `profile_macs.py`)
 
@@ -1393,26 +1417,34 @@ Week 1: Setup
 Week 2-3: Baseline training
   [x] E0 full 3DUXNET — 45 000 iter   ✓ Mean DICE 0.7918 / HD95 9.04 (paper 3DUX 79.74)
   [x] E1 EffiDec3D   — 45 000 iter    ✓ Mean DICE 0.7700 / HD95 14.41 (paper Effi 79.25, −2.25)
+  [x] E1 seed 1      — 45 000 iter    ✓ Mean DICE 0.7755 / HD95 10.17 (paper Effi 79.25, −1.70)
   [x] E1 efficiency confirmed: 41.06 GMac (14.1× vs E0), 7.5 ms, 0.24 GB
   [x] E1 milestone_{05000..45000}.pth auto-saved (for O6)
-  [~] Different-seed E1 run in progress (bound 12-case variance)
+  [x] Different-seed E1 run complete; variance does not fully explain reproduction gap
 
-Week 4: Observations — critical gate (run_observations.py)   ✓ ALL PASS
-  [x] O2: entropy skewed (median 0.0011; 1.31% voxels > 0.5)          GO
-  [x] O3: entropy–error Pearson r = 0.971                             GO
+Week 4: Observations — preliminary gate (run_observations.py)   ✓ DIRECTION REPLICATED
+  [x] O1: boundary error is 3.93× interior error
+  [x] O2: entropy skewed (seed 1 median 0.00035; 1.18% voxels > 0.5)
+  [x] O3: pooled-bin entropy–error Pearson r = 0.973 (descriptive; audit pending)
   [x] O4: per-organ dice/entropy (hardest = highest-entropy organs)
-  [x] O5: net gain rises with entropy; CI [0.171, 0.996]; pos>neg     GO (but gain small: 0.13% net)
-  [x] O9: entropy 20% budget recovers 86% of transitions; CI-lo>0     GO (headline)
+  [x] O5: subject r = 0.646, CI [0.158, 0.994]; pos>neg (net effect ≈0.065%)
+  [x] O6: entropy falls from 0.0279 (5k) to 0.0104 (45k)
+  [x] O9: entropy 20% budget recovers 86.4% positive transitions (oracle upper bound)
+  [x] O10: size–difficulty rho = −0.544; partial entropy r = 0.810
+  [x] O11: entropy/confidence comparable; MC dropout inactive
   [x] MAC profiling: decoder = 42.2% (decoder3 37%); encoder 57.8%
   [x] BF16 innocent (FP32 revalidation Δ=0.0000)
-  [x] --- GO: efficiency thesis (iso-accuracy, lower MACs) → Experiment-Design-AdaDec3D ---
+  [~] Statistical audit: subject-level O3, paired/net/region-level O9 still required
+  [x] --- CONDITIONAL GO: prototype Paper B, while completing Paper A audit ---
 
 Week 5-6: Extended observations (deferred — need FeTA / SwinUNETR runs)
-  [ ] O6: difficulty evolution (E1 milestones already saved)
+  [x] O6: difficulty evolution
   [ ] O7: FeTA replication (E0_feta + E1_feta)
   [ ] O8: SwinUNETR consistency (E0_swin + E1_swin)
-  [ ] O10: organ size vs difficulty
-  [ ] O11: routing signal comparison table
+  [x] O10: organ size vs difficulty
+  [~] O11: entropy and confidence complete; MC dropout invalid/inactive
+  [ ] Corrected O3/O9 statistical analysis and contiguous-region opportunity curve
+  [ ] Matched E0/E1 multi-seed run with paper-equivalent preprocessing
   [ ] Patch-level whole-model adaptivity study (extend efficiency beyond decoder's 42%)
 
 Week 7: Paper A draft

@@ -1,0 +1,128 @@
+\section{Results}
+\label{sec:results}
+
+\subsection{Controlled Reimplementation}
+
+\begin{table}[t]
+\centering
+\caption{BTCV controlled reimplementation. Published values are shown only for
+calibration; our paired analyses use the local runs. MAC denotes multiply--
+accumulate operations under our profiler.}
+\label{tab:baseline}
+\resizebox{\columnwidth}{!}{
+\begin{tabular}{lrrrrr}
+\toprule
+Model & Dice $\uparrow$ & HD95 $\downarrow$ & MAC & Params & Lat.\\
+ & & & (G) & (M) & (ms)\\
+\midrule
+Published Full-UX & .7974 & -- & 631.97 & 53.00 & --\\
+Published Effi-UX & .7925 & 10.12 & 51.47 & 3.16 & --\\
+\midrule
+Full-UX, seed 0 & .7918 & 9.04 & 578.74 & 53.007 & 40.6\\
+Effi-UX, seed 0 & .7700 & 14.41 & 41.06 & 2.955 & 7.5\\
+Effi-UX, seed 1 & .7755 & 10.17 & 41.06 & 2.955 & 7.6\\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+Table~\ref{tab:baseline} shows that the full model closely approaches the
+published Dice (a 0.56-point difference), whereas the two efficient runs remain
+1.70--2.25 points below the published efficient model.  Seed 1 nearly matches
+the published HD95.  The two-seed efficient mean Dice is 0.7728.
+Accordingly, seed variance explains part, but not all, of the reproduction gap.
+The local E0--E1 Dice gap (1.63--2.18 points) is larger than the published
+0.49-point gap, and we do not attribute its full magnitude to decoder
+compression.
+
+Efficiency trends reproduce strongly: \effimodel{} uses 14.1$\times$ fewer
+MACs, 17.9$\times$ fewer parameters, 5.3--5.4$\times$ lower measured latency,
+and approximately 7.7$\times$ lower peak inference memory than our \fullmodel{}.
+
+\subsection{Errors Are Anatomically Concentrated}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.96\columnwidth]{figures/O1_organ_error.png}\\[-1mm]
+\textbf{(a) Per-organ error.}\\[1mm]
+\includegraphics[width=0.96\columnwidth]{figures/O6_entropy_evolution.png}\\[-1mm]
+\textbf{(b) Entropy over training.}
+\caption{Current anatomical and temporal observations for Effi-UX seed 1.
+Entropy contracts during training but a residual difficult subset remains.}
+\label{fig:anatomy_training}
+\end{figure}
+
+For seed 1, mean boundary error is 0.1892 versus 0.0481 in the eroded interior,
+a ratio of 3.93.  Small and thin structures are disproportionately difficult:
+the organ-size/difficulty Spearman correlation is $-0.544$.  Entropy retains
+substantial association with organ difficulty after controlling for log volume
+(partial $r=0.810$), suggesting that size alone does not explain the signal.
+
+Difficulty also evolves systematically.  Mean entropy decreases from 0.0279 at
+5k iterations to 0.0166, 0.0126, 0.0123, and 0.0104 at 10k, 20k, 30k, and 45k,
+respectively (Fig.~\ref{fig:anatomy_training}).  Training removes much of the
+global ambiguity but does not eliminate the concentrated residual.
+
+\subsection{Decoder Utility Is Small and Bidirectional}
+
+\begin{table}[t]
+\centering
+\caption{Marginal-utility observations across efficient-decoder seeds.
+Rates are fractions of evaluated voxels. O9 is a preliminary voxel oracle and
+is not the final contiguous-region result.}
+\label{tab:utility}
+\begin{tabular}{lrr}
+\toprule
+Metric & E1 seed 0 & E1 seed 1\\
+\midrule
+Positive transition rate & .00339 & .00290\\
+Negative transition rate & .00209 & .00225\\
+Net transition rate & .00130 & .00065\\
+Entropy--net utility $r$ & .665 & .646\\
+Bootstrap 95\% CI & [.171,.996] & [.158,.994]\\
+Top-20\% positive recovery & .864 & .864\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The full decoder is not uniformly better.  For seed 0 it repairs approximately
+0.339\% of voxels while damaging 0.209\%; for seed 1 the corresponding values
+are 0.290\% and 0.225\%.  Thus the net label-transition benefit is only
+0.065--0.130\% of voxels.  Although this label-level statistic is not identical
+to Dice, it shows why positive and negative transitions must be reported
+together.
+
+\subsection{Utility Is Predictable, but Current O9 Is an Upper Bound}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.96\columnwidth]{figures/O5_decoder_gain.png}\\[-1mm]
+\textbf{(a) Net gain vs.\ entropy.}\\[1mm]
+\includegraphics[width=0.96\columnwidth]{figures/O9_opportunity_legacy.png}\\[-1mm]
+\textbf{(b) Legacy positive-only oracle.}
+\caption{Preliminary predictability results for seed 1.  Panel (b) ranks
+individual voxels and counts only positive transitions; it is shown to motivate,
+not replace, the corrected contiguous-region analysis.}
+\label{fig:opportunity}
+\end{figure}
+
+The subject-level entropy--net-utility correlation is positive for both
+efficient seeds (Table~\ref{tab:utility}), and its subject-bootstrap lower bound
+remains above zero.  The legacy voxel analysis finds that the top 20\%
+entropy-ranked foreground-union voxels contain about 86.4\% of positive
+transitions in both runs.  However, isolated voxels cannot be processed
+efficiently by standard 3D convolutions, and positive-only recovery ignores
+negative transitions.  We therefore treat this result strictly as an oracle
+upper bound.
+
+\todo{Replace Fig.~\ref{fig:opportunity}(b) and the final paragraph with
+\texttt{O9\_corrected}: block-level positive, negative, and net utility; actual
+halo-expanded volume; matched-random mean; and paired 95\% CI for both seeds.}
+
+\subsection{Routing Signals}
+
+On seed 1, confidence and entropy have similar correlations with net utility
+(0.663 and 0.655, respectively).  Monte-Carlo dropout is not a valid comparator
+for this checkpoint because the evaluated architecture has no active dropout;
+its measured stochastic variance is effectively zero.  We therefore retain
+confidence as a required cheap baseline and do not claim entropy is uniquely
+optimal.

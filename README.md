@@ -44,8 +44,8 @@ unzip synapse-dataset.zip -d /root/autodl-tmp/btcv-raw
 # Run E0 + E1 baseline calibration
 cd EffiDec3D && bash run_E0_E1.sh
 
-# Run observations (after E0/E1 checkpoints available)
-cd /root && python Observation_Study.py
+# Run observations after E0/E1 checkpoints are available:
+# follow the executable notebook-style cells in Observation_Study.md
 ```
 
 ## Go/No-Go gate

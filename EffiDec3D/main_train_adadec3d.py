@@ -91,6 +91,8 @@ parser.add_argument("--effidec3d_weights", type=str, default="",
                     help="Path to trained UXNET_EffiDec3D checkpoint (required for stage 1)")
 parser.add_argument("--stage1_ckpt", type=str, default="",
                     help="Path to Stage 1 best checkpoint (required for stage 2)")
+parser.add_argument("--eval_ckpt", type=str, default="",
+                    help="AdaDec3D checkpoint to evaluate when --mode validation")
 parser.add_argument("--max_iter",  type=int,   default=20000)
 parser.add_argument("--eval_step", type=int,   default=500)
 parser.add_argument("--lr",        type=float, default=5e-4)
@@ -100,7 +102,10 @@ parser.add_argument("--backbone_lr_factor", type=float, default=0.1,
 # Loss weights
 parser.add_argument("--lambda_uncertainty", type=float, default=0.10)
 parser.add_argument("--lambda_resource",    type=float, default=0.05)
-parser.add_argument("--lambda_router",      type=float, default=0.10)
+parser.add_argument("--lambda_budget",      type=float, default=0.10,
+                    help="Weight for exceeding the target expert-cost budget")
+parser.add_argument("--lambda_load_balance", type=float, default=0.10,
+                    help="Weight for the expert load-balancing auxiliary loss")
 parser.add_argument("--lambda_coarse",      type=float, default=0.50,
                     help="Weight for auxiliary coarse decoder loss")
 parser.add_argument("--target_expert_cost", type=float, default=0.50,
@@ -238,7 +243,8 @@ global_step = 0
 dice_val_best = 0.0
 global_step_best = 0
 
-if os.path.isfile(last_ckpt_path) and os.path.getsize(last_ckpt_path) > 0:
+if (args.mode == "train" and os.path.isfile(last_ckpt_path)
+        and os.path.getsize(last_ckpt_path) > 0):
     try:
         ckpt = torch.load(last_ckpt_path, map_location=device)
         model.load_state_dict(ckpt["model_state_dict"])
@@ -362,8 +368,8 @@ def compute_loss(
              + args.lambda_coarse  * L_coarse
              + lam_unc             * L_unc
              + args.lambda_resource * L_res
-             + args.lambda_router   * L_router
-             + args.lambda_router   * L_lb)   # reuse lambda_router weight for L_lb
+             + args.lambda_budget   * L_router
+             + args.lambda_load_balance * L_lb)
 
     return total, {
         "L_seg":    L_seg.item(),
@@ -455,21 +461,7 @@ def validation_final(val_loader):
             per_class_hd.append(hd_row)
     per_class_dice = np.array(per_class_dice)   # [N_val, n_classes-1]
     per_class_hd   = np.array(per_class_hd)
-    # Router usage statistics (fraction of cases routed to each expert)
-    expert_counts = np.zeros(args.n_experts)
-    with torch.no_grad():
-        for batch in val_loader:
-            val_inputs = batch["image"].to(device)
-            with torch.autocast("cuda", dtype=_amp_dtype):
-                sliding_window_inference_1out(
-                    val_inputs, tuple(args.img_size), args.val_batch,
-                    model, overlap=args.overlap, mode=args.overlap_mode,
-                )
-            if hasattr(model, "last_expert_ids"):
-                for eid in model.last_expert_ids.cpu().tolist():
-                    expert_counts[int(eid)] += 1
-    expert_frac = expert_counts / expert_counts.sum() if expert_counts.sum() > 0 else expert_counts
-    return per_class_dice, per_class_hd, expert_frac
+    return per_class_dice, per_class_hd
 
 # ---------------------------------------------------------------------------
 # Training loop
@@ -561,22 +553,29 @@ def train_one_epoch(global_step, train_loader, dice_val_best, global_step_best):
 print(f"AdaDec3D stage {args.stage} | dataset={args.dataset} | max_iter={args.max_iter}")
 print(f"Output dir: {root_dir}")
 
-torch.cuda.reset_peak_memory_stats()
-train_start_time = time.time()
+if args.mode == "train":
+    torch.cuda.reset_peak_memory_stats()
+    train_start_time = time.time()
 
-while global_step < args.max_iter:
-    global_step, dice_val_best, global_step_best = train_one_epoch(
-        global_step, train_loader, dice_val_best, global_step_best
-    )
+    while global_step < args.max_iter:
+        global_step, dice_val_best, global_step_best = train_one_epoch(
+            global_step, train_loader, dice_val_best, global_step_best
+        )
 
-train_time_sec = time.time() - train_start_time
-peak_train_mem_mb = torch.cuda.max_memory_allocated() / 1024 ** 2
+    train_time_sec = time.time() - train_start_time
+    peak_train_mem_mb = torch.cuda.max_memory_allocated() / 1024 ** 2
+    eval_ckpt = os.path.join(root_dir, "best_metric_model.pth")
+else:
+    if not args.eval_ckpt:
+        raise ValueError("--eval_ckpt is required when --mode validation")
+    train_time_sec = 0.0
+    peak_train_mem_mb = 0.0
+    eval_ckpt = args.eval_ckpt
 
 # Final evaluation
-print("\nRunning final per-class evaluation on best checkpoint...")
-best_ckpt = os.path.join(root_dir, "best_metric_model.pth")
-ckpt = torch.load(best_ckpt, map_location=device)
-model.load_state_dict(ckpt["model_state_dict"])
+print(f"\nRunning final per-class evaluation: {eval_ckpt}")
+ckpt = torch.load(eval_ckpt, map_location=device)
+model.load_state_dict(ckpt.get("model_state_dict", ckpt))
 model.eval()
 
 # MACs and params
@@ -607,17 +606,19 @@ infer_lat_p95_ms = float(np.percentile(_lat, 95)) * 1000
 peak_infer_mem_mb = torch.cuda.max_memory_allocated() / 1024 ** 2
 del _dummy, _lat
 
-per_class_dice, per_class_hd, expert_frac = validation_final(val_loader)
+per_class_dice, per_class_hd = validation_final(val_loader)
 
 # ---------------------------------------------------------------------------
-# Executed-MACs profiler (#5 fix)
-# ptflops gives a static upper bound (soft routing + dense ROI).
-# This profiler measures ACTUAL executed cost at inference with hard routing.
+# Executed-MACs profiler.
+# Instrument the same sliding-window path used for final inference rather than
+# estimating routing behavior from one center patch.
 # ---------------------------------------------------------------------------
 def profile_executed_cost(model, val_loader):
     """
-    Per-sample executed MACs at inference = base_coarse + selected_expert + roi_crop.
-    Reports overhead above base EffiDec3D for each val case.
+    Measure dynamic decoder overhead on the real sliding-window inference path.
+
+    Base EffiDec3D MACs are not included. ROI processed-volume ratios count
+    overlapping halo crops because those operations are genuinely repeated.
     """
     model.eval()
     half_res = tuple(s // 2 for s in args.img_size)
@@ -645,49 +646,82 @@ def profile_executed_cost(model, val_loader):
         except Exception:
             roi_dense_gmac = float("nan")
 
-    # Use a center crop matching the training patch size so the model sees the right
-    # spatial dimensions (full val volumes would OOM and differ from inference patches).
-    from monai.transforms import CenterSpatialCropd
-    _crop = CenterSpatialCropd(keys=["image"], roi_size=list(args.img_size))
+    class _RoutingRecorder:
+        def __init__(self, wrapped_model):
+            self.model = wrapped_model
+            self.expert_ids = []
+            self.processed_ratios = []
 
-    sample_overhead, crop_fracs, sel_experts = [], [], []
+        def __call__(self, patches):
+            pred, extras = self.model(
+                patches, return_router=True, return_roi=True
+            )
+            ids = extras["expert_ids"].detach().cpu().tolist()
+            ratio = float(extras.get("roi_processed_volume_ratio", 0.0))
+            self.expert_ids.extend(int(i) for i in ids)
+            # ROIRefineBlock reports a batch-average ratio. Repeating it for
+            # each patch preserves the aggregate processed volume.
+            self.processed_ratios.extend([ratio] * len(ids))
+            return pred
+
+    volume_overhead, processed_ratios, sel_experts = [], [], []
     with torch.no_grad():
         for batch in val_loader:
-            batch_cropped = _crop({"image": batch["image"][0]})  # [C,D,H,W]
-            img = batch_cropped["image"].unsqueeze(0).to(device)  # [1,C,D,H,W]
-            _, extras = model(img, return_router=True, return_roi=True)
-            exp_idx = int(extras["expert_ids"].item())
-            crop_f  = float(extras.get("roi_crop_fraction", 0.0))
-            exp_mac = expert_gmacs[exp_idx] if not np.isnan(expert_gmacs[exp_idx]) else 0.0
-            roi_mac = roi_dense_gmac * crop_f if not np.isnan(roi_dense_gmac) else 0.0
-            sel_experts.append(exp_idx)
-            crop_fracs.append(crop_f)
-            sample_overhead.append(exp_mac + roi_mac)
+            img = batch["image"].to(device)
+            recorder = _RoutingRecorder(model)
+            with torch.autocast("cuda", dtype=_amp_dtype):
+                prediction = sliding_window_inference_1out(
+                    img, tuple(args.img_size), args.val_batch, recorder,
+                    overlap=args.overlap, mode=args.overlap_mode,
+                )
+            del prediction
+
+            sel_experts.extend(recorder.expert_ids)
+            processed_ratios.extend(recorder.processed_ratios)
+            expert_cost = sum(
+                expert_gmacs[i] for i in recorder.expert_ids
+                if not np.isnan(expert_gmacs[i])
+            )
+            roi_cost = 0.0
+            if not np.isnan(roi_dense_gmac):
+                roi_cost = roi_dense_gmac * sum(recorder.processed_ratios)
+            volume_overhead.append(expert_cost + roi_cost)
 
     n = len(expert_gmacs)
     labels = (["S", "M", "L"] * n)[:n]
     expert_sel_frac = [sel_experts.count(i) / max(len(sel_experts), 1) for i in range(n)]
 
-    print("\n=== Executed-MACs Profile (hard routing) ===")
+    print("\n=== Sliding-window Executed-MACs Profile (hard routing) ===")
     for lbl, m, f in zip(labels, expert_gmacs, expert_sel_frac):
-        print(f"  Expert-{lbl}: {m:.3f} GMac  selected {f:.1%} of val cases")
+        print(f"  Expert-{lbl}: {m:.3f} GMac  selected {f:.1%} of inference patches")
     if args.use_roi:
-        print(f"  ROI dense:   {roi_dense_gmac:.3f} GMac  mean crop fraction: {np.mean(crop_fracs):.1%}")
-    print(f"  Overhead vs E1 base: {np.mean(sample_overhead):.3f} ± {np.std(sample_overhead):.3f} GMac")
-    print(f"  (ptflops static upper bound with soft routing: {macs_gmac:.2f} GMac)")
+        print(
+            f"  ROI dense/patch: {roi_dense_gmac:.3f} GMac  "
+            f"mean processed ratio/patch: {np.mean(processed_ratios):.3f}x"
+        )
+    print(
+        f"  Dynamic overhead/volume: {np.mean(volume_overhead):.3f} "
+        f"+/- {np.std(volume_overhead):.3f} GMac"
+    )
+    print(f"  (ptflops patch-level model cost: {macs_gmac:.2f} GMac)")
 
     return {
         "expert_gmacs": [round(m, 3) for m in expert_gmacs],
         "roi_dense_gmac": round(roi_dense_gmac, 3),
         "expert_sel_frac": [round(f, 3) for f in expert_sel_frac],
-        "mean_crop_frac": round(float(np.mean(crop_fracs)), 4),
-        "p95_crop_frac":  round(float(np.percentile(crop_fracs, 95) if crop_fracs else 0), 4),
-        "mean_overhead_gmac": round(float(np.mean(sample_overhead)), 3),
-        "std_overhead_gmac":  round(float(np.std(sample_overhead)), 3),
-        "p95_overhead_gmac":  round(float(np.percentile(sample_overhead, 95) if sample_overhead else 0), 3),
+        "mean_processed_ratio": round(float(np.mean(processed_ratios)), 4),
+        "p95_processed_ratio": round(float(np.percentile(
+            processed_ratios, 95) if processed_ratios else 0), 4),
+        "mean_overhead_gmac": round(float(np.mean(volume_overhead)), 3),
+        "std_overhead_gmac": round(float(np.std(volume_overhead)), 3),
+        "p95_overhead_gmac": round(float(np.percentile(
+            volume_overhead, 95) if volume_overhead else 0), 3),
     }
 
 exec_profile = profile_executed_cost(model, val_loader)
+# Use all sliding-window patches recorded by the profiler, not only the last
+# predictor call left in model.last_expert_ids.
+expert_frac = np.asarray(exec_profile["expert_sel_frac"])
 
 mean_dice_per_class = np.nanmean(per_class_dice, axis=0)  # [n_classes-1]
 mean_hd_per_class   = np.nanmean(per_class_hd, axis=0)
@@ -731,7 +765,7 @@ with open(csv_path, "a", newline="") as f:
         header = ["Trained_Weights", "Dataset", "Stage", "use_moe", "use_roi",
                   "MACs_GMac_static", "Params_M",
                   "Overhead_Mean_GMac", "Overhead_Std_GMac", "Overhead_p95_GMac",
-                  "Mean_CropFrac", "p95_CropFrac",
+                  "Mean_ROI_ProcessedRatio", "p95_ROI_ProcessedRatio",
                   "Train_Time_h", "Peak_Train_Mem_GB",
                   "Infer_Lat_ms", "Infer_Lat_p95_ms", "Peak_Infer_Mem_GB"]
         header += [f"Dice_{n}" for n in CLASS_NAMES] + ["Mean_Dice"]
@@ -743,7 +777,8 @@ with open(csv_path, "a", newline="") as f:
            _fmt(macs_gmac), _fmt(params_m, 3),
            _fmt(exec_profile["mean_overhead_gmac"]), _fmt(exec_profile["std_overhead_gmac"]),
            _fmt(exec_profile["p95_overhead_gmac"]),
-           _fmt(exec_profile["mean_crop_frac"], 4), _fmt(exec_profile["p95_crop_frac"], 4),
+           _fmt(exec_profile["mean_processed_ratio"], 4),
+           _fmt(exec_profile["p95_processed_ratio"], 4),
            _fmt(train_time_sec / 3600), _fmt(peak_train_mem_mb / 1024),
            _fmt(infer_lat_ms, 1), _fmt(infer_lat_p95_ms, 1), _fmt(peak_infer_mem_mb / 1024)]
     row += [_fmt(d, 4) for d in mean_dice_per_class] + [_fmt(mean_dice, 4)]

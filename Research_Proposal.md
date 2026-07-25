@@ -54,7 +54,10 @@ The primary Paper A comparison freezes or shares an encoder and varies decoder c
 
 The routing target is marginal decoder utility, ΔL(v) = L_Effi(v) − L_Full(v), not uncertainty alone. Entropy is adopted only if it predicts held-out net benefit better than matched random, boundary, foreground, organ-size, and confidence baselines. Confidently wrong voxels and completely missed organs are reported explicitly.
 
-The practical method is **region-adaptive**, not independent voxel routing. Selected voxels activate contextual 3D tiles; all efficiency claims use actual executed MACs, crop fractions, end-to-end latency, and memory including routing overhead.
+The practical method is **region-adaptive**, not independent voxel routing.
+Selected voxels activate contextual 3D tiles; all efficiency claims use actual
+executed MACs, processed-volume ratios (including repeated halo computation),
+end-to-end latency, and memory including routing overhead.
 
 ---
 
@@ -267,7 +270,13 @@ Instead of increasing decoder capacity globally, computation is routed by the di
 | M | 64 | Medium complexity structures |
 | L | 96 | Small organs, ambiguous boundaries, high uncertainty |
 
-Each expert is a two-layer residual conv block (conv → IN → ReLU → conv → IN → residual add → ReLU → 1×1 head). The router is a linear layer over global-average-pooled bottleneck features concatenated with mean uncertainty scalar, outputting softmax weights over experts. Soft routing is used during training; hard routing (argmax) at inference avoids redundant forward passes. MoE is one implementation of adaptive computation, not the contribution itself.
+Each expert is a two-layer residual conv block (conv → IN → ReLU → conv → IN
+→ residual add → ReLU → 1×1 head). The router is a linear layer over
+global-average-pooled bottleneck features concatenated with mean uncertainty,
+outputting softmax probabilities over experts. Training uses a straight-through
+top-1 gate: its forward pass selects the same single expert used at inference,
+while its backward pass uses the soft probabilities to train the router. MoE is
+one implementation of adaptive computation, not the contribution itself.
 
 **Stage 3 — Selective ROI Refinement**
 
@@ -281,7 +290,8 @@ A residual refinement block applies only within a difficulty mask (top-10–20% 
 
 **Loss function:**
 ```
-L = L_seg + 0.5·L_coarse + 0.1·L_unc + 0.05·L_res + 0.1·L_router
+L = L_seg + 0.5·L_coarse + 0.1·L_unc + 0.05·L_res
+    + 0.1·L_budget + 0.1·L_load_balance
 ```
 | Term | Default λ | Purpose |
 |------|-----------|---------|
@@ -289,7 +299,8 @@ L = L_seg + 0.5·L_coarse + 0.1·L_unc + 0.05·L_res + 0.1·L_router
 | L_coarse | 0.5 | Auxiliary DiceCE — prevents backbone degradation |
 | L_unc | 0.1 | Calibration: entropy should correlate with errors |
 | L_res | 0.05 | Resource penalty: prefer lighter experts when accuracy allows |
-| L_router | 0.1 | Load balancing: prevent expert collapse |
+| L_budget | 0.1 | Penalize expected expert cost above the declared budget |
+| L_load_balance | 0.1 | Prevent routing collapse to a single expert |
 
 All λ values are ablated; see `Experiment-Design-AdaDec3D.md`.
 
@@ -357,7 +368,16 @@ Paper B Draft → MICCAI 2026 / TMI Submission
 
 Paper A core observations (O1–O5 + O9) passing is the Go/No-Go gate for Paper B development. Stages 3–4 begin in parallel with Paper A writing once these pass — do not wait for formal peer-review acceptance before starting implementation.
 
-**Data provenance note**: experiments use the TransUNet preprocessed Synapse split (available on Kaggle as `shinjinidey/synapse-dataset`), which stores volumes as reconstructed NIfTI files with identity affine (`np.eye(4)`). Real voxel spacing is not preserved. Consequently: (a) HD95 values are reported in voxel-space, not mm; (b) results should be compared against other methods using the same TransUNet preprocessed split, not against methods using the original raw BTCV DICOM pipeline.
+**Data provenance note**: experiments use the TransUNet preprocessed Synapse
+split (available on Kaggle as `shinjinidey/synapse-dataset`), which stores
+volumes as reconstructed NIfTI files with identity affine (`np.eye(4)`). Real
+voxel spacing is not preserved. We deliberately keep the **original EffiDec3D
+preprocessing pipeline unchanged** (`Orientationd` + `Spacingd(1.5,1.5,2.0)`) so
+results align with the reference codebase and the paper's reported numbers; the
+identity affine means the resampling grid is nominal rather than physical, so
+HD95 is reported in voxel-space rather than mm. Results should be compared with
+methods using the same TransUNet split and pipeline, not methods using the
+original raw BTCV DICOM pipeline.
 
 ## 7.2 Stage 1 — Baseline Reproduction
 

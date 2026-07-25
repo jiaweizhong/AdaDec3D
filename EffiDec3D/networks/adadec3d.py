@@ -71,8 +71,10 @@ class ROIRefineBlock(nn.Module):
         """Refine contextual tiles that contain selected voxels.
 
         Unlike dense convolution followed by masking, this executes the expensive
-        convolutions only on selected tiles. ``last_crop_fraction`` exposes the
-        actually processed spatial fraction for efficiency reporting.
+        convolutions only on selected tiles. ``last_processed_volume_ratio``
+        reports processed crop volume divided by feature-map volume. Overlapping
+        halo regions are counted repeatedly because they incur repeated MACs, so
+        this value may legitimately exceed 1.0.
         """
         outputs = []
         processed, total = 0, 0
@@ -108,7 +110,7 @@ class ROIRefineBlock(nn.Module):
                                       (crop_hi[1] - crop_lo[1]) *
                                       (crop_hi[2] - crop_lo[2]))
             outputs.append(out)
-        self.last_crop_fraction = processed / max(total, 1)
+        self.last_processed_volume_ratio = processed / max(total, 1)
         return torch.cat(outputs, dim=0)
 
 
@@ -166,7 +168,7 @@ class AdaDec3D_UXNET(nn.Module):
         # AdaDec3D-specific
         n_experts: int = 3,
         expert_channels: list = [32, 64, 96],
-        roi_fraction: float = 0.5,   # fraction of voxels selected (top-k by uncertainty)
+        roi_fraction: float = 0.1,   # fraction of voxels selected (top-k by uncertainty)
         # Ablation flags (disable individual modules for E2/E3 experiments)
         use_moe: bool = True,   # False → always use middle expert (Expert-M)
         use_roi: bool = True,   # False → skip ROI refinement
@@ -178,6 +180,8 @@ class AdaDec3D_UXNET(nn.Module):
 
         self.n_decoder_channels = n_decoder_channels
         self.n_experts = n_experts
+        if not 0.0 < roi_fraction <= 1.0:
+            raise ValueError(f"roi_fraction must be in (0, 1], got {roi_fraction}")
         self.roi_fraction = roi_fraction
         self.use_moe = use_moe
         self.use_roi = use_roi
@@ -262,14 +266,20 @@ class AdaDec3D_UXNET(nn.Module):
         router_weights = self.router(global_feat, unc_stat)              # [B, n_experts]
 
         if self.training:
-            # Dense soft mixture keeps every expert trainable. Efficiency claims
-            # apply to eval/inference, where only the selected expert executes.
+            # Straight-through top-1 routing: the forward pass matches hard
+            # inference, while gradients to the router use the soft probabilities.
+            # All expert outputs are materialized during training, but only experts
+            # selected by at least one sample receive segmentation gradients.
             expert_outs = torch.stack(
                 [expert(refined_feat) for expert in self.experts], dim=1
             )
-            w = router_weights.view(B, self.n_experts, 1, 1, 1, 1)
-            final_pred = (w * expert_outs).sum(dim=1)
             expert_ids = router_weights.argmax(dim=1)
+            hard_weights = F.one_hot(
+                expert_ids, num_classes=self.n_experts
+            ).to(router_weights.dtype)
+            st_weights = hard_weights + router_weights - router_weights.detach()
+            w = st_weights.view(B, self.n_experts, 1, 1, 1, 1)
+            final_pred = (w * expert_outs).sum(dim=1)
         else:
             expert_ids = router_weights.argmax(dim=1)
             outputs = [None] * B
@@ -329,8 +339,8 @@ class AdaDec3D_UXNET(nn.Module):
                 extras["router_weights"] = router_weights
             if return_roi:
                 extras["roi_mask"] = roi_mask
-                extras["roi_crop_fraction"] = getattr(
-                    self.roi_refiner, "last_crop_fraction", 0.0
+                extras["roi_processed_volume_ratio"] = getattr(
+                    self.roi_refiner, "last_processed_volume_ratio", 0.0
                 ) if self.use_roi else 0.0
             if return_router:
                 extras["expert_ids"] = getattr(

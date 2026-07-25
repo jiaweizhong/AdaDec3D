@@ -642,10 +642,11 @@ post_label = AsDiscrete(to_onehot=out_classes)
 post_pred = AsDiscrete(argmax=True, to_onehot=out_classes)
 dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
 if ckpt is None:
-    # Fresh run — start from step 1 (not 0) so first eval fires at step eval_num
-    global_step = 1
+    # global_step counts completed optimizer updates. The loop increments it
+    # immediately after each update, so a fresh run must start at zero.
+    global_step = 0
     dice_val_best = 0.0
-    global_step_best = 1
+    global_step_best = 0
 # Otherwise global_step / dice_val_best / global_step_best were restored from ckpt above
 epoch_loss_values = []
 metric_values = []

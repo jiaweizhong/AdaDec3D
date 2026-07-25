@@ -11,7 +11,8 @@ git pull
 cd EffiDec3D
 
 # Hyperparameters aligned with EffiDec3D paper (README)
-COMMON="--root $ROOT --dataset BTCV13 --cache_rate 1.0 --num_workers 8 --gpu 0 \
+COMMON="--root $ROOT --dataset BTCV13 --skip_spatial_resampling \
+        --cache_rate 1.0 --num_workers 8 --gpu 0 \
         --lr 0.001 --overlap 0.7 --crop_sample 4"
 TRAIN_ARGS="--max_iter 45000 --eval_step 250"
 

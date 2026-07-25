@@ -278,14 +278,10 @@ tmux new -s e1_train
 
 ### Milestone checkpoints (required for O6)
 
-Add to the training loop after each epoch evaluation:
-
-```python
-MILESTONES = [5, 10, 20, 30, 50]   # epochs
-if epoch in MILESTONES:
-    torch.save({"model_state_dict": model.state_dict()},
-               f"{output_dir}/epoch_{epoch:03d}.pth")
-```
+`main_train_BTCV_TU.py` automatically saves iteration checkpoints at steps
+5k, 10k, 20k, 30k, and 45k whenever validation runs at those steps. Keep
+`--eval_step 250` (or another divisor of all milestone steps). Files are named
+`milestone_05000.pth`, ..., `milestone_45000.pth`.
 
 ### E1 on FeTA (required for O7)
 
@@ -726,12 +722,12 @@ matched random at 10–30% budgets with a subject-level 95% CI (see O9).
 *Requires milestone checkpoints saved in Part 2.*
 
 ```python
-MILESTONES = [5, 10, 20, 30, 50]
+MILESTONES = [5000, 10000, 20000, 30000, 45000]
 
-epoch_ent = {}
-for epoch in MILESTONES:
+step_ent = {}
+for train_step in MILESTONES:
     m = load_model("3DUXNET_EffiDec3D",
-                   f"/root/output/E1/.../epoch_{epoch:03d}.pth")
+                   f"/root/output/E1/.../milestone_{train_step:05d}.pth")
     mean_ents = []
     with torch.no_grad():
         for batch in val_loader:
@@ -740,23 +736,25 @@ for epoch in MILESTONES:
             prob = logits.softmax(1).cpu()
             ent = -(prob * torch.log(prob + 1e-8)).sum(1)
             mean_ents.append(ent.mean().item())
-    epoch_ent[epoch] = float(np.mean(mean_ents))
-    print(f"Epoch {epoch:3d}  mean_entropy={epoch_ent[epoch]:.4f}")
+    step_ent[train_step] = float(np.mean(mean_ents))
+    print(f"Step {train_step:5d}  mean_entropy={step_ent[train_step]:.4f}")
 
-# Figure: entropy vs training epoch
+# Figure: entropy vs training iteration
 plt.figure(figsize=(7, 4))
-plt.plot(list(epoch_ent.keys()), list(epoch_ent.values()), "o-")
-plt.xlabel("Epoch"); plt.ylabel("Mean entropy")
+plt.plot(list(step_ent.keys()), list(step_ent.values()), "o-")
+plt.xlabel("Training iteration"); plt.ylabel("Mean entropy")
 plt.title("O6: Entropy Evolution During Training")
 plt.tight_layout()
 plt.savefig("/root/obs/O6_entropy_evolution.png", dpi=150)
 plt.show()
 
-save_obs("O6", {"epoch_mean_entropy": epoch_ent})
+save_obs("O6", {"step_mean_entropy": step_ent})
 ```
 
-**Figure**: mean entropy vs epoch (line) + spatial entropy maps at epochs 5, 20, 50.
-**Expected**: entropy decreases but stabilizes; residual high-entropy voxels concentrate at boundaries/small organs by epoch 30.
+**Figure**: mean entropy vs training iteration (line) + spatial entropy maps at
+steps 5k, 20k, and 45k.
+**Expected**: entropy decreases but stabilizes; residual high-entropy voxels
+concentrate at boundaries and small organs late in training.
 
 ---
 

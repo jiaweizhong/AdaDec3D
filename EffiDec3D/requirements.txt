@@ -1,6 +1,7 @@
 # Core DL — PyTorch is pre-installed in the AutoDL image (2.6+/2.8+, CUDA 12.8)
 # Install remaining packages:
-monai>=1.4
+# The training code passes SwinUNETR(img_size=...), removed in MONAI 1.5.
+monai>=1.4,<1.5
 timm
 batchgenerators
 medpy

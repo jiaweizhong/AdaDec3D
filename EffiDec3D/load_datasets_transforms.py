@@ -1357,4 +1357,3 @@ def infer_post_transforms_brats(args, test_transforms, out_classes):
     return post_transforms
 
 
-

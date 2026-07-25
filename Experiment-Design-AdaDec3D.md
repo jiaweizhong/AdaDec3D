@@ -149,9 +149,11 @@ python main_train_adadec3d.py \
 | `L_coarse` | 0.5 | Auxiliary DiceCE on coarse decoder — prevents backbone degradation |
 | `L_uncertainty` | 0.1 | Calibration: high-entropy voxels correlate with actual errors |
 | `L_resource` | 0.05 | Pushes router toward lighter experts when accuracy allows |
-| `L_router` | 0.1 | Expected-cost constraint: penalizes exceeding declared expert budget |
+| `L_budget` | 0.1 | Expected-cost constraint: penalizes exceeding declared expert budget |
+| `L_load_balance` | 0.1 | Prevents all patches collapsing to one expert |
 
-All adjustable via `--lambda_uncertainty`, `--lambda_resource`, `--lambda_router`, `--lambda_coarse`.
+All adjustable via `--lambda_uncertainty`, `--lambda_resource`,
+`--lambda_budget`, `--lambda_load_balance`, and `--lambda_coarse`.
 
 ### Monitor in TensorBoard
 
@@ -162,7 +164,7 @@ All adjustable via `--lambda_uncertainty`, `--lambda_resource`, `--lambda_router
 
 | Signal | Healthy | Action if unhealthy |
 |---|---|---|
-| `Loss/router` | Decreasing, stabilises | Expected cost misses budget → tune `--lambda_router` |
+| `Loss/router` | Decreasing, stabilises | Expected cost misses budget → tune `--lambda_budget` |
 | `Loss/unc` | Decreasing | Uncertainty not calibrating → check loss formulation |
 | `Loss/seg` stalls + low `Loss/resource` | — | Reduce `--lambda_resource` |
 
@@ -189,7 +191,7 @@ for name, d, h in zip(BTCV_NAMES, per_dice, per_hd95):
 ### 5.2 Efficiency (executed cost — primary)
 
 `ptflops` reports the **dense static graph** (upper bound only). Primary efficiency
-results are: hard-routing latency, selected expert, ROI crop fraction, and
+results are: hard-routing latency, selected expert, ROI processed-volume ratio, and
 executed expert/ROI MACs per subject. Report mean, median, p95 on the same GPU
 after warm-up, including routing, crop extraction, and scatter/fusion overhead.
 Do not label MACs as FLOPs; state the convention explicitly.
@@ -238,7 +240,9 @@ print(f"Expert-L (96ch): {expert_hist[2]/total:.1%}")
 ```
 
 **Target**: Expert-L preferentially activated for hard samples (Pancreas, Adrenal).
-If all samples route to Expert-S → increase `--lambda_router`.
+If routing collapses to one expert, increase `--lambda_load_balance`. If the
+average expert is too expensive, increase `--lambda_budget` or reduce
+`--target_expert_cost`.
 
 #### ROI coverage of small organs
 
@@ -412,8 +416,8 @@ Week 13-14: Paper B writing
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| DICE < EffiDec3D | Expert collapse | Increase `--lambda_router` |
-| All samples → Expert-S | Load imbalance | Increase `--lambda_router` |
+| DICE < EffiDec3D | Budget pressure too strong | Reduce `--lambda_budget` or `--lambda_resource` |
+| All samples → one expert | Load imbalance | Increase `--lambda_load_balance` |
 | ROI coverage < 5% | Fraction too low | Increase `--roi_fraction` |
 | E4 ≤ C0 (continued training) | Gains from steps, not adaptation | Re-examine routing effectiveness |
 | No latency saving | Routing overhead dominates | Profile crop extraction and scatter ops |

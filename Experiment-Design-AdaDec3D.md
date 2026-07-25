@@ -9,12 +9,22 @@
 
 | | Paper A | Paper B — this document |
 |---|---|---|
-| **Output** | Empirical evidence that decoder benefit is spatially heterogeneous | AdaDec3D: adaptive decoder that realizes selective allocation |
-| **Gate** | O1–O5 + O9 pass | Paper A accepted; O7, O8, O11 pass |
+| **Output** | Empirical evidence that decoder capacity is over-provisioned & where it matters is entropy-predictable | AdaDec3D: input-adaptive decoder that spends compute only where entropy says it matters |
+| **Gate** | O2/O3/O5/O9 pass ✅ | Paper A + AdaDec3D beats controls |
 | **Venue** | MIDL / MLMI / ISBI | MICCAI 2026 / TMI |
-| **Key metric** | Opportunity curve (O9) | DICE ≥ EffiDec3D + 0.3% at matched executed MACs |
+| **Key metric** | Opportunity curve (O9) | **DICE ≈ EffiDec3D (iso-accuracy) at LOWER executed MACs** |
 
 E0 and E1 checkpoints from Paper A are reused here as baselines.
+
+> **🎯 Current focus: Paper A.** Paper B design below is captured for later; the
+> v2 redesign (next section) supersedes the v1 architecture in the training
+> commands further down until those are rebuilt.
+>
+> **Thesis correction (2026-07)**: the goal is **not** to beat EffiDec3D's accuracy
+> (it already achieves near-parity, 79.25 vs 79.74; the measured decoder gain is
+> only ~0.13% net voxels). The goal is **iso-accuracy at lower executed compute**
+> via input-adaptive decoding. "DICE ≥ EffiDec3D + 0.3%" everywhere below is a
+> **stale recovery-era target** — read it as "DICE ≈ EffiDec3D (no significant drop)".
 
 ---
 
@@ -22,8 +32,69 @@ E0 and E1 checkpoints from Paper A are reused here as baselines.
 
 | File | Purpose |
 |---|---|
-| [EffiDec3D/networks/adadec3d.py](EffiDec3D/networks/adadec3d.py) | `AdaDec3D_UXNET` model |
+| [EffiDec3D/networks/adadec3d.py](EffiDec3D/networks/adadec3d.py) | `AdaDec3D_UXNET` model (⚠️ v1 — needs v2 redesign below) |
 | [EffiDec3D/main_train_adadec3d.py](EffiDec3D/main_train_adadec3d.py) | Two-stage training script |
+
+---
+
+## Part 1.5: Design v2 — efficiency-first architecture *(supersedes v1)*
+
+### Why v1 is wrong for the efficiency thesis
+
+The current `adadec3d.py` runs the **full** EffiDec3D coarse decoder
+(`decoder5→decoder4→decoder3`, [adadec3d.py:238](EffiDec3D/networks/adadec3d.py#L238))
+and *then adds* ROI refinement + MoE experts on top. Executed cost:
+
+```
+AdaDec3D_v1 = encoder + full decoder (incl. decoder3 15.8 GMac) + ROI + expert  >  EffiDec3D
+```
+
+So v1 is **more** expensive than EffiDec3D — it can only trade extra compute for
+accuracy (the abandoned recovery thesis). The MoE lever (Expert-S/M/L) acts on a
+tiny output head, while the real cost — `decoder3` (37% of MACs) — always runs
+fully. **v1 cannot demonstrate lower MACs.**
+
+### MAC anatomy of EffiDec3D (from `profile_macs.py`)
+
+| Group | GMac | % | AdaDec3D can touch? |
+|---|---|---|---|
+| ENCODER (uxnet_3d + encoder2–5) | 24.74 | 57.8% | ✗ (floor; needs patch-level work — Paper C) |
+| **decoder3** (finest, half-res 48³) | **15.80** | **36.9%** | ✅ **the prize** |
+| decoder4/5 + out | 2.30 | 5.4% | ✅ (small) |
+
+### v2 architecture — make `decoder3` adaptive
+
+Replace the single dense `decoder3` with **cheap dense base + full-capacity path
+gated to the ~20% high-uncertainty ROI** (O9: 20% budget recovers 86% of benefit):
+
+1. `decoder3_base` — thin (e.g. 16–24 ch) `ModifiedUnetrUpBlock`, runs **densely** → cheap `coarse_feat` + `coarse_pred` everywhere.
+2. Entropy of `coarse_pred` → ROI tile mask (top `roi_fraction` uncertainty).
+3. `decoder3_refine` — full (48 ch) capacity, runs **only on selected tiles**, fused back into `coarse_feat`.
+4. MoE (optional, sample-level): pick base width per scan (easy scan → thinner base) → **input-adaptive** total cost.
+
+**Executed cost model** (per volume):
+```
+AdaDec3D_v2 = encoder + (decoder4/5 + base decoder3, dense) + roi_fraction · (full decoder3 refine)
+            ≈ 24.74 + ~2.3 + cheap_base + 0.2 · 15.8
+```
+Target: **41 → ~33 GMac (~20% lower) at iso-accuracy**, with per-scan variance
+(easy scans cheaper). Encoder (57.8%) is the untouched floor — going below it is a
+separate "patch-level whole-model adaptivity" direction (see `patch_difficulty.py`).
+
+### v2 success criteria (replaces the recovery targets below)
+
+- **Accuracy**: mean DICE ≈ E1 (within noise, no significant drop; small-organ DICE not worse).
+- **Efficiency**: executed MACs **< EffiDec3D** (target ~0.8×), measured with hard routing.
+- **Adaptivity (novelty)**: per-scan executed MACs correlate with scan difficulty; Pareto curve (MACs vs DICE) dominates static channel/resolution reductions.
+
+### adadec3d.py changes required
+
+| Module | v1 | v2 |
+|---|---|---|
+| `decoder3` | single full block, dense | `decoder3_base` (thin, dense) + `decoder3_refine` (full, ROI-tiled) |
+| `roi_refiner` | conv head on `coarse_feat` (cheap add-on) | **is** the full-capacity `decoder3_refine`, tile-gated |
+| `experts` (MoE) | output heads S/M/L | base-width selector (sample-level), or drop for v2.0 and add in ablation |
+| loss | `L_seg + L_coarse + L_unc + L_res + L_budget + L_lb` | keep; `L_res`/`L_budget` now push the **base width / roi_fraction** down |
 
 ---
 
@@ -319,11 +390,11 @@ C1 StaticL    —          —        —
 † executed MACs vary per sample; report mean ± std from hard-routing inference
 ```
 
-Key claims:
-- `Pancreas`: target ≥ +1% over EffiDec3D
-- `R.Adrenal`, `L.Adrenal`: target ≥ +1%
-- Mean DICE: ≥ EffiDec3D + 0.3%
-- Executed MACs: ≤ EffiDec3D × 1.3 on average
+Key claims (v2, efficiency — supersedes the recovery targets):
+- Mean DICE ≈ EffiDec3D (within noise; no significant drop)
+- Small-organ DICE (`Pancreas`, `R.Adrenal`, `L.Adrenal`) not worse than EffiDec3D
+- Executed MACs **< EffiDec3D** (target ~0.8×), measured with hard routing
+- Per-scan executed MACs scale with scan difficulty (input-adaptive novelty)
 
 ---
 
@@ -400,18 +471,18 @@ Week 13-14: Paper B writing
 
 ## Part 8: Go / No-Go Criteria
 
-### Go: MICCAI oral
+### Go: MICCAI oral (v2, efficiency)
 
-- Mean DICE ≥ EffiDec3D + 0.5%
-- Pancreas + Adrenal mean DICE ≥ +1.5%
-- Executed MACs ≤ EffiDec3D × 1.3 (measured, not inferred from soft routing)
-- E4 > C0, C1, C2, C3 on at least 2 of 3 matched seeds
+- Mean DICE ≈ EffiDec3D (Δ ≥ −0.3% — no meaningful accuracy drop)
+- Executed MACs ≤ EffiDec3D × 0.8 (measured, hard routing)
+- Pareto: E4 dominates static channel/resolution reductions at matched executed MACs
+- E4 holds E1 accuracy at lower MACs on ≥ 2 of 3 matched seeds
 
 ### Go: MICCAI poster / JBHI
 
-- Mean DICE ≥ EffiDec3D + 0.2%
-- ≥ 2 small organ classes with ≥ +1% DICE
-- ROI coverage > 80% for small organs
+- Mean DICE ≈ EffiDec3D (Δ ≥ −0.5%)
+- Executed MACs meaningfully < EffiDec3D (≤ ~0.9×)
+- ROI coverage > 80% for small organs; per-scan MAC variance demonstrated
 
 ### No-Go: debug first
 

@@ -172,9 +172,11 @@ def O5_decoder_gain(val_loader, effi, full):
             pos = ((pred_full == lbl) & (pred_effi != lbl)).float()
             neg = ((pred_full != lbl) & (pred_effi == lbl)).float()
             net = pos - neg
+            # np.quantile: torch.quantile errors on tensors > 2^24 elements
+            edges = np.quantile(ent.flatten().numpy(), np.linspace(0, 1, 21))
             s_ent, s_net = [], []
             for b in range(20):
-                q_lo = ent.quantile(b / 20).item(); q_hi = ent.quantile((b + 1) / 20).item()
+                q_lo, q_hi = float(edges[b]), float(edges[b + 1])
                 mask = (ent >= q_lo) & (ent < q_hi)
                 if mask.sum() > 100:
                     s_ent.append(ent[mask].mean().item()); s_net.append(net[mask].mean().item())
@@ -183,6 +185,8 @@ def O5_decoder_gain(val_loader, effi, full):
             if len(s_ent) >= 5:
                 subj_r_pearson.append(pearsonr(s_ent, s_net)[0])
                 subj_r_spearman.append(spearmanr(s_ent, s_net)[0])
+    if len(subj_r_pearson) == 0:
+        print("[O5] no subject produced >=5 valid entropy bins; skipping"); return
     r_mean = float(np.mean(subj_r_pearson)); r_std = float(np.std(subj_r_pearson))
     rng = np.random.default_rng(0)
     boot = [np.mean(rng.choice(subj_r_pearson, len(subj_r_pearson), replace=True)) for _ in range(2000)]
@@ -231,6 +235,8 @@ def O9_opportunity(val_loader, effi, full):
             rnd_rec.append(np.mean([[pb[rng.choice(len(pb), max(1, int(len(pb) * q / 100)), replace=False)].sum() / total
                                      for q in budgets] for _ in range(100)], axis=0))
     ent_arr = np.asarray(ent_rec); rnd_arr = np.asarray(rnd_rec)
+    if ent_arr.size == 0:
+        print("[O9] no positive decoder transitions found; skipping"); return
     diffs = np.array([(ent_arr[rng.integers(len(ent_arr), size=len(ent_arr))]
                        - rnd_arr[rng.integers(len(rnd_arr), size=len(rnd_arr))]).mean(0) for _ in range(2000)])
     lo, hi = np.percentile(diffs, [2.5, 97.5], axis=0)

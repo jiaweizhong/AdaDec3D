@@ -1,15 +1,27 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Paper A observation gate: O2, O3, O4, O5, O9 on the existing E0/E1 checkpoints.
+Paper A observation gate: O1-O11, generalized across backbones and datasets.
 
-Runnable version of the code blocks in Observation_Study.md (command-line, no
-notebook). Resolves E0/E1 best_metric_model.pth via glob, runs the decisive
-decoder-gain analyses, saves figures to /root/obs and metrics to
-/root/obs/results.json. O5 is the critical Go/No-Go gate; O9 is the headline.
+Two modes, keyed by --network:
+  * MATCHED backbones (3DUXNET, SwinUNETR, SwinUNETRv2, MedNeXt) have an EffiDec3D
+    counterpart -> full-vs-efficient transition analysis; runs all O1-O11.
+  * CONTROL backbones (UNETR, nnUNet) are full-only ecological baselines -> runs
+    the single-model observations O1/O2/O3/O4/O6/O10 (error/entropy concentration),
+    skipping the transition-pair analyses O5/O9/O11.
+
+Class count and per-organ names are derived from the dataset (BTCV13, feta, or any
+dataset in load_datasets_transforms), so the same analysis runs on BTCV/FeTA/MSD.
+Checkpoints are resolved by network subfolder; results/figures go to --obs_dir.
 
 Usage (from /root/AdaDec3D/EffiDec3D):
+  # matched, BTCV, 3D UX-Net (default)
   python run_observations.py --root /root/autodl-tmp/btcv-synapse --output /root/output
+  # matched, FeTA, Swin UNETR
+  python run_observations.py --root /root/autodl-tmp/feta-processed --dataset feta \
+      --network SwinUNETR --obs_dir /root/obs/swin_feta
+  # ecological control (full only)
+  python run_observations.py --network UNETR --dataset BTCV13 --obs_dir /root/obs/unetr_btcv
 """
 import argparse
 import glob
@@ -30,12 +42,29 @@ from monai.utils import set_determinism
 
 from load_datasets_transforms import data_loader, data_transforms
 from monai_utils.inferers.utils import sliding_window_inference_1out
-from networks.UXNet_3D.network_backbone import UXNET, UXNET_EffiDec3D
 
-# Standard BTCV/Synapse 13-organ order (class 1..13), matches CSV columns
-BTCV_NAMES = ["Spleen", "R.Kidney", "L.Kidney", "Gallbladder", "Esophagus",
-              "Liver", "Stomach", "Aorta", "IVC", "Veins",
-              "Pancreas", "R.Adrenal", "L.Adrenal"]
+# --- Class-name maps (foreground classes 1..N; length must equal out_classes-1) --
+BTCV13_NAMES = ["Spleen", "R.Kidney", "L.Kidney", "Gallbladder", "Esophagus",
+                "Liver", "Stomach", "Aorta", "IVC", "Veins",
+                "Pancreas", "R.Adrenal", "L.Adrenal"]
+FETA_NAMES = ["ECF", "GM", "WM", "Ventricles", "Cerebellum", "DeepGM", "Brainstem"]
+DATASET_NAMES = {"BTCV13": BTCV13_NAMES, "feta": FETA_NAMES}
+
+# Module global; main() sets it from the dataset. O1/O4/O10 reference CLASS_NAMES,
+# so per-organ observations stay generic across datasets (else class_1..N).
+CLASS_NAMES = list(BTCV13_NAMES)
+
+# Backbones with an EffiDec3D counterpart (matched full-vs-efficient comparison)
+# vs full-only ecological controls (single-model observations only, no O5/O9/O11).
+MATCHED_BACKBONES = {"3DUXNET", "SwinUNETR", "SwinUNETRv2", "MedNeXt"}
+CONTROL_BACKBONES = {"UNETR", "nnUNet"}
+# main_train_BTCV_TU.py --network string per role (== output subfolder name).
+EFFI_NETWORK = {"3DUXNET": "3DUXNET_EffiDec3D", "SwinUNETR": "SwinUNETR_EffiDec3D",
+                "SwinUNETRv2": "SwinUNETRv2_EffiDec3D", "MedNeXt": "MedNeXt_M_EffiDec3D"}
+FULL_NETWORK = {"3DUXNET": "3DUXNET", "SwinUNETR": "SwinUNETR",
+                "SwinUNETRv2": "SwinUNETRv2", "MedNeXt": "MedNeXt_M",
+                "UNETR": "UNETR", "nnUNet": "nnUNet"}
+DEFAULT_FEATURE_SIZE = {"SwinUNETR": 48, "SwinUNETRv2": 48, "UNETR": 16, "MedNeXt": 48}
 
 ROI = (96, 96, 96)
 SW_BATCH = 4
@@ -57,15 +86,65 @@ def save_obs(tag, metrics):
     print(f"[{tag}] saved -> {RESULTS_FILE}")
 
 
-def build_model(kind, device):
-    if kind == "effi":
-        return UXNET_EffiDec3D(
-            in_chans=1, out_chans=14, depths=[2, 2, 2, 2],
-            feat_size=[48, 96, 192, 384], n_decoder_channels=48,
-            drop_path_rate=0, layer_scale_init_value=1e-6, spatial_dims=3,
-            skip_aggregation="addition", resolution_factor=2).to(device)
-    return UXNET(in_chans=1, out_chans=14, depths=[2, 2, 2, 2],
-                 feat_size=[48, 96, 192, 384]).to(device)
+def build_model(network, role, out_classes, device, img_size=(96, 96, 96),
+                feature_size=48):
+    """Build Full ('full') or EffiDec3D ('effi') model for `network`.
+
+    Mirrors main_train_BTCV_TU.py instantiation. MedNeXt uses kernel size 3 to
+    match the paper's ``MedNeXt-M-K3`` comparison. Only MATCHED_BACKBONES have an
+    'effi' role.
+    """
+    ic = 1
+    if network == "3DUXNET":
+        from networks.UXNet_3D.network_backbone import UXNET, UXNET_EffiDec3D
+        if role == "effi":
+            m = UXNET_EffiDec3D(in_chans=ic, out_chans=out_classes, depths=[2, 2, 2, 2],
+                feat_size=[48, 96, 192, 384], n_decoder_channels=48, drop_path_rate=0,
+                layer_scale_init_value=1e-6, spatial_dims=3,
+                skip_aggregation="addition", resolution_factor=2)
+        else:
+            m = UXNET(in_chans=ic, out_chans=out_classes, depths=[2, 2, 2, 2],
+                feat_size=[48, 96, 192, 384], drop_path_rate=0,
+                layer_scale_init_value=1e-6, spatial_dims=3)
+    elif network in ("SwinUNETR", "SwinUNETRv2"):
+        use_v2 = network == "SwinUNETRv2"
+        if role == "effi":
+            from networks.swin_unetr_effidec3d import SwinUNETR_EffiDec3D
+            m = SwinUNETR_EffiDec3D(img_size=img_size, in_channels=ic,
+                out_channels=out_classes, feature_size=feature_size,
+                n_decoder_channels=48, resolution_factor=2, use_checkpoint=False,
+                skip_aggregation="addition", use_v2=use_v2)
+        elif use_v2:
+            from networks.swin_unetr_effidec3d import SwinUNETR as SwinFull
+            m = SwinFull(img_size=img_size, in_channels=ic, out_channels=out_classes,
+                feature_size=feature_size, use_checkpoint=False, use_v2=True)
+        else:
+            from monai.networks.nets import SwinUNETR
+            m = SwinUNETR(img_size=img_size, in_channels=ic, out_channels=out_classes,
+                feature_size=feature_size, use_checkpoint=False)
+    elif network == "MedNeXt":
+        if role == "effi":
+            from networks.MedNeXt.mednextv1.create_mednextv1_effidec3d import create_mednextv1_effidec3d
+            m = create_mednextv1_effidec3d(ic, out_classes, 'M', n_channels=feature_size,
+                kernel_size=3, deep_supervision=False)
+        else:
+            from networks.MedNeXt.mednextv1.create_mednext_v1 import create_mednext_v1
+            m = create_mednext_v1(ic, out_classes, 'M', kernel_size=3,
+                n_channels=feature_size, deep_supervision=False)
+    elif network == "UNETR":                       # ecological control (full only)
+        from monai.networks.nets import UNETR
+        m = UNETR(in_channels=ic, out_channels=out_classes, img_size=img_size,
+            feature_size=feature_size, hidden_size=768, mlp_dim=3072, num_heads=12,
+            pos_embed="perceptron", norm_name="instance", res_block=True, dropout_rate=0.0)
+    elif network == "nnUNet":                       # ecological control (full only)
+        import torch.nn as nn
+        from networks.nnunet.network_architecture.generic_UNet import Generic_UNet
+        m = Generic_UNet(input_channels=ic, base_num_features=48, num_classes=out_classes,
+            num_pool=4, num_conv_per_stage=2, conv_op=nn.Conv3d, norm_op=nn.BatchNorm3d,
+            dropout_op=nn.Dropout3d, max_num_features=512, deep_supervision=False)
+    else:
+        raise NotImplementedError(f"network '{network}' is not wired in build_model")
+    return m.to(device)
 
 
 def load_ckpt(model, path, device):
@@ -84,7 +163,7 @@ def infer(model, img):
 def O1_error_distribution(val_loader, effi):
     from scipy.ndimage import binary_erosion
     boundary_err, interior_err = [], []
-    organ_err = {n: [] for n in BTCV_NAMES}
+    organ_err = {n: [] for n in CLASS_NAMES}
     with torch.no_grad():
         for batch in val_loader:
             img = batch["image"].cuda()
@@ -92,7 +171,7 @@ def O1_error_distribution(val_loader, effi):
             pred = infer(effi, img).argmax(1).cpu()
             error = (pred != lbl).float().squeeze()
             lbl_sq = lbl.squeeze()
-            for c, name in enumerate(BTCV_NAMES, start=1):
+            for c, name in enumerate(CLASS_NAMES, start=1):
                 mask = (lbl_sq == c)
                 if mask.sum() > 0:
                     organ_err[name].append(error[mask].mean().item())
@@ -167,8 +246,8 @@ def O3_unc_error_corr(val_loader, effi):
 
 
 def O4_per_organ(val_loader, effi, post_pred, post_lbl):
-    organ_dice = {n: [] for n in BTCV_NAMES}
-    organ_ent = {n: [] for n in BTCV_NAMES}
+    organ_dice = {n: [] for n in CLASS_NAMES}
+    organ_ent = {n: [] for n in CLASS_NAMES}
     dm = DiceMetric(include_background=False, reduction="none")
     with torch.no_grad():
         for batch in val_loader:
@@ -179,16 +258,16 @@ def O4_per_organ(val_loader, effi, post_pred, post_lbl):
             ent = -(prob * torch.log(prob + 1e-8)).sum(1).squeeze()
             dvals = dm(post_pred(logits.squeeze(0)).unsqueeze(0),
                        post_lbl(lbl.squeeze(0)).unsqueeze(0))[0]
-            for c, name in enumerate(BTCV_NAMES):
+            for c, name in enumerate(CLASS_NAMES):
                 organ_dice[name].append(dvals[c].item())
                 mask = (lbl.squeeze() == c + 1)
                 if mask.sum() > 0:
                     organ_ent[name].append(ent[mask].mean().item())
-    dice_summary = {n: float(np.nanmean(organ_dice[n])) for n in BTCV_NAMES}
+    dice_summary = {n: float(np.nanmean(organ_dice[n])) for n in CLASS_NAMES}
     ent_summary = {n: (float(np.nanmean(organ_ent[n])) if organ_ent[n] else float("nan"))
-                   for n in BTCV_NAMES}
+                   for n in CLASS_NAMES}
     print("[O4] per-organ dice/entropy:")
-    for n in BTCV_NAMES:
+    for n in CLASS_NAMES:
         print(f"      {n:12s} dice={dice_summary[n]:.3f}  ent={ent_summary[n]:.4f}")
     save_obs("O4", {"dice": {k: round(v, 4) for k, v in dice_summary.items()},
                     "entropy": {k: round(v, 4) for k, v in ent_summary.items()}})
@@ -523,15 +602,16 @@ def O9_opportunity(val_loader, effi, full, block_size=16, halo=4, primary_budget
     })
 
 
-def O6_difficulty_evolution(val_loader, output, dataset, device):
+def O6_difficulty_evolution(val_loader, output, dataset, device, network, role, out_classes):
     steps = [5000, 10000, 20000, 30000, 45000]
+    folder = EFFI_NETWORK[network] if role == "effi" else FULL_NETWORK[network]
     step_ent = {}
     for s in steps:
-        paths = sorted(glob.glob(f"{output}/E1*/3DUXNET_EffiDec3D/{dataset}/milestone_{s:05d}.pth"))
+        paths = sorted(glob.glob(f"{output}/*/{folder}/{dataset}/milestone_{s:05d}.pth"))
         if not paths:
             print(f"[O6] milestone {s:05d} not found; skipping")
             continue
-        m = load_ckpt(build_model("effi", device), paths[-1], device)
+        m = load_ckpt(build_model(network, role, out_classes, device), paths[-1], device)
         ents = []
         with torch.no_grad():
             for batch in val_loader:
@@ -552,15 +632,15 @@ def O6_difficulty_evolution(val_loader, output, dataset, device):
 
 def O10_organ_size(val_loader, dice_summary, organ_ent):
     from scipy.stats import spearmanr
-    sizes_all = {n: [] for n in BTCV_NAMES}
+    sizes_all = {n: [] for n in CLASS_NAMES}
     for batch in val_loader:
         lbl = batch["label"].cpu().squeeze()
-        for c, name in enumerate(BTCV_NAMES):
+        for c, name in enumerate(CLASS_NAMES):
             mask = (lbl == c + 1)
             if mask.sum() > 0:
                 sizes_all[name].append(float(mask.float().sum()))
     sizes, diffs, names = [], [], []
-    for name in BTCV_NAMES:
+    for name in CLASS_NAMES:
         if sizes_all[name] and organ_ent.get(name):
             sizes.append(float(np.mean(sizes_all[name])))
             diffs.append(float(np.nanmean(organ_ent[name])))
@@ -636,19 +716,24 @@ def O11_routing_signals(val_loader, effi, full, bin_ent, bin_net):
 
 
 def main():
-    global OBS_DIR, RESULTS_FILE
+    global OBS_DIR, RESULTS_FILE, CLASS_NAMES
     p = argparse.ArgumentParser()
     p.add_argument("--root", default="/root/autodl-tmp/btcv-synapse")
     p.add_argument("--output", default="/root/output")
     p.add_argument("--dataset", default="BTCV13")
+    p.add_argument("--network", default="3DUXNET",
+                   choices=sorted(MATCHED_BACKBONES | CONTROL_BACKBONES),
+                   help="Backbone. MATCHED_BACKBONES run full-vs-EffiDec3D (all O1-O11); "
+                        "CONTROL_BACKBONES (UNETR, nnUNet) are full-only ecological "
+                        "baselines (single-model O1/O2/O3/O4/O6/O10 only).")
+    p.add_argument("--feature_size", type=int, default=None,
+                   help="Backbone feature size (default: 48 Swin/MedNeXt, 16 UNETR)")
     p.add_argument("--obs_dir", default="/root/obs",
                    help="Directory for figures and results.json")
-    p.add_argument("--e0_ckpt", default=None,
-                   help="Explicit E0 checkpoint; recommended for reproducible comparisons")
-    p.add_argument("--e1_ckpt", default=None,
-                   help="Explicit E1 checkpoint; recommended for seed-specific comparisons")
+    p.add_argument("--e0_ckpt", default=None, help="Explicit full-model checkpoint")
+    p.add_argument("--e1_ckpt", default=None, help="Explicit EffiDec3D checkpoint")
     p.add_argument("--only_o9", action="store_true",
-                   help="Run only the corrected O9 analysis")
+                   help="Run only the corrected O9 analysis (matched backbones only)")
     p.add_argument("--o9_block_size", type=int, default=16,
                    help="O9 contiguous selector core block edge length in voxels")
     p.add_argument("--o9_halo", type=int, default=4,
@@ -663,54 +748,78 @@ def main():
     os.makedirs(OBS_DIR, exist_ok=True)
     device = torch.device("cuda:0")
 
-    e0 = ([args_ns.e0_ckpt] if args_ns.e0_ckpt else
-          sorted(glob.glob(f"{args_ns.output}/E0*/3DUXNET/{args_ns.dataset}/best_metric_model.pth")))
-    e1 = ([args_ns.e1_ckpt] if args_ns.e1_ckpt else
-          sorted(glob.glob(f"{args_ns.output}/E1*/3DUXNET_EffiDec3D/{args_ns.dataset}/best_metric_model.pth")))
-    assert e0, f"No E0 checkpoint under {args_ns.output}/E0*/3DUXNET/{args_ns.dataset}/"
-    assert e1, f"No E1 checkpoint under {args_ns.output}/E1*/3DUXNET_EffiDec3D/{args_ns.dataset}/"
-    print(f"E0: {e0[-1]}\nE1: {e1[-1]}")
-    full = load_ckpt(build_model("full", device), e0[-1], device)
-    effi = load_ckpt(build_model("effi", device), e1[-1], device)
+    network = args_ns.network
+    matched = network in MATCHED_BACKBONES
+    fsize = args_ns.feature_size or DEFAULT_FEATURE_SIZE.get(network, 48)
+    full_folder = FULL_NETWORK[network]
 
+    # Data + class count/names derived from the dataset (generalizes beyond BTCV13).
     ld_args = argparse.Namespace(root=args_ns.root, dataset=args_ns.dataset,
                                  mode="validation", crop_sample=4, img_size=[96, 96, 96])
-    _, val_samples, _ = data_loader(ld_args)
+    _, val_samples, out_classes = data_loader(ld_args)
     _, val_transform = data_transforms(ld_args)
+    CLASS_NAMES = list(DATASET_NAMES.get(args_ns.dataset,
+                       [f"class_{i}" for i in range(1, out_classes)]))
     val_files = [{"image": im, "label": lb}
                  for im, lb in zip(val_samples["images"], val_samples["labels"])]
     val_loader = DataLoader(Dataset(data=val_files, transform=val_transform),
                             batch_size=1, shuffle=False, num_workers=2)
-    post_pred = AsDiscrete(argmax=True, to_onehot=14)
-    post_lbl = AsDiscrete(to_onehot=14)
-    print(f"Val cases: {len(val_files)}\n")
+    post_pred = AsDiscrete(argmax=True, to_onehot=out_classes)
+    post_lbl = AsDiscrete(to_onehot=out_classes)
+    print(f"Network: {network} ({'matched' if matched else 'control'})  "
+          f"dataset: {args_ns.dataset}  classes: {out_classes}  val cases: {len(val_files)}\n")
+
+    # Full model (always present).
+    e0 = ([args_ns.e0_ckpt] if args_ns.e0_ckpt else
+          sorted(glob.glob(f"{args_ns.output}/*/{full_folder}/{args_ns.dataset}/best_metric_model.pth")))
+    assert e0, f"No full checkpoint under {args_ns.output}/*/{full_folder}/{args_ns.dataset}/"
+    full = load_ckpt(build_model(network, "full", out_classes, device, feature_size=fsize),
+                     e0[-1], device)
+    print(f"Full: {e0[-1]}")
+
+    # EffiDec3D counterpart (matched backbones only).
+    effi, e1 = None, None
+    if matched:
+        e1 = ([args_ns.e1_ckpt] if args_ns.e1_ckpt else
+              sorted(glob.glob(f"{args_ns.output}/*/{EFFI_NETWORK[network]}/{args_ns.dataset}/best_metric_model.pth")))
+        if e1:
+            effi = load_ckpt(build_model(network, "effi", out_classes, device, feature_size=fsize),
+                             e1[-1], device)
+            print(f"Effi: {e1[-1]}")
+        else:
+            print(f"[warn] no EffiDec3D checkpoint for {network}; falling back to single-model mode")
+    analyzed = effi if effi is not None else full   # model whose error/entropy we characterize
+    role = "effi" if effi is not None else "full"
 
     if args_ns.only_o9:
-        O9_opportunity(
-            val_loader, effi, full,
-            block_size=args_ns.o9_block_size,
-            halo=args_ns.o9_halo,
-            primary_budget=args_ns.o9_primary_budget,
-            provenance={"dataset": args_ns.dataset, "e0_checkpoint": e0[-1],
-                        "e1_checkpoint": e1[-1]},
-        )
+        if effi is None:
+            print("[O9] needs a matched full+EffiDec3D pair; nothing to do"); return
+        O9_opportunity(val_loader, effi, full, block_size=args_ns.o9_block_size,
+                       halo=args_ns.o9_halo, primary_budget=args_ns.o9_primary_budget,
+                       provenance={"network": network, "dataset": args_ns.dataset,
+                                   "full_checkpoint": e0[-1], "effi_checkpoint": e1[-1]})
         print(f"\nDone. Corrected O9 figure + results.json in {OBS_DIR}")
         return
 
-    O1_error_distribution(val_loader, effi)
-    O2_entropy_distribution(val_loader, effi)
-    O3_unc_error_corr(val_loader, effi)
-    dice_summary, organ_ent = O4_per_organ(val_loader, effi, post_pred, post_lbl)
-    bin_ent, bin_net = O5_decoder_gain(val_loader, effi, full)
-    O9_opportunity(val_loader, effi, full,
-                   block_size=args_ns.o9_block_size,
-                   halo=args_ns.o9_halo,
-                   primary_budget=args_ns.o9_primary_budget,
-                   provenance={"dataset": args_ns.dataset, "e0_checkpoint": e0[-1],
-                               "e1_checkpoint": e1[-1]})
-    O6_difficulty_evolution(val_loader, args_ns.output, args_ns.dataset, device)
+    # Single-model observations (run for both matched and control).
+    O1_error_distribution(val_loader, analyzed)
+    O2_entropy_distribution(val_loader, analyzed)
+    O3_unc_error_corr(val_loader, analyzed)
+    dice_summary, organ_ent = O4_per_organ(val_loader, analyzed, post_pred, post_lbl)
+    O6_difficulty_evolution(val_loader, args_ns.output, args_ns.dataset, device,
+                            network, role, out_classes)
     O10_organ_size(val_loader, dice_summary, organ_ent)
-    O11_routing_signals(val_loader, effi, full, bin_ent, bin_net)
+
+    # Matched-only observations (need the full-vs-EffiDec3D transition pair).
+    if effi is not None:
+        bin_ent, bin_net = O5_decoder_gain(val_loader, effi, full)
+        O9_opportunity(val_loader, effi, full, block_size=args_ns.o9_block_size,
+                       halo=args_ns.o9_halo, primary_budget=args_ns.o9_primary_budget,
+                       provenance={"network": network, "dataset": args_ns.dataset,
+                                   "full_checkpoint": e0[-1], "effi_checkpoint": e1[-1]})
+        O11_routing_signals(val_loader, effi, full, bin_ent, bin_net)
+    else:
+        print("[O5/O9/O11] skipped — ecological control has no EffiDec3D pair")
     print(f"\nDone. Figures + results.json in {OBS_DIR}")
 
 

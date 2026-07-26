@@ -11,11 +11,13 @@ decoding rather than applying a uniformly expensive decoder.
 
 \paragraph{What it does not yet support.}
 The current study does not demonstrate lower \emph{executed} compute for an
-adaptive model.  The legacy top-20\% result is a voxel oracle, not a realizable
-router.  Even a block opportunity curve uses full-model predictions only to
-define retrospective benefit; it does not account for errors introduced by a
-learned refinement module.  Dynamic FLOPs, latency, memory, and final Dice must
-therefore be evaluated in a separate method study.  Our analysis is also
+adaptive model.  Our region-level opportunity curve shows that entropy-selected
+contiguous regions carry disproportionate \emph{net} benefit, but it still uses
+full-model predictions to define that benefit retrospectively and does not account
+for errors introduced by a learned refinement module; the voxel-level $86.4\%$
+recovery figure is an oracle upper bound, not a realizable router.  Dynamic FLOPs,
+latency, memory, and final Dice must therefore be evaluated in a separate method
+study.  Our analysis is also
 \emph{decoder-only} by construction: because EffiDec3D alters the decoder while
 keeping the encoder identical, every transition isolates decoder capacity, but the
 study says nothing about the encoder, which accounts for the larger share of

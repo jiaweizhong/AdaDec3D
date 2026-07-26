@@ -15,13 +15,13 @@ We find that its benefit is small and bidirectional --- a stronger decoder
 improves and degrades predictions in comparable amounts --- yet spatially
 concentrated at organ boundaries and small
 structures, and predictable from the efficient model's own uncertainty.
-Quantitatively, the net benefit is only about $0.1\%$ of voxels, while roughly
-$86\%$ of positive transitions fall in the top $20\%$ ranked by the efficient
-model's entropy.  These findings show that efficient decoders are
+Quantitatively, the net benefit is only about $0.1\%$ of voxels, yet at a
+predeclared budget the efficient model's entropy selects contiguous 3D regions whose
+net benefit is roughly five times that of matched random regions, with a positive
+paired subject-bootstrap lower bound.  These findings show that efficient decoders are
 not adequately characterized by aggregate accuracy and computation.  They
 motivate, and provide an evaluation protocol for, region-adaptive decoder
 allocation rather than uniform compression.
-\todo{Before submission: add cross-backbone/cross-dataset replication and the
-corrected region-level (contiguous-3D) opportunity result; retain ``predictable''
-only if it survives.}
+\todo{Before submission: add cross-backbone/cross-dataset replication; retain
+``predictable'' only if it survives.}
 \end{abstract}

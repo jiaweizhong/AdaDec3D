@@ -56,10 +56,11 @@ treated as independent samples.  More specifically, our contributions are:
     beyond organ size, partial $r=0.81$).  Efficient decoders are thus
     poorly summarized by aggregate Dice and FLOPs.
     \item \textbf{Evidence that this benefit is predictable at test time.}
-    Ranking voxels by the efficient model's entropy places about $86\%$ of
-    positive transitions in the top $20\%$ of voxels, well above random, boundary,
-    and confidence controls --- identifying where a stronger decoder helps without
-    access to ground truth.
+    At a predeclared $20\%$ budget, ranking contiguous 3D regions by the efficient
+    model's entropy captures the full decoder's net benefit at about five times the
+    rate of matched random regions, with a positive paired subject-bootstrap lower
+    bound --- identifying where a stronger decoder helps without access to ground
+    truth.
 \end{itemize}
 
 We deliberately stop short of proposing an adaptive method: whether these improvements

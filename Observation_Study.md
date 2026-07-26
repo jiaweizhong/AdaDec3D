@@ -330,6 +330,14 @@ Per-organ (our E1 | paper EffiDec3D):
   Kaggle split with identity affine; the paper uses `btcv_trns`). Seed 1 improves
   the result, but does not close the reproduction gap (see below), so random-seed
   variance alone is not a sufficient explanation.
+- **Skip-`Spacingd` control — rejected (negative result, 2026-07-26).** To test
+  whether the identity-affine metadata made resampling harmful, we retrained E1
+  with `--skip_spatial_resampling`. It is **decisively worse** (best Mean DICE
+  ≈ 0.674 vs 0.77, ~10 points lower), so bypassing resampling is **not** the fix —
+  `Spacingd` is beneficial even with identity affine. We therefore **keep the
+  standard pipeline** (skip flag stays off) and discard this checkpoint. This is a
+  discarded control, **not** an analyzed model: it does **not** affect any O1–O11
+  result, which were all computed on the standard-pipeline seed-1 checkpoint.
 - The **CSV/paper-protocol metric is 0.7700**, not the 0.7549 shown mid-training
   (that periodic MONAI metric uses a running-aggregate average on the resampled
   grid; the final `validation_save` resamples to original resolution + medpy dice,
@@ -1085,6 +1093,44 @@ Outputs:
 The old `results.json["O9"]` is retained only as a legacy positive-transition
 oracle and must not be used as the final Paper A result.
 
+#### Corrected O9 results (seed 1) — **PASS**
+
+Refreshed run (`results/obs-seed1/`, full E0 + seed-1 EffiDec3D, 12 subjects,
+100 random repeats, 2000-sample paired subject bootstrap). Net utility =
+`(positive − negative) / all positive transitions`. Two selectors:
+
+**Voxel oracle** (non-deployable upper bound):
+
+| Budget | Positive recovery | Net utility | Net CI-lower | Random net | Paired-diff CI-lower |
+|---:|---:|---:|---:|---:|---:|
+| 5% | 0.304 | 0.121 | 0.039 | 0.011 | 0.035 ✓ |
+| 10% | 0.587 | 0.241 | 0.138 | 0.022 | 0.129 ✓ |
+| **20%** | **0.864** | **0.299** | **0.182** | **0.045** | **0.166 ✓** |
+| 30% | 0.952 | 0.277 | 0.137 | 0.067 | 0.116 ✓ |
+| 50% | 0.995 | 0.243 | 0.087 | 0.112 | 0.055 ✓ |
+
+**Region selector** (deployable: 16³ blocks + 4-voxel halo):
+
+| Block budget | Executed vol. | Pos. recovery | Neg. recovery | Net utility | Random net | Paired-diff CI-lower |
+|---:|---:|---:|---:|---:|---:|---:|
+| 5% | 0.109 | 0.543 | 0.411 | 0.133 | 0.011 | −0.012 (ns) |
+| 10% | 0.162 | 0.937 | 0.732 | 0.206 | 0.022 | 0.049 ✓ |
+| **20%** | **0.291** | **1.000** | **0.775** | **0.225** | **0.043** | **0.056 ✓** |
+| 30% | 0.384 | 1.000 | 0.775 | 0.225 | 0.067 | 0.048 ✓ |
+| 50% | 0.581 | 1.000 | 0.775 | 0.225 | 0.113 | 0.029 ✓ |
+
+**Interpretation.** At the predeclared **20% block budget** (which executes 29.1% of
+the union-foreground volume after halo expansion), entropy-ranked contiguous regions
+achieve net utility **0.225 vs 0.043 for matched random**, with a paired subject-
+bootstrap lower bound of **0.056 > 0** → the selection is significantly better than
+random. The direction holds at every budget ≥10% (paired CI-lower `> 0` for 10/20/30/50%),
+failing only at 5% (CI includes 0), so there is a minimum viable budget. Honest
+nuance: capturing 100% of positive transitions also captures **77.5% of negative**
+ones, so the *net* gain (0.225) — not positive recovery alone — is the correct headline;
+the positive-only 86.4% voxel figure is an oracle upper bound, not a deployable claim.
+This upgrades O9 from the legacy positive-only voxel oracle to a **net, paired,
+region-level, deployable** result: **Go criterion met.**
+
 Repeat the command with the seed-0 E1 checkpoint and a separate
 `--obs_dir /root/obs-seed0-corrected`; do not overwrite or merge the two runs
 before checking their subject-level results.
@@ -1344,14 +1390,15 @@ confidence as Paper B baselines; it does not establish entropy as uniquely best.
 | O2 | Strongly skewed entropy | median 0.0011; 1.31% > 0.5 | median 0.00035; 1.18% > 0.5 | ✅ replicated |
 | O3 | Entropy predicts voxel error | pooled-bin r = 0.971 | pooled-bin r = 0.973 | ⚠ estimator audit required |
 | O5 | Net benefit rises with entropy | subj-r 0.665, CI [0.171, 0.996] | subj-r 0.646, CI [0.158, 0.994] | ✅ direction replicated |
-| O9 | Entropy beats matched random | 20% recovers 86.4% positive transitions | 20% recovers 86.4% | ⚠ oracle/net/paired audit required |
+| O9 | Entropy beats matched random | — | region 20%: net 0.225 vs random 0.043, paired CI-lower 0.056 > 0 | ✅ corrected (net/paired/region) |
 
 These results pass the **prototype gate**: uncertainty-guided regional refinement
-is sufficiently motivated to prototype Paper B. They do not yet pass the final
-Paper A submission gate. O3 needs a subject-level discrimination/calibration
-analysis; O9 needs paired subject bootstrap, net transitions and contiguous-region
-routing. The corrected analyses must retain a positive subject-bootstrap lower
-bound at a predeclared budget.
+is sufficiently motivated to prototype Paper B. **O9 is now complete** — the
+corrected region-level analysis (net transitions, contiguous 16³ blocks + halo,
+paired subject bootstrap) retains a positive lower bound (0.056) at the predeclared
+20% budget, so it clears the audit that was outstanding. The remaining open item for
+the final Paper A submission gate is **O3**, which still needs a subject-level
+discrimination/calibration analysis (the pooled-bin r is descriptive only).
 
 ### Generalization criteria (not yet run)
 
@@ -1482,7 +1529,7 @@ Week 4: Observations — preliminary gate (run_observations.py)   ✓ DIRECTION 
   [x] O4: per-organ dice/entropy (hardest = highest-entropy organs)
   [x] O5: subject r = 0.646, CI [0.158, 0.994]; pos>neg (net effect ≈0.065%)
   [x] O6: entropy falls from 0.0279 (5k) to 0.0104 (45k)
-  [x] O9: entropy 20% budget recovers 86.4% positive transitions (oracle upper bound)
+  [x] O9: CORRECTED region-level — 20% block budget net 0.225 vs random 0.043, paired CI-lower 0.056 > 0 (deployable; 86.4% positive recovery is oracle upper bound only)
   [x] O10: size–difficulty rho = −0.544; partial entropy r = 0.810
   [x] O11: entropy/confidence comparable; MC dropout inactive
   [x] MAC profiling: decoder = 42.2% (decoder3 37%); encoder 57.8%
@@ -1499,7 +1546,8 @@ Week 5-6: Generalization matrix (run_observations.py --network/--dataset)
   [ ] O8: architecture-family consistency = aggregate over architecture axis
   [x] O10: organ size vs difficulty
   [~] O11: entropy and confidence complete; MC dropout invalid/inactive
-  [ ] Corrected O3/O9 statistical analysis and contiguous-region opportunity curve
+  [x] Corrected O9 contiguous-region opportunity curve (net/paired/halo) — PASS
+  [ ] Corrected O3 subject-level discrimination/calibration analysis
   [ ] (optional) Matched E0/E1 multi-seed run with paper-equivalent preprocessing
        — improves absolute numbers; NOT required for within-study O1-O11 direction
   [ ] Patch-level whole-model adaptivity study (extend efficiency beyond decoder's 42%)

@@ -106,32 +106,42 @@ are 0.290\% and 0.225\%.  Thus the net label-transition benefit is only
 to Dice, it shows why positive and negative transitions must be reported
 together.
 
-\subsection{The Benefit Is Predictable, but Current O9 Is an Upper Bound}
+\subsection{The Benefit Is Spatially Predictable}
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.96\columnwidth]{figures/O5_decoder_gain.png}\\[-1mm]
 \textbf{(a) Net transition vs.\ entropy.}\\[1mm]
-\includegraphics[width=0.96\columnwidth]{figures/O9_opportunity_legacy.png}\\[-1mm]
-\textbf{(b) Legacy positive-only oracle.}
-\caption{Preliminary predictability results for seed 1.  Panel (b) ranks
-individual voxels and counts only positive transitions; it is shown to motivate,
-not replace, the corrected contiguous-region analysis.}
+\includegraphics[width=0.96\columnwidth]{figures/O9_opportunity_corrected.png}\\[-1mm]
+\textbf{(b) Region-level opportunity curve.}
+\caption{Predictability for seed 1.  Panel (b) ranks contiguous $16^3$ blocks
+(plus a $4$-voxel halo) by mean entropy and reports \emph{net} transition utility
+against a matched-random selector with a paired subject bootstrap.}
 \label{fig:opportunity}
 \end{figure}
 
 The subject-level entropy--net-transition correlation is positive for both
 efficient seeds (Table~\ref{tab:transitions}), and its subject-bootstrap lower bound
-remains above zero.  The legacy voxel analysis finds that the top 20\%
-entropy-ranked foreground-union voxels contain about 86.4\% of positive
-transitions in both runs.  However, isolated voxels cannot be processed
-efficiently by standard 3D convolutions, and positive-only recovery ignores
-negative transitions.  We therefore treat this result strictly as an oracle
-upper bound.
+remains above zero.  We convert this into a deployable test with a contiguous-region
+selector: non-overlapping $16^3$ blocks are ranked by mean entropy, each selected
+block is expanded by a $4$-voxel context halo, and we measure the \emph{net}
+transition utility (positive minus negative, normalized by all positive transitions)
+against a matched-random selector under a paired subject bootstrap.  At the
+predeclared $20\%$ block budget --- which executes $29.1\%$ of the foreground-union
+volume after halo expansion --- entropy-ranked regions attain a net utility of
+$0.225$ versus $0.043$ for random selection, roughly a five-fold gain, with a paired
+$95\%$ lower bound of $0.056>0$; the advantage remains significant at every budget of
+$10\%$ or more and vanishes only at $5\%$.  Crucially, the selected regions capture
+all positive transitions but also $77.5\%$ of the negative ones, so the honest
+headline is the \emph{net} gain rather than positive recovery alone.  A voxel-level
+oracle that ranks individual voxels and counts only positive transitions places
+$86.4\%$ of them in the top $20\%$; we report it solely as a non-deployable upper
+bound, since isolated voxels cannot be processed efficiently by standard 3D
+convolutions.  The benefit is therefore not only concentrated but identifiable at
+test time from the efficient model's own uncertainty.
 
-\todo{Replace Fig.~\ref{fig:opportunity}(b) and the final paragraph with
-\texttt{O9\_corrected}: block-level positive, negative, and net transitions; actual
-halo-expanded volume; matched-random mean; and paired 95\% CI for both seeds.}
+\todo{Before submission: add the same corrected region-level curve for a second Full
+seed and for the cross-backbone/cross-dataset cells.}
 
 \subsection{Routing Signals}
 

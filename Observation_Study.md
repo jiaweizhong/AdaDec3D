@@ -494,6 +494,27 @@ concentration/predictability finding holds across the matrix. (`run_observations
 still supports single-model runs for optional non-EffiDec3D controls, but those are
 not part of the aligned matrix.)
 
+**Next backbone — SwinUNETR (2nd matched, O8 axis).** Ready-made one-command runner
+`run_E0_E1_swin.sh` (proven clone of `run_E0_E1.sh`): 1 Full + 1 EffiDec3D seed on
+BTCV13, same 45k/lr1e-3/overlap0.7 protocol, standard Spacingd pipeline. Checkpoints
+→ `E0_swin*/SwinUNETR/BTCV13/` and `E1_swin*/SwinUNETR_EffiDec3D/BTCV13/`; observations
+→ `/root/obs-swin`.
+
+```bash
+cd /root/AdaDec3D/EffiDec3D && git pull
+bash run_E0_E1_swin.sh          # E0 → E1 → O1–O11 (≈10–14 h on RTX 5090)
+# or stage-by-stage:  bash run_E0_E1_swin.sh E0   then   bash run_E0_E1_swin.sh E1
+```
+
+Calibration (EffiDec3D paper, BTCV 13-organ): SwinUNETR ≈ 80.1 Dice / 337.6 GFLOPs /
+69.2 M → +EffiDec3D ≈ 79.8 / 57.3 / 11.2 M (published gap ~0.3 pt). A local gap is
+footnoted per the reproduction-gap policy above and does not affect O5/O8/O9 direction.
+
+**O8 Go (Swin):** O5 subject-r CI-lower > 0 **and** corrected O9 region-level paired
+CI-lower > 0, with O1/O2/O10 concentration recurring → decoder-benefit concentration
+is architecture-general, not a 3D UX-Net artifact. Add a 2nd EffiDec3D seed only if the
+lower bound is borderline.
+
 > **Reproduction-gap policy (per cell).** Each cell's observations are *within-study*
 > and relational — they compare Full vs EffiDec3D (or analyze one model) on the same
 > local data, split, and eval code. So if a given backbone or dataset trails the

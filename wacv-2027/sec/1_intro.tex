@@ -1,27 +1,33 @@
 \section{Introduction}
 \label{sec:intro}
 
-Volumetric medical image segmentation is dominated by U-Net--based
-encoder--decoder networks, and recent years have produced a steady stream of
-stronger variants: self-configuring pipelines such as
-nnU-Net~\cite{isensee2021nnunet}, and transformer or large-kernel models
-including UNETR~\cite{hatamizadeh2022unetr}, Swin UNETR~\cite{tang2022swinunetr},
-and 3D UX-Net~\cite{lee20233duxnet}.  These models improve accuracy, but their
-decoders are expensive: every high-resolution 3D convolution operates over
-millions of voxels with wide feature maps, so memory, latency, and energy grow
-quickly with decoder capacity.
+Segmenting organs and lesions in 3D scans such as CT and MRI underpins
+computer-aided diagnosis, treatment planning, and quantitative follow-up, where
+accuracy at the voxel level directly affects clinical measurements.  This task is
+dominated by U-Net--based encoder--decoder networks, and recent progress has come
+mostly from stronger but heavier variants.  Transformer-based models such as
+UNETR~\cite{hatamizadeh2022unetr} and Swin UNETR~\cite{tang2022swinunetr}, and
+large-kernel convolutional models such as 3D UX-Net~\cite{lee20233duxnet},
+improve accuracy at a substantial computational cost.  The number of voxels
+grows cubically with per-axis resolution; dense 3D convolutions are linear in
+this voxel count, while global self-attention is quadratic in it, so memory,
+latency, and energy rise rapidly with volume resolution and decoder width.  Even
+self-configuring pipelines such as nnU-Net~\cite{isensee2021nnunet} inherit this
+burden.
 
-EffiDec3D~\cite{rahman2025effidec3d} attacks this cost directly.  By compressing
-decoder channels and removing high-resolution stages, its 3D UX-Net variant cuts
-decoder parameters by 96.4\% and decoder FLOPs by 93.0\% while retaining
-competitive aggregate Dice.  This is strong evidence that decoders are
-over-provisioned \emph{on average}.  It does not, however, answer a more basic
-question: \emph{where} does the remaining decoder computation actually help?
-Aggregate Dice and FLOPs cannot reveal whether the benefit of a stronger decoder
-is spread uniformly or concentrated in a few regions.  The distinction is subtle:
-a difficult or uncertain voxel is not necessarily one that a stronger decoder can
-fix, and model disagreement is not necessarily improvement --- a full decoder can
-also break a prediction that the efficient decoder got right.
+EffiDec3D~\cite{rahman2025effidec3d} targets this cost on the decoder side.  It
+\emph{uniformly} reduces decoder channel width and removes high-resolution
+decoder stages, cutting decoder parameters by 96.4\% and FLOPs by 93.0\% while
+retaining competitive aggregate Dice.  This is strong evidence that decoders are
+over-provisioned on average.  However, it shrinks capacity uniformly
+\emph{without explaining why} the removed computation was unnecessary, and it
+keeps the decoder \emph{static}: the same reduced budget is applied to every
+subject, organ, and voxel.  It therefore leaves unanswered a more basic point:
+\emph{where} decoder computation is actually needed, and whether that need is
+uniform or concentrated.  Aggregate Dice and FLOPs cannot reveal this, because a
+difficult or uncertain voxel is not necessarily one a stronger decoder can fix,
+and disagreement between decoders is not necessarily improvement --- a full
+decoder can also break a prediction that the efficient decoder got right.
 
 We answer this question directly.  On 13-organ abdominal CT, we compare a full 3D
 UX-Net decoder (\fullmodel) with its EffiDec3D-compressed counterpart

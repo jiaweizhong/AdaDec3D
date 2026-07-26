@@ -1,26 +1,26 @@
 \begin{abstract}
-Efficient 3D segmentation decoders are commonly evaluated by aggregate accuracy
-and computational cost, leaving a basic question unanswered: \emph{where does
-additional decoder computation actually improve a prediction?}
-We study this question through a controlled reimplementation of a full 3D
-UX-Net decoder and its compressed EffiDec3D counterpart on 13-organ abdominal
-CT segmentation.  Rather than treating every disagreement as a benefit, we
-define voxel-wise decoder marginal utility using positive transitions
-(efficient wrong, full correct), negative transitions (efficient correct, full
-wrong), and their net difference.  Our current study yields three consistent
-observations.  First, errors are spatially heterogeneous: boundary error is
-$3.93\times$ interior error, and organ difficulty is negatively associated with
-organ size ($\rho=-0.544$).  Second, the aggregate benefit of the full decoder
-is small and bidirectional; across two efficient-decoder seeds, positive and
-negative transition rates differ by only $0.065$--$0.130\%$ of evaluated
-voxels.  Third, this marginal benefit is predictable: subject-level
-entropy--net-utility correlations are 0.665 and 0.646 across the two seeds,
-while a preliminary voxel oracle places approximately 86\% of positive
-transitions in the top 20\% entropy-ranked foreground voxels.
-These findings motivate selective decoder allocation, but do not by themselves
-demonstrate realizable savings.  We therefore introduce a paired,
-subject-bootstrap evaluation protocol based on net utility and contiguous 3D
-regions, separating oracle opportunity from deployable selection.
+Efficient 3D segmentation decoders are usually evaluated by aggregate accuracy
+and computational cost, which leaves a basic question unanswered: \emph{where}
+does additional decoder computation actually improve a prediction?  Using a
+controlled reimplementation of a full 3D UX-Net decoder and its compressed
+EffiDec3D counterpart on 13-organ abdominal CT, we answer this by directly
+counting, at each voxel, where the full decoder \emph{fixes} the efficient
+decoder's prediction (a positive transition) and where it \emph{breaks} it (a
+negative transition), rather than treating every disagreement as a benefit.
+Three findings emerge.  First, errors are spatially concentrated: boundary error
+is $3.93\times$ interior error, and difficulty grows as organ size shrinks
+($\rho=-0.54$).  Second, the full decoder's net benefit is small and
+bidirectional: across two efficient-decoder seeds, positive and negative
+transition rates differ by only $0.065$--$0.130\%$ of evaluated voxels, so
+efficient decoders are over-provisioned non-uniformly rather than uniformly.
+Third, this small benefit is predictable at test time: subject-level
+entropy--net correlations are $0.665$ and $0.646$, and a preliminary voxel oracle
+places about $86\%$ of positive transitions in the top $20\%$ entropy-ranked
+foreground voxels.  These findings motivate selective decoder allocation but do
+not by themselves demonstrate realizable savings; we therefore contribute a
+paired, subject-bootstrap evaluation protocol based on net transitions and
+contiguous 3D regions that separates oracle opportunity from deployable
+selection.
 \todo{Replace the preliminary voxel-oracle sentence with corrected region-level
 O9 results and add cross-backbone/cross-dataset findings before submission.}
 \end{abstract}

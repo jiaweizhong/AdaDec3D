@@ -57,16 +57,31 @@ the organ-size/difficulty Spearman correlation is $-0.544$.  Entropy retains
 substantial association with organ difficulty after controlling for log volume
 (partial $r=0.810$), suggesting that size alone does not explain the signal.
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.86\columnwidth]{figures/O2_entropy.png}
+\caption{Voxel entropy distribution for Effi-UX seed 1 (log-count).  Uncertainty
+is spatially sparse: the median voxel entropy is near zero and only $1.18\%$ of
+voxels exceed $0.5$.}
+\label{fig:entropy_dist}
+\end{figure}
+
+Uncertainty is spatially sparse as well: the median voxel entropy is near zero
+and only $1.18\%$ of voxels exceed $0.5$ (Fig.~\ref{fig:entropy_dist}), so the
+difficult subset occupies a small fraction of the volume.  This is the premise
+that makes selective allocation plausible: most voxels are confidently easy, and
+any benefit from a stronger decoder must come from the sparse remainder.
+
 Difficulty also evolves systematically.  Mean entropy decreases from 0.0279 at
 5k iterations to 0.0166, 0.0126, 0.0123, and 0.0104 at 10k, 20k, 30k, and 45k,
 respectively (Fig.~\ref{fig:anatomy_training}).  Training removes much of the
 global ambiguity but does not eliminate the concentrated residual.
 
-\subsection{Decoder Utility Is Small and Bidirectional}
+\subsection{The Full Decoder's Benefit Is Small and Bidirectional}
 
 \begin{table}[t]
 \centering
-\caption{Marginal-utility observations across efficient-decoder seeds.
+\caption{Transition-count observations across efficient-decoder seeds.
 Rates are fractions of evaluated voxels. O9 is a preliminary voxel oracle and
 is not the final contiguous-region result.}
 \label{tab:utility}
@@ -77,7 +92,7 @@ Metric & E1 seed 0 & E1 seed 1\\
 Positive transition rate & .00339 & .00290\\
 Negative transition rate & .00209 & .00225\\
 Net transition rate & .00130 & .00065\\
-Entropy--net utility $r$ & .665 & .646\\
+Entropy--net transition $r$ & .665 & .646\\
 Bootstrap 95\% CI & [.171,.996] & [.158,.994]\\
 Top-20\% positive recovery & .864 & .864\\
 \bottomrule
@@ -91,7 +106,7 @@ are 0.290\% and 0.225\%.  Thus the net label-transition benefit is only
 to Dice, it shows why positive and negative transitions must be reported
 together.
 
-\subsection{Utility Is Predictable, but Current O9 Is an Upper Bound}
+\subsection{The Benefit Is Predictable, but Current O9 Is an Upper Bound}
 
 \begin{figure}[t]
 \centering
@@ -105,7 +120,7 @@ not replace, the corrected contiguous-region analysis.}
 \label{fig:opportunity}
 \end{figure}
 
-The subject-level entropy--net-utility correlation is positive for both
+The subject-level entropy--net-transition correlation is positive for both
 efficient seeds (Table~\ref{tab:utility}), and its subject-bootstrap lower bound
 remains above zero.  The legacy voxel analysis finds that the top 20\%
 entropy-ranked foreground-union voxels contain about 86.4\% of positive
@@ -115,12 +130,12 @@ negative transitions.  We therefore treat this result strictly as an oracle
 upper bound.
 
 \todo{Replace Fig.~\ref{fig:opportunity}(b) and the final paragraph with
-\texttt{O9\_corrected}: block-level positive, negative, and net utility; actual
+\texttt{O9\_corrected}: block-level positive, negative, and net transitions; actual
 halo-expanded volume; matched-random mean; and paired 95\% CI for both seeds.}
 
 \subsection{Routing Signals}
 
-On seed 1, confidence and entropy have similar correlations with net utility
+On seed 1, confidence and entropy have similar correlations with net transitions
 (0.663 and 0.655, respectively).  Monte-Carlo dropout is not a valid comparator
 for this checkpoint because the evaluated architecture has no active dropout;
 its measured stochastic variance is effectively zero.  We therefore retain

@@ -132,12 +132,16 @@ ls /root/autodl-tmp/btcv-synapse/imagesVal/ | wc -l  # expect 12
   labelsVal/  label0001.nii.gz …
 ```
 
-**Standard split — Kaggle IDs** (mapped from original 3D UX-Net paper split)
+**Standard split — Kaggle IDs** (= TransUNet/Synapse split, **verified** 2026-07-25)
 
 > The Kaggle dataset (`shinjinidey/synapse-dataset`) renumbers cases 0001–0030
 > (original IDs skip 0011–0020; Kaggle 0011 = original 0021, …, Kaggle 0030 = original 0040).
-> The split below reflects the paper's original IDs translated to Kaggle IDs and is
-> already hardcoded in `load_datasets_transforms.py` under `BTCV13`.
+> **Verification**: our 12 val cases, mapped back to original IDs, are
+> {0001,0002,0003,0004,0008,0022,0025,0029,0032,0035,0036,0038} — an **exact match**
+> to TransUNet's `lists_Synapse/test_vol.txt`. EffiDec3D uses TransUNet-preprocessed
+> data, so this is almost certainly the same split the paper used. The split is
+> defined by which files `convert_synapse.py` places in imagesTr/imagesVal; the
+> loader (`BTCV13`) globs those directories (no hardcoded IDs).
 
 ```python
 TRAIN = ["0005","0006","0007","0009","0010","0011","0013","0014",
@@ -373,7 +377,7 @@ gap. Therefore:
 | O6 | Mean entropy falls 0.0279 → 0.0104 from 5k to 45k | Difficulty contracts during training but does not disappear |
 | O9 | Top 10/20/30% entropy voxels recover 58.7/86.4/95.2% of positive transitions | Strong oracle opportunity; not yet deployable regional compute evidence |
 | O10 | Size–difficulty Spearman −0.544; partial entropy–difficulty r 0.810 | Small organs are harder, while entropy retains information beyond size |
-| O11 | Entropy r 0.655; confidence r 0.663; MC dropout inactive | Confidence is a valid cheap baseline; MC-dropout result is missing |
+| O11 | Entropy r 0.655; confidence r 0.663; MC dropout inactive | Confidence is a valid cheap baseline, tied with entropy; MC-dropout is inactive (EffiDec3D uses DropPath, variance ≈ 0 — auto-detected and skipped, not a failure) |
 
 The most important result is **cross-seed stability**: O5 changes from about
 0.665 to 0.646 and O9's 20% recovery remains about 86%. This supports Paper A's

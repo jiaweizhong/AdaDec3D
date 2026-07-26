@@ -11,7 +11,7 @@ hierarchical transformer behavior with large-kernel depthwise convolutions.
 nnU-Net~\cite{isensee2021nnunet} demonstrates that data-dependent pipeline
 configuration and rigorous evaluation can be as important as architectural
 novelty.  These works primarily optimize segmentation accuracy; our study
-instead examines the spatial utility of the decoder computation already
+instead examines the spatial benefit of the decoder computation already
 present in such systems.
 
 \paragraph{Efficient decoders.}
@@ -21,12 +21,12 @@ reduced channel width and removes stages whose aggregate accuracy contribution
 is small.  Across 12 tasks, the resulting static decoder preserves competitive
 accuracy at much lower cost.  We take this result as a starting point and ask a
 different question: whether the small residual benefit of the full decoder is
-spatially uniform.  Our work is an evaluation of decoder utility, not a new
-compression block.
+spatially uniform.  Our work is an evaluation of where the decoder helps, not a
+new compression block.
 
 \paragraph{Uncertainty and selective computation.}
 Predictive entropy and confidence are widely used as uncertainty proxies.
-They identify ambiguous predictions, but ambiguity and decoder utility are not
+They identify ambiguous predictions, but ambiguity and decoder benefit are not
 equivalent: an uncertain location may remain wrong after additional decoding,
 whereas a confident error may still be correctable.  Accordingly, we evaluate
 signals against held-out \emph{net transitions} between matched decoders rather

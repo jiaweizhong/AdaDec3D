@@ -1,61 +1,59 @@
 \section{Introduction}
 \label{sec:intro}
 
-Volumetric medical image segmentation relies on decoders to fuse multi-scale
-features and restore spatial detail.  This restoration is expensive: every
-high-resolution 3D convolution operates over millions of voxels, often with
-wide feature maps.  Modern architectures therefore face a tension between
-anatomical accuracy and the memory, latency, and energy required for deployment.
-This tension has motivated efficient architectures and automated configuration
-pipelines such as nnU-Net~\cite{isensee2021nnunet}, as well as transformer and
-large-kernel models including UNETR~\cite{hatamizadeh2022unetr}, Swin
-UNETR~\cite{tang2022swinunetr}, and 3D UX-Net~\cite{lee20233duxnet}.
+Volumetric medical image segmentation is dominated by U-Net--based
+encoder--decoder networks, and recent years have produced a steady stream of
+stronger variants: self-configuring pipelines such as
+nnU-Net~\cite{isensee2021nnunet}, and transformer or large-kernel models
+including UNETR~\cite{hatamizadeh2022unetr}, Swin UNETR~\cite{tang2022swinunetr},
+and 3D UX-Net~\cite{lee20233duxnet}.  These models improve accuracy, but their
+decoders are expensive: every high-resolution 3D convolution operates over
+millions of voxels with wide feature maps, so memory, latency, and energy grow
+quickly with decoder capacity.
 
-EffiDec3D~\cite{rahman2025effidec3d} recently showed that decoder channels and
-high-resolution stages can be aggressively reduced while retaining competitive
-aggregate Dice.  Its 3D UX-Net variant reports a 96.4\% reduction in decoder
-parameters and a 93.0\% reduction in decoder FLOPs.  This is strong evidence
-that conventional decoders are over-provisioned in aggregate.  Aggregate
-metrics, however, cannot reveal whether the remaining utility is uniformly
-distributed.  A static decoder assigns the same architecture to every subject,
-organ, and location, although the need for detail restoration may vary sharply.
+EffiDec3D~\cite{rahman2025effidec3d} attacks this cost directly.  By compressing
+decoder channels and removing high-resolution stages, its 3D UX-Net variant cuts
+decoder parameters by 96.4\% and decoder FLOPs by 93.0\% while retaining
+competitive aggregate Dice.  This is strong evidence that decoders are
+over-provisioned \emph{on average}.  It does not, however, answer a more basic
+question: \emph{where} does the remaining decoder computation actually help?
+Aggregate Dice and FLOPs cannot reveal whether the benefit of a stronger decoder
+is spread uniformly or concentrated in a few regions.  The distinction is subtle:
+a difficult or uncertain voxel is not necessarily one that a stronger decoder can
+fix, and model disagreement is not necessarily improvement --- a full decoder can
+also break a prediction that the efficient decoder got right.
 
-This distinction matters.  A difficult or uncertain voxel is not necessarily a
-voxel that benefits from a stronger decoder: both models may fail there.
-Conversely, model disagreement is not necessarily improvement, because the full
-decoder can destroy a prediction that the efficient decoder got right.  We
-therefore ask:
-\begin{quote}
-\emph{Where is the marginal utility of additional decoder capacity, how
-concentrated is it, and can it be identified without access to ground truth?}
-\end{quote}
-
-We answer this question with a controlled marginal-utility study.  We compare a
-full 3D UX-Net decoder (\fullmodel) with an EffiDec3D-compressed decoder
+We answer this question directly.  On 13-organ abdominal CT, we compare a full 3D
+UX-Net decoder (\fullmodel) with its EffiDec3D-compressed counterpart
 (\effimodel) under a common dataset, split, preprocessing pipeline, training
-schedule, and evaluation protocol.  At each voxel we distinguish positive,
-negative, and net transitions between their predictions.  We then analyze this
-utility by anatomy, boundary proximity, uncertainty, training stage, and
-selection budget.  Statistical comparisons are performed at the subject level
-to avoid treating millions of correlated voxels as independent samples.
-
-Our current contributions are:
+schedule, and evaluation protocol.  At every voxel we simply count where the full
+decoder \emph{fixes} the efficient decoder's prediction (a \emph{positive
+transition}: efficient wrong, full correct) and where it \emph{breaks} it (a
+\emph{negative transition}: efficient correct, full wrong), and we test whether
+the efficient model's own entropy predicts these locations.  All statistics are
+computed at the subject level, so that millions of correlated voxels are not
+treated as independent samples.  More specifically, our contributions are:
 \begin{itemize}
-    \item We formulate \emph{decoder marginal utility}, separating additional
-    decoder capacity from generic segmentation error and explicitly accounting
-    for both corrected and damaged predictions.
-    \item We provide a controlled audit of full and efficient 3D UX-Net decoders
-    across two efficient-decoder seeds, reporting accuracy, HD95, parameters,
-    MACs, latency, and memory together with the observed reproduction gap.
-    \item We characterize the anatomical and temporal distribution of decoder
-    opportunity, including boundary/interior error, organ size, uncertainty,
-    and training-checkpoint evolution.
-    \item We define a selective-allocation protocol with predeclared budgets,
-    paired subject bootstrap, net utility, and contiguous 3D regions.  This
-    protocol distinguishes a voxel oracle from a selector that could motivate
-    an adaptive decoder.
+    \item \textbf{A transition-count comparison of efficient and full decoders.}
+    Instead of comparing only aggregate Dice and FLOPs, we count per-voxel
+    positive and negative transitions and their net difference, with
+    subject-level bootstrap, so that not every disagreement is counted as an
+    improvement.
+    \item \textbf{Evidence that the full decoder's benefit is small,
+    bidirectional, and spatially concentrated.}  Net positive transitions amount
+    to only about $0.1\%$ of evaluated voxels and are largely offset by negative
+    ones; they concentrate at organ boundaries (boundary error $3.93\times$
+    interior) and in small organs (size--difficulty $\rho=-0.54$; entropy still
+    predicts difficulty after controlling for organ size, partial $r=0.81$).
+    Efficient decoders are therefore over-provisioned \emph{non-uniformly}.
+    \item \textbf{Evidence that this benefit is predictable at test time.}
+    Ranking voxels by the efficient model's entropy places about $86\%$ of
+    positive transitions in the top $20\%$ of voxels, well above random, boundary,
+    and confidence controls --- identifying where a stronger decoder helps without
+    access to ground truth.
 \end{itemize}
 
-The study intentionally stops short of claiming an efficient adaptive method.
-Measured dynamic compute savings belong to a subsequent method study; here our
-goal is to establish whether the empirical premise for such a method is sound.
+We deliberately stop short of proposing an adaptive method: whether these fixes
+can be realized as measured compute savings is the subject of a separate method
+study.  Here our goal is to establish whether the empirical premise for such a
+method holds.

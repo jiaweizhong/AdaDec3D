@@ -423,6 +423,13 @@ elif args.network == 'TransBTS':
 
 print('Chosen Network Architecture: {}'.format(args.network))
 
+# Repo networks (UXNET, EffiDec3D variants) take a `mode` kwarg via **kwargs; MONAI
+# nets (SwinUNETR, UNETR, ...) do not. Detect once so the train loop calls correctly.
+import inspect as _inspect
+_fwd_params = _inspect.signature(model.forward).parameters
+_model_takes_mode = ("mode" in _fwd_params) or any(
+    _p.kind == _p.VAR_KEYWORD for _p in _fwd_params.values())
+
 macs, params = get_model_complexity_info(model, (args.n_channels, args.img_size[0], args.img_size[1], args.img_size[2]), as_strings=True,
                                            print_per_layer_stat=True, verbose=True)
 print('{:<30}  {:<8}'.format('Computational complexity: ', macs))
@@ -545,7 +552,7 @@ def train(global_step, train_loader, dice_val_best, global_step_best):
         step += 1
         x, y = (batch["image"].cuda(), batch["label"].cuda())
         with torch.autocast("cuda", dtype=_amp_dtype):
-            p = model(x, mode='train')
+            p = model(x, mode='train') if _model_takes_mode else model(x)
             P = []
             if type(p) is not list:
                 P.append(p)

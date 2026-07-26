@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -eo pipefail   # pipefail so a python crash through `| tee` still aborts the script
 
 # ── Usage ────────────────────────────────────────────────────────────────────
 #   bash run_E0_E1_swin.sh          # E0 then E1, then observations (default)

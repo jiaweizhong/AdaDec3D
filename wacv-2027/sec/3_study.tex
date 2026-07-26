@@ -13,23 +13,23 @@ P(v) &= \mathbb{1}[\hat y_{\mathrm{E}}(v)\ne y(v)]
 N(v) &= \mathbb{1}[\hat y_{\mathrm{E}}(v)=y(v)]
         \mathbb{1}[\hat y_{\mathrm{F}}(v)\ne y(v)].
 \end{align}
-A positive transition is a voxel the full decoder \emph{fixes}; a negative
-transition is one it \emph{breaks}.  We define the discrete net transition count
+A positive transition is a voxel the full decoder improves; a negative
+transition is one it degrades.  We define the discrete net transition
 as
 \begin{equation}
-U(v)=P(v)-N(v).
-\label{eq:utility}
+T_{\mathrm{net}}(v)=P(v)-N(v).
+\label{eq:net_transition}
 \end{equation}
 This prevents every model disagreement from being counted as an improvement.
 For a selected region $S$, normalized net recovery is
 \begin{equation}
 R_{\mathrm{net}}(S)=
-\frac{\sum_{v\in S} U(v)}
+\frac{\sum_{v\in S} T_{\mathrm{net}}(v)}
      {\sum_v P(v)}.
 \label{eq:recovery}
 \end{equation}
 The denominator makes positive recovery interpretable while allowing negative
-values when selection damages more predictions than it repairs.  We report
+values when selection degrades more predictions than it improves.  We report
 positive and negative components alongside their difference.
 
 \subsection{Difficulty, Transitions, and Predictability}

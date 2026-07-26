@@ -53,31 +53,31 @@ Paper B 必须进一步证明两件 Paper A 没有证明的事：
 
 ### 首选
 
-**Where Does Decoder Computation Matter? A Marginal-Utility Study of Efficient 3D Medical Image Segmentation**
+**Rethinking Efficient Decoder Design: A Systematic Characterization of Where Decoder Computation Helps**
 
 这个标题明确包含：
 
 - 研究对象：decoder computation；
 - 主要问题：where it matters；
-- 方法性质：marginal-utility study；
+- 方法性质：systematic observation study；
 - 应用范围：efficient 3D medical image segmentation。
 
 ### 备选
 
-1. **Rethinking Decoder Redundancy in Efficient 3D Medical Image Segmentation**
-2. **The Spatially Concentrated Utility of Decoder Computation in 3D Medical Image Segmentation**
+1. **Where Does Decoder Computation Matter in Efficient 3D Medical Image Segmentation?**
+2. **Understanding the Spatially Concentrated Benefit of Decoder Computation**
 3. **Understanding Where Additional Decoder Capacity Helps in Efficient 3D Medical Image Segmentation**
-4. **A Small Fraction of Voxels Accounts for Most Decoder Gains in 3D Medical Image Segmentation**
+4. **A Small Fraction of Voxels Accounts for Most Positive Decoder Transitions**
 
 第 4 个标题只有在 O9 得到足够强、跨 seed 稳定的 Pareto 结果后才能使用，不能预先假设具体比例。
 
 ---
 
-## 3. 核心概念：Decoder Marginal Utility
+## 3. 核心概念：Decoder Benefit and Prediction Transitions
 
 论文不能只讨论“哪里容易错”或“哪里 entropy 高”。这些问题已有大量研究，单独不足以形成强贡献。
 
-核心分析对象应定义为额外 decoder capacity 的逐 voxel 边际效用：
+核心分析对象是额外 decoder capacity 带来的逐 voxel **decoder benefit**：
 
 $$
 \Delta(v) =
@@ -89,15 +89,15 @@ $$
 
 - $\ell_{\mathrm{Effi}}(v)$ 是轻量 EffiDec3D 在 voxel $v$ 的损失；
 - $\ell_{\mathrm{Full}}(v)$ 是 matched full decoder 在同一 voxel 的损失；
-- $\Delta(v)>0$ 表示额外 decoder capacity 有益；
-- $\Delta(v)<0$ 表示 full decoder 反而使该 voxel 变差；
+- $\Delta(v)>0$ 表示额外 decoder capacity improves prediction；
+- $\Delta(v)<0$ 表示 full decoder degrades prediction；
 - $\Delta(v)\approx0$ 表示额外计算没有实质收益。
 
 同时报告离散标签转移：
 
-- **Positive gain**：EffiDec3D 错、Full decoder 对；
-- **Negative gain**：EffiDec3D 对、Full decoder 错；
-- **Net gain**：positive gain − negative gain。
+- **Positive transition**：EffiDec3D 错、Full decoder 对，即额外 decoder 改善了预测；
+- **Negative transition**：EffiDec3D 对、Full decoder 错，即额外 decoder 降低了预测质量；
+- **Net transition**：positive transition − negative transition。
 
 这样可以避免把任何 prediction disagreement 都错误解释成“full decoder 带来改善”。
 
@@ -105,7 +105,7 @@ $$
 
 论文需要依次证明四层不同的 claim：
 
-1. **Heterogeneity**：decoder gain 在 subject、organ 或 region 上并不均匀；
+1. **Heterogeneity**：decoder benefit 在 subject、organ 或 region 上并不均匀；
 2. **Concentration**：少量区域贡献了大部分正向或净收益；
 3. **Predictability**：测试时可用信号可以识别这些区域；
 4. **Generalizability**：该现象不是单一数据集、backbone 或 checkpoint 的偶然结果。
@@ -118,25 +118,29 @@ Paper A 不声称第五层 **realizable efficiency**；这一层属于 AdaDec3D 
 
 ### Central thesis
 
-> The marginal utility of decoder capacity is spatially concentrated and predictable: most additional gains from a full decoder arise from a small subset of anatomically difficult regions, while the remaining voxels receive little or no benefit.
+论文最大的卖点不是 “we discovered decoder redundancy”，而是：
 
-如果实验只能证明 gain 集中，却不能证明部署时信号可预测它，应将 thesis 缩减为：
+> **We show why Dice and FLOPs alone are insufficient to understand efficient decoder design.**
 
-> The marginal utility of decoder capacity is strongly heterogeneous across spatial regions and anatomical structures.
+Dice 和 FLOPs 只给出整例精度与总计算量，无法揭示额外 decoder computation 在哪里改善预测、在哪里使预测退化，以及这些变化是否集中且可预测。空间分析是支撑这一主张的证据，而不是需要另造术语包装的最终卖点。
+
+如果实验只能证明 positive transitions 集中，却不能证明部署时信号可预测它，应将 thesis 缩减为：
+
+> The benefit of additional decoder capacity varies substantially across spatial regions and anatomical structures.
 
 ### 推荐贡献写法
 
-1. **A marginal-utility formulation of decoder computation**  
-   不再仅比较整幅图像的 Dice/FLOPs，而是测量额外 decoder capacity 对 subject、organ、boundary 和 voxel region 的正向、负向及净收益。
+1. **An evaluation beyond Dice and FLOPs**
+   不再只比较整幅图像的 Dice/FLOPs，而是测量额外 decoder capacity 在 subject、organ、boundary 和 voxel region 上引起的 positive、negative 和 net transitions。
 
 2. **A systematic characterization of where decoder computation helps**  
-   分析收益集中度、边界距离、器官大小、训练演化，并明确区分 segmentation difficulty 与 decoder-specific utility。
+   分析收益集中度、边界距离、器官大小、训练演化，并明确区分 segmentation difficulty 与 decoder-specific benefit。
 
 3. **A selective-allocation opportunity analysis**  
-   绘制“被分配额外计算的 voxel/region 比例”与“恢复的 decoder gain 比例”之间的 Pareto 曲线，并与 random、boundary、confidence 等 controls 比较。
+   绘制“被分配额外计算的 voxel/region 比例”与“覆盖的 positive/net transition 比例”之间的 opportunity curve，并与 random、boundary、confidence 等 controls 比较。
 
 4. **Evidence for consistency and predictability**  
-   使用 subject-level confidence interval、多个 seed、跨数据集和跨 backbone 实验，检验该现象是否稳定以及低成本信号能否预测 held-out marginal utility。
+   使用 subject-level confidence interval、多个 seed、跨数据集和跨 backbone 实验，检验该现象是否稳定以及低成本信号能否预测 held-out decoder benefit。
 
 不要把“首次”“90% FLOPs”“只需 5% voxels”等措辞写进贡献，除非实验和文献检索都能支持。
 
@@ -164,14 +168,14 @@ EffiDec3D 等方法通过统一通道压缩和分辨率限制显著降低 decode
 
 #### Paragraph 4 — 本文做什么
 
-构造 matched lightweight/full decoder comparison，在相同数据和尽可能受控的 encoder 条件下定义 voxel-level marginal decoder utility。围绕空间集中度、解剖分布、训练演化和可预测性进行系统分析，并用 subject-level bootstrap 和跨域实验检验稳健性。
+构造 matched lightweight/full decoder comparison，在相同数据和尽可能受控的 encoder 条件下记录 voxel-level decoder benefit 和 prediction transitions。围绕空间集中度、解剖分布、训练演化和可预测性进行系统分析，并用 subject-level bootstrap 和跨域实验检验稳健性。
 
 #### Paragraph 5 — 主要发现
 
 最终按真实结果填写：
 
-- `[X]%` 的候选区域解释了 `[Y]%` 的 positive/net decoder gain；
-- gain 在 boundary 和 small/difficult organs 上更集中；
+- `[X]%` 的候选区域解释了 `[Y]%` 的 positive/net transitions；
+- positive/net transitions 在 boundary 和 small/difficult organs 上更集中；
 - entropy 或其他 deployable signal 在 held-out subjects 上优于 matched random/boundary controls；
 - 这一趋势在 `[datasets]` 和 `[backbones]` 上保持一致/部分一致。
 
@@ -192,44 +196,69 @@ Related Work 的落点应是：
 - efficient decoder 研究“怎样整体缩小 decoder”；
 - uncertainty 研究“哪里可能预测错误”；
 - conditional computation 研究“怎样动态执行”；
-- 本文研究的是两者之间尚未被充分回答的问题：**额外 decoder capacity 在哪里具有正边际效用**。
+- 本文研究的是两者之间尚未被充分回答的问题：**额外 decoder capacity 在哪里改善预测、在哪里使预测退化**。
 
 ### 5.3 Study Design 的组织
 
 不要按 O1–O11 写成十一组互相独立的小实验。正文合并成三个 scientific findings：
 
-#### Finding I — Decoder utility is spatially concentrated
+#### Finding I — Decoder benefit is spatially concentrated
 
 对应 O1、O2、O5、O9：
 
 - error 与 entropy 的空间稀疏性；
-- positive/negative/net decoder gain；
-- gain concentration curve；
+- positive/negative/net transitions；
+- transition concentration curve；
 - oracle、deployable signal、random control 的 selective-allocation curve。
 
-#### Finding II — Decoder utility has anatomical structure
+#### Finding II — Decoder benefit has anatomical structure
 
 对应 O3、O4、O10：
 
 - uncertainty 与 error 的关系；
 - boundary distance 分析；
-- organ-wise gain；
-- organ volume 与 difficulty/gain 的相关或偏相关分析。
+- organ-wise decoder benefit；
+- organ volume 与 difficulty/decoder benefit 的相关或偏相关分析。
 
 重点不是简单得出“小器官更难”，而是回答：
 
-> 在控制器官大小或 boundary proportion 后，routing signal 是否仍能解释 decoder gain？
+> 在控制器官大小或 boundary proportion 后，routing signal 是否仍能解释 decoder benefit？
 
 #### Finding III — Concentration is stable and predictable
 
 对应 O6、O7、O8、O11：
 
 - 随训练 checkpoint 的变化；
-- CT → MRI 跨数据集；
-- UX-Net → SwinUNETR/MedNeXt 跨 backbone；
+- CT → MRI、multi-organ → lesion/organ 跨数据集；
+- 3D UX-Net + EffiDec3D → SwinUNETR 跨 matched decoder pair；
+- UNETR 与 nnU-Net 作为不同设计范式的 ecological controls；
 - entropy、margin、MC-dropout、boundary proxy 等 signal comparison。
 
 O11 如果涉及训练 router 或方法组件，应移到 Paper B；Paper A 只比较无需 AdaDec3D 训练即可计算的 signals。
+
+### 5.4 Generality protocol
+
+Generality 必须同时覆盖 architecture family 与 dataset diversity，不能只增加一个 SwinUNETR 实验后声称普适。推荐按以下层级执行：
+
+| 层级 | 模型 | 代表性 | 在 Paper A 中的作用 |
+|---|---|---|---|
+| Primary | **3D UX-Net + EffiDec3D** | large-kernel CNN encoder + efficient decoder | matched full/efficient decoder 主因果比较 |
+| Cross-backbone | **SwinUNETR + EffiDec3D** | hierarchical Transformer | 检验 decoder benefit 是否跨 encoder family 保持 |
+| Architecture control | **UNETR** | ViT encoder | 检验结论是否依赖 shifted-window 或 large-kernel 特征 |
+| Strong baseline | **nnU-Net** | self-configuring CNN baseline | 提供不依赖 EffiDec3D 的强基线与 error/concentration 参照 |
+
+其中，只有存在结构匹配的 full/efficient decoder pair 时，才把 prediction transition 归因于 decoder 变化。UNETR 与 nnU-Net 若没有对应的 EffiDec3D 版本，只作为 ecological controls；不能把两个独立模型的差异写成 decoder-specific benefit。
+
+数据集与 EffiDec3D 原文的评估范围对齐。原文覆盖 FeTA、BTCV 和 MSD 十项任务；Paper A 不必重复十二项，但应预先选择 3–4 个有代表性的任务：
+
+| 数据集 | 模态 / 场景 | 选择理由 |
+|---|---|---|
+| **BTCV** | abdominal CT, 13 organs | 主实验；多器官、尺度差异与边界复杂度丰富 |
+| **FeTA 2021** | fetal brain MRI, 7 tissues | 跨模态、跨解剖域，并与 EffiDec3D 原文直接对齐 |
+| **MSD BrainTumour (Task01)** | brain MRI, multimodal lesion segmentation | 从器官分割扩展到异质性病灶 |
+| **MSD Lung (Task06)** 或 **HepaticVessel (Task08)** | thoracic CT lesion / abdominal CT vessel | 选择一个测试小目标、细长结构或高类别不平衡的任务 |
+
+最终固定其中 3–4 个，不根据结果好坏事后挑选。每个数据集报告相同的 positive transition、negative transition、net transition、spatial concentration 和 opportunity curve，并使用 subject-level confidence intervals。
 
 ---
 
@@ -243,10 +272,10 @@ O11 如果涉及训练 router 或方法组件，应移到 Paper B；Paper A 只�
 2. ground truth；
 3. EffiDec3D prediction；
 4. full decoder prediction；
-5. positive/negative decoder gain map；
+5. positive/negative transition map；
 6. entropy 或最佳 deployable signal。
 
-图注必须强调 error map、uncertainty map 和 decoder gain map 是三个不同概念。
+图注必须强调 error map、uncertainty map 和 transition map 是三个不同概念。
 
 ### Figure 2 — 全文核心 Pareto 图
 
@@ -256,11 +285,11 @@ O11 如果涉及训练 router 或方法组件，应移到 Paper B；Paper A 只�
 
 纵轴：
 
-> Fraction of total positive/net decoder gain recovered
+> Fraction of total positive/net transitions covered
 
 曲线至少包括：
 
-- oracle gain ranking；
+- oracle transition ranking；
 - entropy 或最佳 deployable signal；
 - confidence/margin；
 - boundary proxy；
@@ -270,18 +299,19 @@ O11 如果涉及训练 router 或方法组件，应移到 Paper B；Paper A 只�
 
 ### Figure 3 — Anatomical analysis
 
-- per-organ decoder gain；
+- per-organ decoder benefit；
 - boundary vs interior；
 - organ size vs difficulty；
-- organ size vs decoder gain；
+- organ size vs decoder benefit；
 - 必要时报告 partial correlation。
 
 ### Figure 4 — Generalization
 
 使用统一坐标展示：
 
-- BTCV / FeTA；
-- UX-Net / SwinUNETR 或 MedNeXt；
+- BTCV / FeTA / MSD BrainTumour / MSD Lung 或 HepaticVessel；
+- 3D UX-Net + EffiDec3D / SwinUNETR + EffiDec3D；
+- UNETR / nnU-Net ecological controls；
 - 不同训练 checkpoint；
 - 多个随机 seed。
 
@@ -297,11 +327,11 @@ O11 如果涉及训练 router 或方法组件，应移到 Paper B；Paper A 只�
 
 ### Table 2 — Predictability
 
-报告每个 deployable signal 对 held-out marginal utility 的：
+报告每个 deployable signal 对 held-out decoder benefit 的：
 
 - Pearson/Spearman correlation；
-- AUROC/AUPRC（若将 positive gain 定义为二分类）；
-- top-k gain recovery；
+- AUROC/AUPRC（若将 positive transition 定义为二分类）；
+- top-k transition coverage；
 - 相对 matched random control 的提升；
 - subject-level 95% confidence interval。
 
@@ -313,7 +343,7 @@ O11 如果涉及训练 router 或方法组件，应移到 Paper B；Paper A 只�
 
 如果满足：
 
-- gain concentration 明显；
+- transition concentration 明显；
 - deployable signal 显著优于 controls；
 - 跨 seed、backbone 或 dataset 稳定；
 
@@ -323,17 +353,17 @@ O11 如果涉及训练 router 或方法组件，应移到 Paper B；Paper A 只�
 
 ### Medium narrative
 
-如果 gain 集中，但 entropy 等信号预测一般：
+如果 transitions 集中，但 entropy 等信号预测一般：
 
-> decoder computation has strongly heterogeneous utility, but identifying beneficial regions remains an open problem.
+> the benefit of decoder computation is strongly heterogeneous, but identifying regions that will improve remains an open problem.
 
 这仍是有效 observation paper，但不能把它包装成 AdaDec3D 的直接可行性证明。
 
 ### Negative but publishable narrative
 
-如果 entropy 只预测 error、不预测 decoder gain：
+如果 entropy 只预测 error、不预测 decoder benefit：
 
-> segmentation uncertainty is not a reliable proxy for the marginal utility of decoder computation.
+> segmentation uncertainty is not a reliable proxy for where additional decoder computation improves prediction.
 
 这会推翻当前 AdaDec3D 的 router 假设，但若 controls 和跨 backbone 实验完整，仍可作为有价值的 negative result / evaluation paper，尤其适合 WACV E&D Track。
 
@@ -341,7 +371,7 @@ O11 如果涉及训练 router 或方法组件，应移到 Paper B；Paper A 只�
 
 若 Full 与 EffiDec3D 的差异：
 
-- 不稳定且 seed variance 大于 decoder gain；
+- 不稳定且 seed variance 大于 decoder benefit；
 - 无法在 matched setting 中复现；
 - 只在单一模型、单一器官或极少病例出现；
 
@@ -351,11 +381,11 @@ O11 如果涉及训练 router 或方法组件，应移到 Paper B；Paper A 只�
 
 ## 8. 常见叙事错误
 
-1. **把 error 当作 decoder gain**  
+1. **把 error 当作 decoder benefit**
    高误差区域不一定能被更强 decoder 修复。
 
 2. **只报告 positive transitions**  
-   必须同时报告 negative transitions 和 net gain。
+   必须同时报告 negative transitions 和 net transitions。
 
 3. **把 oracle hybrid prediction 当作真实加速**  
    Paper A 的 selective allocation 是 opportunity analysis，不是 executed FLOPs reduction。
@@ -392,7 +422,7 @@ O11 如果涉及训练 router 或方法组件，应移到 Paper B；Paper A 只�
 
 **推荐定位**
 
-> A rigorous evaluation of where efficient 3D segmentation decoders fail and where additional decoder capacity provides measurable utility.
+> A rigorous evaluation of where efficient 3D segmentation decoders fail and where additional decoder capacity measurably improves predictions.
 
 WACV 2027 的 E&D Track 明确包括：
 
@@ -412,7 +442,7 @@ WACV 2027 的 E&D Track 明确包括：
 
 **推荐定位**
 
-> Predicting the marginal utility of decoder computation in volumetric biomedical image segmentation.
+> Predicting where additional decoder computation improves volumetric biomedical image segmentation.
 
 官方 CFP 包含 Biomedical Imaging & Signal Processing、Computational Imaging、Computer Vision 和 Image/Video/Multidimensional Signal Processing，full paper deadline 为 **2026-09-16**，会议于 **2027-05-16 至 05-21** 在 Toronto 举行：
 
@@ -420,8 +450,8 @@ WACV 2027 的 E&D Track 明确包括：
 
 **综合判断**：学术认可度高于 ICBBE/MMM，但短篇格式要求叙事非常聚焦。建议只保留：
 
-- marginal utility 定义；
-- gain concentration/Pareto 主图；
+- positive、negative 与 net transition 定义；
+- transition concentration/opportunity curve 主图；
 - deployable signal vs controls；
 - 一项跨 backbone 或跨 dataset 验证。
 
@@ -429,7 +459,7 @@ WACV 2027 的 E&D Track 明确包括：
 
 **推荐定位**
 
-> Understanding the spatial utility of decoder computation for efficient 3D biomedical image segmentation.
+> Understanding where decoder computation improves efficient 3D biomedical image segmentation.
 
 ICBBE 官网列出：
 
@@ -531,8 +561,8 @@ ISBI 专注 biological and medical imaging 的数学、算法和计算问题，�
 由于主论文只有四页，正文建议只保留：
 
 1. matched Full/EffiDec comparison；
-2. marginal decoder utility 定义；
-3. positive、negative、net gain；
+2. positive、negative 与 net transition 定义；
+3. positive、negative、net transitions；
 4. selective-allocation Pareto curve；
 5. entropy/boundary/random controls；
 6. 一项跨 backbone 或跨 dataset 验证。
@@ -595,7 +625,7 @@ SCI/SCIE 通常指期刊，不是会议。常规期刊全年滚动投稿，因�
 
 ## 12. Paper A 摘要骨架
 
-> Efficient decoders substantially reduce the cost of volumetric medical image segmentation, but existing evaluations report only case-level accuracy and aggregate computation. It therefore remains unclear where additional decoder capacity is useful and whether its benefit can be predicted before the computation is executed. We formulate the voxel-wise marginal utility of decoder capacity by comparing matched lightweight and full decoders, explicitly separating positive, negative, and net prediction transitions. Across [datasets], [backbones], and [seeds], we analyze the concentration, anatomical distribution, training evolution, and predictability of decoder gains. We find that [result 1], with [X]% of candidate regions accounting for [Y]% of net gain. These gains are concentrated in [result 2] and can be identified by [signal] significantly better than random, boundary, and confidence controls on held-out subjects [result 3]. Our findings show that decoder computation has spatially heterogeneous utility and establish an evaluation framework for future region-adaptive decoders.
+> Efficient decoders substantially reduce the cost of volumetric medical image segmentation, but Dice and FLOPs alone do not explain how decoder simplification changes predictions. They cannot reveal where additional decoder capacity improves a prediction, where it degrades one, or whether these changes are spatially concentrated and predictable. We compare matched lightweight and full decoders and explicitly separate positive, negative, and net prediction transitions. Across [datasets], [backbones], and [seeds], we analyze their concentration, anatomical distribution, training evolution, and predictability. We find that [result 1], with [X]% of candidate regions accounting for [Y]% of net transitions. These transitions are concentrated in [result 2] and can be identified by [signal] significantly better than random, boundary, and confidence controls on held-out subjects [result 3]. Our findings show why aggregate accuracy and computation are insufficient for understanding efficient decoder design and provide an evaluation protocol for future region-adaptive decoders.
 
 在实验完成前保留方括号，不提前填写预期数值。
 
@@ -605,7 +635,7 @@ SCI/SCIE 通常指期刊，不是会议。常规期刊全年滚动投稿，因�
 
 Paper B 的开场不需要重复 Paper A 的全部观察，只需：
 
-> Our previous analysis showed that the marginal utility of 3D decoder computation is spatially concentrated and predictable. Based on this finding, we introduce AdaDec3D, a region-adaptive decoder that routes additional capacity only to regions with predicted positive utility.
+> Our previous analysis showed that the prediction improvements from additional 3D decoder computation are spatially concentrated and predictable. Based on this finding, we introduce AdaDec3D, a region-adaptive decoder that routes additional capacity only to regions predicted to improve.
 
 Paper B 的标题可以保留：
 

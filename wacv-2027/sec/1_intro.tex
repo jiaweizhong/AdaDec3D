@@ -18,26 +18,25 @@ burden.
 EffiDec3D~\cite{rahman2025effidec3d} targets this cost on the decoder side.  It
 \emph{uniformly} reduces decoder channel width and removes high-resolution
 decoder stages, cutting decoder parameters by 96.4\% and FLOPs by 93.0\% while
-retaining competitive aggregate Dice.  This is strong evidence that decoders are
-over-provisioned on average.  Despite this efficiency, EffiDec3D shrinks capacity
+retaining competitive aggregate Dice.  Despite this efficiency, EffiDec3D shrinks capacity
 uniformly \emph{without explaining why} the removed computation is unnecessary,
 and it follows a fundamentally \emph{static} computation paradigm: every voxel,
 every anatomical structure, and every patient receives identical decoder
-computation.  This design implicitly assumes that the utility of decoder
+computation.  This design implicitly assumes that the benefit of decoder
 computation is spatially uniform.  Whether that assumption holds --- whether the
 benefit of a stronger decoder is instead \emph{heterogeneous} across patients,
 organs, and regions, and \emph{concentrated} in a small subset of them --- has not
 been examined.  Aggregate Dice and FLOPs cannot reveal it, because a
-difficult or uncertain voxel is not necessarily one a stronger decoder can fix,
+difficult or uncertain voxel is not necessarily one a stronger decoder can improve,
 and disagreement between decoders is not necessarily improvement --- a full
-decoder can also break a prediction that the efficient decoder got right.
+decoder can also degrade a prediction that the efficient decoder got right.
 
 We examine this directly.  On 13-organ abdominal CT, we compare a full 3D
 UX-Net decoder (\fullmodel) with its EffiDec3D-compressed counterpart
 (\effimodel) under a common dataset, split, preprocessing pipeline, training
 schedule, and evaluation protocol.  At every voxel we simply count where the full
-decoder \emph{fixes} the efficient decoder's prediction (a \emph{positive
-transition}: efficient wrong, full correct) and where it \emph{breaks} it (a
+decoder improves the efficient decoder's prediction (a \emph{positive
+transition}: efficient wrong, full correct) and where it degrades it (a
 \emph{negative transition}: efficient correct, full wrong), and we test whether
 the efficient model's own entropy predicts these locations.  All statistics are
 computed at the subject level, so that millions of correlated voxels are not
@@ -50,13 +49,12 @@ treated as independent samples.  More specifically, our contributions are:
     improvement.
     \item \textbf{Evidence that decoder benefit is heterogeneous and concentrated,
     not uniform.}  In aggregate the full decoder's net benefit is small and
-    bidirectional --- it repairs only about $0.1\%$ of voxels and damages
-    comparably many --- but it is far from uniform: the benefit that exists
+    bidirectional --- positive and negative transitions each affect only a small
+    fraction of voxels --- but it is far from uniform: the benefit that exists
     concentrates at organ boundaries (boundary error $3.93\times$ interior) and in
     small organs (size--difficulty $\rho=-0.54$; entropy predicts difficulty
     beyond organ size, partial $r=0.81$).  Efficient decoders are thus
-    over-provisioned \emph{non-uniformly}, contradicting the static design's
-    uniform assumption.
+    poorly summarized by aggregate Dice and FLOPs.
     \item \textbf{Evidence that this benefit is predictable at test time.}
     Ranking voxels by the efficient model's entropy places about $86\%$ of
     positive transitions in the top $20\%$ of voxels, well above random, boundary,
@@ -64,7 +62,7 @@ treated as independent samples.  More specifically, our contributions are:
     access to ground truth.
 \end{itemize}
 
-We deliberately stop short of proposing an adaptive method: whether these fixes
+We deliberately stop short of proposing an adaptive method: whether these improvements
 can be realized as measured compute savings is the subject of a separate method
 study.  Here our goal is to establish whether the empirical premise for such a
 method holds.

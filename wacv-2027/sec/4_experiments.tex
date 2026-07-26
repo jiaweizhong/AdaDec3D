@@ -42,7 +42,28 @@ experiment as a \emph{controlled reimplementation}, not an exact reproduction.
 All comparisons within our study use the same local data and evaluation code.
 We report the discrepancy from published numbers in full.
 
-\paragraph{Planned generalization.}
-The final submission will repeat the transition analysis on a second backbone
-(Swin UNETR or MedNeXt) and a second dataset/modality (FeTA MRI).
-\todo{Insert O7 cross-dataset and O8 cross-backbone protocols/results.}
+\paragraph{Architecture generality.}
+We organize architecture coverage as a predeclared ladder rather than treating
+one additional model as evidence of universality.  The primary causal comparison
+is the matched full/efficient 3D UX-Net pair (large-kernel CNN).  A matched
+Swin UNETR/EffiDec3D pair tests whether the transition pattern transfers to a
+hierarchical Transformer.  UNETR provides a ViT architecture control, and
+nnU-Net provides a strong self-configuring CNN baseline.  Unless a matched
+EffiDec3D counterpart is implemented under the same protocol, UNETR and nnU-Net
+are used only to compare error and spatial-concentration patterns; differences
+between independently trained models are not attributed specifically to the
+decoder.
+
+\paragraph{Dataset generality.}
+The original EffiDec3D evaluation covers FeTA, BTCV, and all ten Medical
+Segmentation Decathlon (MSD) tasks.  We preselect three to four representative
+tasks from that scope: BTCV abdominal CT as the primary multi-organ task; FeTA
+fetal-brain MRI for modality and anatomy shift; MSD Task01 BrainTumour for
+multimodal lesion segmentation; and either MSD Task06 Lung or Task08
+HepaticVessel as a sparse-lesion or thin-structure stress test.  Every dataset
+uses the same positive, negative, and net transition definitions, spatial
+concentration analysis, opportunity curve, and subject-level confidence
+intervals.  The final set is frozen before inspecting results.
+
+\todo{Insert the matched Swin UNETR replication, UNETR/nnU-Net controls, and
+the predeclared FeTA/MSD results.}

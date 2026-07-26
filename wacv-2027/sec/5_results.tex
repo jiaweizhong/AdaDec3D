@@ -84,7 +84,7 @@ global ambiguity but does not eliminate the concentrated residual.
 \caption{Transition-count observations across efficient-decoder seeds.
 Rates are fractions of evaluated voxels. O9 is a preliminary voxel oracle and
 is not the final contiguous-region result.}
-\label{tab:utility}
+\label{tab:transitions}
 \begin{tabular}{lrr}
 \toprule
 Metric & E1 seed 0 & E1 seed 1\\
@@ -99,8 +99,8 @@ Top-20\% positive recovery & .864 & .864\\
 \end{tabular}
 \end{table}
 
-The full decoder is not uniformly better.  For seed 0 it repairs approximately
-0.339\% of voxels while damaging 0.209\%; for seed 1 the corresponding values
+The full decoder is not uniformly better.  For seed 0 it improves approximately
+0.339\% of voxel predictions while degrading 0.209\%; for seed 1 the corresponding values
 are 0.290\% and 0.225\%.  Thus the net label-transition benefit is only
 0.065--0.130\% of voxels.  Although this label-level statistic is not identical
 to Dice, it shows why positive and negative transitions must be reported
@@ -111,7 +111,7 @@ together.
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.96\columnwidth]{figures/O5_decoder_gain.png}\\[-1mm]
-\textbf{(a) Net gain vs.\ entropy.}\\[1mm]
+\textbf{(a) Net transition vs.\ entropy.}\\[1mm]
 \includegraphics[width=0.96\columnwidth]{figures/O9_opportunity_legacy.png}\\[-1mm]
 \textbf{(b) Legacy positive-only oracle.}
 \caption{Preliminary predictability results for seed 1.  Panel (b) ranks
@@ -121,7 +121,7 @@ not replace, the corrected contiguous-region analysis.}
 \end{figure}
 
 The subject-level entropy--net-transition correlation is positive for both
-efficient seeds (Table~\ref{tab:utility}), and its subject-bootstrap lower bound
+efficient seeds (Table~\ref{tab:transitions}), and its subject-bootstrap lower bound
 remains above zero.  The legacy voxel analysis finds that the top 20\%
 entropy-ranked foreground-union voxels contain about 86.4\% of positive
 transitions in both runs.  However, isolated voxels cannot be processed

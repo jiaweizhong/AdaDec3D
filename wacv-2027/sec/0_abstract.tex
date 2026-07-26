@@ -2,24 +2,24 @@
 Recent 3D medical image segmentation is driven by increasingly heavy U-Net--based
 networks --- especially transformer-based decoders --- whose cost rises rapidly
 with volume resolution.  EffiDec3D reduces this cost by \emph{uniformly} shrinking
-decoder channels and removing high-resolution stages, showing that aggregate
-accuracy largely survives; but it removes capacity without explaining why it is
-unnecessary and treats the decoder as \emph{static}, applying identical computation to every
-voxel, organ, and patient.  It therefore never establishes where that decoder
-computation is actually needed: whether the
-residual benefit of a full decoder is spatially uniform or concentrated, how large
-and how one-sided it is, and whether the useful regions can be located at test
-time.  We resolve this through a controlled reimplementation of a full and a
+decoder channels and removing high-resolution stages while largely preserving
+aggregate accuracy.  However, Dice and FLOPs alone cannot explain how this
+simplification changes predictions: where additional decoder computation
+improves a prediction, where it degrades one, or whether these changes are
+spatially concentrated and predictable.  We examine these questions through a
+controlled reimplementation of a full and a
 compressed 3D UX-Net decoder on 13-organ abdominal CT, counting where the full
-decoder \emph{fixes} versus \emph{breaks} the efficient decoder's predictions.
-We find that its benefit is small and bidirectional --- a stronger decoder repairs and damages predictions in
-comparable amounts --- yet spatially concentrated at organ boundaries and small
+decoder produces \emph{positive transitions} (efficient wrong, full correct)
+versus \emph{negative transitions} (efficient correct, full wrong).
+We find that its benefit is small and bidirectional --- a stronger decoder
+improves and degrades predictions in comparable amounts --- yet spatially
+concentrated at organ boundaries and small
 structures, and predictable from the efficient model's own uncertainty.
 Quantitatively, the net benefit is only about $0.1\%$ of voxels, while roughly
-$86\%$ of the voxels it repairs fall in the top $20\%$ ranked by the efficient
+$86\%$ of positive transitions fall in the top $20\%$ ranked by the efficient
 model's entropy.  These findings show that efficient decoders are
-over-provisioned \emph{non-uniformly},
-and they motivate, and provide an evaluation protocol for, region-adaptive decoder
+not adequately characterized by aggregate accuracy and computation.  They
+motivate, and provide an evaluation protocol for, region-adaptive decoder
 allocation rather than uniform compression.
 \todo{Before submission: add cross-backbone/cross-dataset replication and the
 corrected region-level (contiguous-3D) opportunity result; retain ``predictable''

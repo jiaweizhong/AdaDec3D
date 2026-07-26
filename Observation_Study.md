@@ -9,15 +9,15 @@
 
 | | Paper A — this document | Paper B |
 |---|---|---|
-| **Claim** | The marginal utility of decoder capacity is spatially concentrated and entropy-predictable (**observation only**) | AdaDec3D realizes region-adaptive decoding — **iso-accuracy at lower executed cost** |
+| **Claim** | Dice and FLOPs alone are insufficient to explain efficient decoder design; positive, negative, and net transitions reveal where additional decoder computation helps (**observation only**) | AdaDec3D realizes region-adaptive decoding — **iso-accuracy at lower executed cost** |
 | **Venue** | MIDL / MLMI / ISBI | MICCAI 2026 / TMI |
 | **Gate** | O2/O3/O5/O9 pass ✅ (all passed 2026-07-25) | O7, O8, O11 + AdaDec3D beats controls |
-| **Key result** | Preliminary cross-seed evidence that decoder gain is small, concentrated and predictable; corrected regional analysis still required | **DICE ≈ EffiDec3D at meaningfully lower executed MACs** (input-adaptive) |
+| **Key result** | Preliminary cross-seed evidence that decoder benefit is small, concentrated and predictable; corrected regional analysis still required | **DICE ≈ EffiDec3D at meaningfully lower executed MACs** (input-adaptive) |
 
 > **Scope note**: Paper A is an **observation paper** — it characterizes *where*
-> extra decoder capacity has marginal utility (concentrated, entropy-predictable)
+> extra decoder capacity changes predictions in spatially concentrated and partly predictable regions
 > and does **not** claim realizable efficiency (that is Paper B). O5's small,
-> concentrated decoder gain (0.13% net) is read here as evidence that decoder
+> concentrated net transition (0.13%) is read here as evidence that decoder
 > capacity is *over-provisioned* — a finding that **motivates** the Paper B
 > efficiency direction, but is not itself an efficiency claim. The MAC-headroom
 > analysis in Part 4 is likewise Paper B motivation, reported here for context.
@@ -394,9 +394,9 @@ as final evidence:
 1. **O3:** the current implementation pools entropy bins from all subjects and
    correlates their bin means. Report subject-level AUROC/AUPRC for voxel error,
    calibration curves, and a subject-bootstrap confidence interval instead.
-2. **O9 utility:** the current recovery curve counts only positive E0-over-E1
-   transitions. Add a **net utility** curve (`positive − negative`) so selecting
-   a region that also destroys correct E1 voxels is penalized.
+2. **O9 transitions:** the current recovery curve counts only positive E0-over-E1
+   transitions. Add a **net transition** curve (`positive − negative`) so a region
+   that improves some E1 errors but also degrades correct E1 predictions is penalized.
 3. **O9 bootstrap:** resample the same subject indices for entropy and random
    policies (paired bootstrap). Store both CI bounds and require the lower bound
    to exceed zero at each pre-declared primary budget, rather than selecting the
@@ -748,7 +748,7 @@ save_obs("O4", {"dice": dice_summary, "entropy": ent_summary})
 
 ---
 
-### O5 — Decoder Gain Analysis *(critical Go/No-Go gate)*
+### O5 — Decoder Transition Analysis *(critical Go/No-Go gate)*
 
 **Question**: Does a stronger decoder produce net benefit primarily in high-entropy voxels?
 
@@ -816,7 +816,7 @@ print(f"Per-subject Spearman ρ: {rho_subj_mean:.3f}")
 print(f"Mean positive rate={mean_pos:.5f}  negative rate={mean_neg:.5f}")
 print(f"(Pooled Pearson is descriptive only — bins within subject are correlated)")
 
-# Figure: global net gain curve (descriptive) with per-subject r in title
+# Figure: global net-transition curve (descriptive) with per-subject r in title
 # Sort ALL four arrays together by entropy to keep curves aligned
 _sort_idx = np.argsort(global_bin_ent)
 x_plot = np.array(global_bin_ent)[_sort_idx]
@@ -828,10 +828,10 @@ plt.figure(figsize=(8, 5))
 plt.plot(x_plot, y_pos, "g--o", markersize=3, alpha=0.6, label="Positive rate")
 plt.plot(x_plot, y_neg, "r--o", markersize=3, alpha=0.6, label="Negative rate")
 plt.plot(x_plot, y_plot, "b-o", markersize=4,
-         label=f"Net gain (subj-r={r_subj_mean:.2f} [{r_ci_lo:.2f},{r_ci_hi:.2f}])")
+         label=f"Net transition (subj-r={r_subj_mean:.2f} [{r_ci_lo:.2f},{r_ci_hi:.2f}])")
 plt.axhline(0, color="k", linewidth=0.8, linestyle=":")
 plt.xlabel("Mean entropy (bin)"); plt.ylabel("Rate")
-plt.title("O5: Decoder Gain vs Uncertainty")
+plt.title("O5: Decoder Transitions vs Uncertainty")
 plt.legend(); plt.tight_layout()
 plt.savefig("/root/obs/O5_decoder_gain.png", dpi=150)
 plt.show()
@@ -904,6 +904,22 @@ concentrate at boundaries and small organs late in training.
 
 ### O7 — Cross-Dataset Consistency
 
+O7 is not limited to a single CT→MRI check. The final generality study should
+align with the representative task families evaluated in the original EffiDec3D
+paper (FeTA, BTCV, and the ten MSD tasks) without reproducing all 12 datasets:
+
+| Priority | Dataset | Modality / task | Role |
+|---:|---|---|---|
+| 1 | **BTCV** | abdominal CT, 13 organs | primary multi-organ experiment |
+| 2 | **FeTA 2021** | fetal brain MRI, 7 tissues | cross-modality and cross-anatomy replication |
+| 3 | **MSD Task01 BrainTumour** | multimodal brain MRI, lesion segmentation | organ→lesion generalization |
+| 4 | **MSD Task06 Lung** or **Task08 HepaticVessel** | CT lesion / thin vessel | small, sparse, or elongated target stress test |
+
+Freeze the final set of 3–4 datasets before inspecting results. On every dataset,
+report the same positive transition, negative transition, net transition,
+spatial concentration, and opportunity curve with subject-level confidence
+intervals.
+
 **Question**: Do O1–O5 findings replicate on FeTA (fetal brain MRI)?
 
 *Requires E0_feta and E1_feta from Part 2.*
@@ -963,9 +979,21 @@ save_obs("O7", {"feta_gain_entropy_subj_pearson_r": r_feta, "n_subjects": len(fe
 
 ---
 
-### O8 — Backbone Consistency
+### O8 — Architecture-Family Consistency
 
-**Question**: Does the O5 gain–entropy correlation hold with SwinUNETR instead of UXNET?
+| Model | Family | Required comparison |
+|---|---|---|
+| **3D UX-Net + EffiDec3D** | large-kernel CNN | primary matched full/efficient decoder pair |
+| **SwinUNETR + EffiDec3D** | hierarchical Transformer | matched cross-backbone pair |
+| **UNETR** | ViT | architecture control |
+| **nnU-Net** | strong self-configuring CNN baseline | ecological strong baseline |
+
+Only matched full/efficient pairs support decoder-specific claims. Unless an
+EffiDec3D counterpart is implemented under the same training protocol, UNETR
+and nnU-Net are controls for error patterns and spatial concentration, not
+causal decoder comparisons.
+
+**Question**: Does the O5 transition–entropy correlation hold with SwinUNETR instead of UXNET?
 
 *Requires E0_swin and E1_swin from Part 2.*
 
@@ -1012,14 +1040,14 @@ save_obs("O8", {"swin_gain_entropy_subj_pearson_r": r_swin, "n_subjects": len(sw
 ### O9 — Selective-Allocation Opportunity *(headline result for Paper A)*
 
 **Question**: At a predeclared compute budget, can entropy select contiguous
-regions with greater **net decoder utility** than matched random regions?
+regions with more favorable **net transitions** than matched random regions?
 
 The corrected implementation is in `EffiDec3D/run_observations.py`. It reports:
 
 1. A voxel-wise entropy oracle as a non-deployable upper bound.
 2. Non-overlapping 16³ blocks ranked by mean entropy.
 3. A 4-voxel context halo around every selected block.
-4. Net utility
+4. Net transition
    `(E0-correct/E1-wrong − E0-wrong/E1-correct) / all positive transitions`.
 5. A paired subject bootstrap: entropy and random use exactly the same resampled
    subject indices.
@@ -1046,7 +1074,7 @@ Outputs:
 
 - `/root/obs-seed1-corrected/O9_opportunity_corrected.png`
 - `results.json["O9_corrected"]`
-- Per-subject positive/negative counts, net utilities and executed-volume fractions
+- Per-subject positive/negative counts, net transitions and executed-volume fractions
   under `O9_corrected.subject_results`
 
 The old `results.json["O9"]` is retained only as a legacy positive-transition
@@ -1057,7 +1085,7 @@ Repeat the command with the seed-0 E1 checkpoint and a separate
 before checking their subject-level results.
 
 **Predeclared Go criterion**: at the 20% block budget, the entropy region selector
-has positive mean net utility and the lower bound of the paired 95% CI for
+has a positive mean net transition and the lower bound of the paired 95% CI for
 `entropy − matched random` is above zero. The same direction must hold for both
 E1 seeds. The 10% and 30% budgets are secondary sensitivity analyses.
 
@@ -1162,7 +1190,7 @@ difficulty. This demonstrates entropy captures difficulty beyond organ size alon
 
 ### O11 — Routing Signal Comparison
 
-**Question**: Which test-time difficulty signal best predicts decoder gain?
+**Question**: Which test-time difficulty signal best predicts decoder benefit?
 
 Run after O5. Evaluate five signals on the BTCV validation set:
 
@@ -1175,7 +1203,7 @@ Run after O5. Evaluate five signals on the BTCV validation set:
 | Boundary Probability | distance-to-foreground-boundary map | moderate |
 
 For each signal compute:
-- Pearson correlation with per-bin O5 net gain
+- Pearson correlation with per-bin O5 net transition
 - Inference latency overhead (ms/volume vs baseline)
 - Stability: BTCV vs FeTA correlation difference
 
@@ -1316,30 +1344,33 @@ confidence as Paper B baselines; it does not establish entropy as uniquely best.
 These results pass the **prototype gate**: uncertainty-guided regional refinement
 is sufficiently motivated to prototype Paper B. They do not yet pass the final
 Paper A submission gate. O3 needs a subject-level discrimination/calibration
-analysis; O9 needs paired subject bootstrap, net utility and contiguous-region
+analysis; O9 needs paired subject bootstrap, net transitions and contiguous-region
 routing. The corrected analyses must retain a positive subject-bootstrap lower
 bound at a predeclared budget.
 
-### Generalization criteria (not yet run — need FeTA / SwinUNETR)
+### Generalization criteria (not yet run)
 
 | Obs | Criterion | Result | Pass? |
 |-----|-----------|--------|-------|
-| O7 | FeTA replication: net-gain/entropy r > 0.40 | pending E0/E1-FeTA | ☐ |
-| O8 | SwinUNETR backbone: net-gain/entropy r > 0.45 | pending E0/E1-Swin | ☐ |
+| O7 | FeTA replication: net-transition/entropy r > 0.40 | pending E0/E1-FeTA | ☐ |
+| O7 | One predeclared MSD lesion/thin-structure task shows the same transition concentration trend | pending MSD pair | ☐ |
+| O8 | SwinUNETR backbone: net-transition/entropy r > 0.45 | pending E0/E1-Swin | ☐ |
+| O8 | UNETR and nnU-Net ecological controls included without decoder-causal claims | pending controls | ☐ |
 | O11 | Entropy is best or tied-best cheap routing signal | confidence 0.663 vs entropy 0.655; MC dropout inactive | ◐ partial |
 
 ---
 
-### Interpretation — decoder capacity is over-provisioned (Paper A finding)
+### Interpretation — why Dice and FLOPs are not enough (Paper A finding)
 
-O5's decoder gain is **small**: for seed 0 the positive/negative transition rates
+O5's net transition is **small**: for seed 0 the positive/negative transition rates
 are 0.339%/0.209% (about 0.130% net), while for seed 1 they are
 0.290%/0.225% (about 0.065% net). The direction is stable, although our enlarged
 E0–E1 DICE gap means the magnitude cannot yet be claimed as an exact reproduction
 of the paper's near-parity (79.74 vs 79.25).
 
-As a **Paper A observation**, this reads as: the *marginal utility* of extra
-decoder capacity is small in aggregate, concentrated where entropy is high, and
+As a **Paper A observation**, this reads as: aggregate Dice and FLOPs hide where
+extra decoder capacity improves predictions and where it degrades them. The net
+change is small in aggregate, concentrated where entropy is high, and partly
 predictable (O9). The three observations line up:
 
 - O2: only about 1.2–1.3% of voxels have entropy above 0.5; difficulty is spatially sparse.
@@ -1394,7 +1425,7 @@ the iso-accuracy target.
 | Fig 2 | Entropy heatmap overlay (O2) |
 | Fig 3 | Entropy–error scatter by bin (O3) |
 | Fig 4 | Organ-wise difficulty bar plot (O4) |
-| Fig 5 | Net gain vs entropy curve (O5) |
+| Fig 5 | Net transition vs entropy curve (O5) |
 | Fig 6 | Difficulty evolution over training (O6) |
 | **Fig 7** | **Opportunity curve: entropy vs random (O9) — headline** |
 | Fig 8 | Organ size vs difficulty scatter (O10) |

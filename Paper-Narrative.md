@@ -77,27 +77,16 @@ Paper B 必须进一步证明两件 Paper A 没有证明的事：
 
 论文不能只讨论“哪里容易错”或“哪里 entropy 高”。这些问题已有大量研究，单独不足以形成强贡献。
 
-核心分析对象是额外 decoder capacity 带来的逐 voxel **decoder benefit**：
+核心分析对象不是“哪里容易错”，而是额外 decoder capacity 引起的逐 voxel
+**prediction transitions**。用最朴素的指标计数表达，**不引入新造的连续“效用”量**：
 
-$$
-\Delta(v) =
-\ell_{\mathrm{Effi}}(v) -
-\ell_{\mathrm{Full}}(v),
-$$
+- **Positive transition** $P(v)=\mathbb{1}[\hat y_{\mathrm{Effi}}(v)\neq y(v)\ \wedge\ \hat y_{\mathrm{Full}}(v)=y(v)]$：EffiDec3D 错、Full decoder 对，即额外 decoder 改善了预测；
+- **Negative transition** $N(v)=\mathbb{1}[\hat y_{\mathrm{Effi}}(v)=y(v)\ \wedge\ \hat y_{\mathrm{Full}}(v)\neq y(v)]$：EffiDec3D 对、Full decoder 错，即额外 decoder 使预测退化；
+- **Net transition** $U(v)=P(v)-N(v)$；聚合率 $R_{\mathrm{net}}=\mathrm{mean}_v P(v)-\mathrm{mean}_v N(v)$。
 
-其中：
-
-- $\ell_{\mathrm{Effi}}(v)$ 是轻量 EffiDec3D 在 voxel $v$ 的损失；
-- $\ell_{\mathrm{Full}}(v)$ 是 matched full decoder 在同一 voxel 的损失；
-- $\Delta(v)>0$ 表示额外 decoder capacity improves prediction；
-- $\Delta(v)<0$ 表示 full decoder degrades prediction；
-- $\Delta(v)\approx0$ 表示额外计算没有实质收益。
-
-同时报告离散标签转移：
-
-- **Positive transition**：EffiDec3D 错、Full decoder 对，即额外 decoder 改善了预测；
-- **Negative transition**：EffiDec3D 对、Full decoder 错，即额外 decoder 降低了预测质量；
-- **Net transition**：positive transition − negative transition。
+> 早期草稿曾用连续量 $\Delta(v)=\ell_{\mathrm{Effi}}(v)-\ell_{\mathrm{Full}}(v)$（“marginal
+> utility”）作为核心量；现已**弃用**，改用上述离散标签转移，避免另造术语，并与
+> Observation_Study 的 O-metric glossary 及正文保持一致（`grep -ri marginal` 应为 0）。
 
 这样可以避免把任何 prediction disagreement 都错误解释成“full decoder 带来改善”。
 
@@ -128,21 +117,25 @@ Dice 和 FLOPs 只给出整例精度与总计算量，无法揭示额外 decoder
 
 > The benefit of additional decoder capacity varies substantially across spatial regions and anatomical structures.
 
-### 推荐贡献写法
+### 推荐贡献写法（三条，与论文 C1/C2/C3 对齐）
 
-1. **An evaluation beyond Dice and FLOPs**
-   不再只比较整幅图像的 Dice/FLOPs，而是测量额外 decoder capacity 在 subject、organ、boundary 和 voxel region 上引起的 positive、negative 和 net transitions。
+论文集中在**三条**贡献，不再写成四条发散的贡献：
 
-2. **A systematic characterization of where decoder computation helps**  
-   分析收益集中度、边界距离、器官大小、训练演化，并明确区分 segmentation difficulty 与 decoder-specific benefit。
+1. **C1 — 超越 Dice/FLOPs 的 transition-count 比较**
+   不再只比较整幅图像的 Dice/FLOPs，而是逐 voxel 计数 positive、negative 和 net
+   transitions，并做 subject-level bootstrap，避免把任何 disagreement 当作改善。
 
-3. **A selective-allocation opportunity analysis**  
-   绘制“被分配额外计算的 voxel/region 比例”与“覆盖的 positive/net transition 比例”之间的 opportunity curve，并与 random、boundary、confidence 等 controls 比较。
+2. **C2 — decoder 收益小、双向且空间集中**
+   聚合 net 收益很小（约 0.1% voxels）且被 negative transitions 大量抵消，但高度
+   非均匀：集中在器官边界（boundary error 3.93× interior）与小器官（size–difficulty
+   $\rho=-0.54$；控制 log size 后 entropy 仍解释 difficulty，partial $r=0.81$）。
 
-4. **Evidence for consistency and predictability**  
-   使用 subject-level confidence interval、多个 seed、跨数据集和跨 backbone 实验，检验该现象是否稳定以及低成本信号能否预测 held-out decoder benefit。
+3. **C3 — 该收益在测试时可预测**
+   用 efficient 模型自身的 entropy 排序 contiguous 3D regions，在预声明预算下 net
+   收益约为 matched random 的五倍，paired subject-bootstrap 下界 > 0。
 
-不要把“首次”“90% FLOPs”“只需 5% voxels”等措辞写进贡献，除非实验和文献检索都能支持。
+Generalizability（跨 seed / backbone / dataset）**不单列为第四条贡献**，而是贯穿
+C1–C3 的稳健性检验（O7/O8）。不要把“首次”“90% FLOPs”“只需 5% voxels”等措辞写进贡献，除非实验和文献检索都能支持。
 
 ---
 
@@ -230,24 +223,38 @@ Related Work 的落点应是：
 
 - 随训练 checkpoint 的变化；
 - CT → MRI、multi-organ → lesion/organ 跨数据集；
-- 3D UX-Net + EffiDec3D → SwinUNETR 跨 matched decoder pair；
-- UNETR 与 nnU-Net 作为不同设计范式的 ecological controls；
+- 3D UX-Net + EffiDec3D → SwinUNETR + EffiDec3D（+ 可选 SwinUNETRv2、MedNeXt）跨 matched decoder pair；
 - entropy、margin、MC-dropout、boundary proxy 等 signal comparison。
+
+> **不含 UNETR / nnU-Net。** 它们没有官方 EffiDec3D pair，matched transition 无从定义，
+> 不纳入 generality matrix（详见 §5.4）。
 
 O11 如果涉及训练 router 或方法组件，应移到 Paper B；Paper A 只比较无需 AdaDec3D 训练即可计算的 signals。
 
 ### 5.4 Generality protocol
 
-Generality 必须同时覆盖 architecture family 与 dataset diversity，不能只增加一个 SwinUNETR 实验后声称普适。推荐按以下层级执行：
+Generality 必须同时覆盖 architecture family 与 dataset diversity，不能只增加一个
+SwinUNETR 实验后声称普适。**严格对齐 EffiDec3D 原文实际构建过 decoder pair 的
+backbone**——即 3D UX-Net、SwinUNETR、SwinUNETRv2、MedNeXt——每个都是 matched
+full/efficient pair，可做完整 O1–O11 transition 分析：
 
 | 层级 | 模型 | 代表性 | 在 Paper A 中的作用 |
 |---|---|---|---|
-| Primary | **3D UX-Net + EffiDec3D** | large-kernel CNN encoder + efficient decoder | matched full/efficient decoder 主因果比较 |
-| Cross-backbone | **SwinUNETR + EffiDec3D** | hierarchical Transformer | 检验 decoder benefit 是否跨 encoder family 保持 |
-| Architecture control | **UNETR** | ViT encoder | 检验结论是否依赖 shifted-window 或 large-kernel 特征 |
-| Strong baseline | **nnU-Net** | self-configuring CNN baseline | 提供不依赖 EffiDec3D 的强基线与 error/concentration 参照 |
+| Primary | **3D UX-Net + EffiDec3D** | large-kernel CNN | matched full/efficient decoder 主因果比较（全 O1–O11） |
+| Cross-backbone | **SwinUNETR + EffiDec3D** | hierarchical Transformer | 检验 decoder benefit 是否跨 encoder family 保持（全 O1–O11） |
+| 可选深化 | **SwinUNETRv2 / MedNeXt-M-K3 + EffiDec3D** | Transformer v2 / ConvNeXt 式大核 | 额外 matched pair，加深 backbone 覆盖 |
 
-其中，只有存在结构匹配的 full/efficient decoder pair 时，才把 prediction transition 归因于 decoder 变化。UNETR 与 nnU-Net 若没有对应的 EffiDec3D 版本，只作为 ecological controls；不能把两个独立模型的差异写成 decoder-specific benefit。
+**不纳入 UNETR 与 nnU-Net。** EffiDec3D 从未为它们构建 decoder pair（UNETR 本身已
+经很轻，82.6 vs 337.6 GFLOPs；nnU-Net 自配置 decoder，固定 EffiDec3D decoder 不适
+用）。对它们而言 matched transition 比较无从定义，强行拼一个非官方 EffiDec3D 版本属于
+无根据的扩展。若 reviewer 追问非 EffiDec3D 架构，最多把它们作为 single-model 的
+O1/O2/O10 concentration 参照，**绝不用于 decoder-causal claim**。
+
+**Scope — decoder only。** EffiDec3D 只改 decoder（统一通道压缩 + 去高分辨率层），
+**encoder 在 Full 与 Effi 之间完全一致**。因此每个 transition（O5/O9/O11）都是 encoder
+恒定下的干净 decoder 消融——这正是把收益归因于 decoder capacity 的依据；同时也意味着
+Paper A 对 **encoder（未触及的约 57.8% MACs）不作任何结论**，encoder 是否过配属于
+Paper B 的问题（需要 per-stage effective rank / probing / CKA 等不同工具，而非 transition pair）。
 
 数据集与 EffiDec3D 原文的评估范围对齐。原文覆盖 FeTA、BTCV 和 MSD 十项任务；Paper A 不必重复十二项，但应预先选择 3–4 个有代表性的任务：
 
@@ -310,8 +317,7 @@ Generality 必须同时覆盖 architecture family 与 dataset diversity，不能
 使用统一坐标展示：
 
 - BTCV / FeTA / MSD BrainTumour / MSD Lung 或 HepaticVessel；
-- 3D UX-Net + EffiDec3D / SwinUNETR + EffiDec3D；
-- UNETR / nnU-Net ecological controls；
+- 3D UX-Net + EffiDec3D / SwinUNETR + EffiDec3D（+ 可选 SwinUNETRv2 / MedNeXt）；
 - 不同训练 checkpoint；
 - 多个随机 seed。
 

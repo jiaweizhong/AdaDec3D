@@ -36,7 +36,7 @@ log() { echo "[$(date '+%H:%M:%S')] $*" | tee -a $LOG; }
 
 # ── E0: Full SwinUNETR (upper bound) ─────────────────────────────────────────
 run_E0() {
-    E0_CKPT=$(ls $OUT/E0_swin*/SwinUNETR/BTCV13/best_metric_model.pth 2>/dev/null | head -1)
+    E0_CKPT=$(ls $OUT/E0_swin*/SwinUNETR/BTCV13/best_metric_model.pth 2>/dev/null | head -1 || true)
     if [ -n "$E0_CKPT" ]; then
         log "E0 checkpoint found: $E0_CKPT — running test/inference only"
         python main_train_BTCV_TU.py $COMMON \
@@ -61,8 +61,8 @@ run_E1() {
 
 # ── Observations: O1–O11 for the matched Swin pair ───────────────────────────
 run_obs() {
-    E0_CKPT=$(ls $OUT/E0_swin*/SwinUNETR/BTCV13/best_metric_model.pth 2>/dev/null | head -1)
-    E1_CKPT=$(ls $OUT/E1_swin*/SwinUNETR_EffiDec3D/BTCV13/best_metric_model.pth 2>/dev/null | head -1)
+    E0_CKPT=$(ls $OUT/E0_swin*/SwinUNETR/BTCV13/best_metric_model.pth 2>/dev/null | head -1 || true)
+    E1_CKPT=$(ls $OUT/E1_swin*/SwinUNETR_EffiDec3D/BTCV13/best_metric_model.pth 2>/dev/null | head -1 || true)
     if [ -z "$E0_CKPT" ] || [ -z "$E1_CKPT" ]; then
         log "Observations skipped — need both E0 and E1 (E0='$E0_CKPT' E1='$E1_CKPT')"
         return

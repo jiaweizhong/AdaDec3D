@@ -4,8 +4,9 @@ networks --- especially transformer-based decoders --- whose cost rises rapidly
 with volume resolution.  EffiDec3D reduces this cost by \emph{uniformly} shrinking
 decoder channels and removing high-resolution stages, showing that aggregate
 accuracy largely survives; but it removes capacity without explaining why it is
-unnecessary and treats the decoder as \emph{static}.  It therefore never
-establishes where that decoder computation is actually needed: whether the
+unnecessary and treats the decoder as \emph{static}, applying identical computation to every
+voxel, organ, and patient.  It therefore never establishes where that decoder
+computation is actually needed: whether the
 residual benefit of a full decoder is spatially uniform or concentrated, how large
 and how one-sided it is, and whether the useful regions can be located at test
 time.  We resolve this through a controlled reimplementation of a full and a

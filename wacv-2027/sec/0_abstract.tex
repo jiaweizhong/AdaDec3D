@@ -1,27 +1,21 @@
 \begin{abstract}
-Recent 3D medical image segmentation is driven by increasingly heavy U-Net--based
-networks --- especially transformer-based decoders --- whose cost rises rapidly
-with volume resolution.  EffiDec3D reduces this cost by \emph{uniformly} shrinking
-decoder channels and removing high-resolution stages while largely preserving
-aggregate accuracy.  However, Dice and FLOPs alone cannot explain how this
-simplification changes predictions: where additional decoder computation
-improves a prediction, where it degrades one, or whether these changes are
-spatially concentrated and predictable.  We examine these questions through a
-controlled reimplementation of a full and a
-compressed 3D UX-Net decoder on 13-organ abdominal CT, counting where the full
-decoder produces \emph{positive transitions} (efficient wrong, full correct)
-versus \emph{negative transitions} (efficient correct, full wrong).
-We find that its benefit is small and bidirectional --- a stronger decoder
-improves and degrades predictions in comparable amounts --- yet spatially
-concentrated at organ boundaries and small
-structures, and predictable from the efficient model's own uncertainty.
-Quantitatively, the net benefit is only about $0.1\%$ of voxels, yet at a
-predeclared budget the efficient model's entropy selects contiguous 3D regions whose
-net benefit is roughly five times that of matched random regions, with a positive
-paired subject-bootstrap lower bound.  These findings show that efficient decoders are
-not adequately characterized by aggregate accuracy and computation.  They
-motivate, and provide an evaluation protocol for, region-adaptive decoder
-allocation rather than uniform compression.
-\todo{Before submission: add cross-backbone/cross-dataset replication; retain
-``predictable'' only if it survives.}
+Efficient decoders substantially reduce the cost of volumetric medical image
+segmentation by uniformly shrinking decoder channels and removing
+high-resolution stages, yet Dice and FLOPs alone do not explain how this
+simplification changes predictions: they cannot reveal where additional decoder
+capacity improves a prediction, where it degrades one, or whether these changes
+are spatially concentrated and predictable.  We study this through a controlled
+comparison of a full and a compressed 3D UX-Net decoder that share an identical
+encoder, counting per voxel the \emph{positive transitions} the full decoder
+produces (efficient wrong, full correct) and the \emph{negative transitions}
+(efficient correct, full wrong).  On 13-organ abdominal CT, the full decoder's
+net benefit is small and bidirectional---about $0.1\%$ of voxels, largely offset
+by degradations---yet concentrated at organ boundaries and small structures and
+predictable from the efficient model's own uncertainty: at a predeclared budget,
+entropy-ranked contiguous 3D regions capture the net benefit at roughly five
+times the rate of matched-random regions, with a positive paired subject
+bootstrap.  These findings show why aggregate accuracy and computation are
+insufficient for understanding efficient decoder design, and provide an
+evaluation protocol for region-adaptive decoder allocation rather than uniform
+compression.
 \end{abstract}

@@ -3,62 +3,60 @@
 
 \paragraph{What the evidence supports.}
 Across two efficient-decoder seeds, the direction of the central observation is
-stable: additional decoder capacity produces a small, bidirectional aggregate
-effect, and its net benefit increases with an uncertainty proxy.  Boundary and
-organ analyses further show that segmentation difficulty is spatially
-heterogeneous.  Together, these findings justify testing selective regional
-decoding rather than applying a uniformly expensive decoder.
+stable: the full decoder's aggregate benefit is small and bidirectional, and its
+net benefit rises with the efficient model's uncertainty.  Boundary and organ
+analyses show that difficulty is spatially heterogeneous, and the region-level
+opportunity curve shows that entropy-selected contiguous regions carry
+disproportionate net benefit.  Together these justify testing selective regional
+decoding rather than a uniformly expensive decoder.
 
 \paragraph{What it does not yet support.}
-The current study does not demonstrate lower \emph{executed} compute for an
-adaptive model.  Our region-level opportunity curve shows that entropy-selected
-contiguous regions carry disproportionate \emph{net} benefit, but it still uses
-full-model predictions to define that benefit retrospectively and does not account
-for errors introduced by a learned refinement module; the voxel-level $86.4\%$
-recovery figure is an oracle upper bound, not a realizable router.  Dynamic FLOPs,
-latency, memory, and final Dice must therefore be evaluated in a separate method
-study.  Our analysis is also
-\emph{decoder-only} by construction: because EffiDec3D alters the decoder while
-keeping the encoder identical, every transition isolates decoder capacity, but the
-study says nothing about the encoder, which accounts for the larger share of
+The study does not demonstrate lower \emph{executed} compute for an adaptive
+model.  The opportunity curve uses full-model predictions to define benefit
+retrospectively and does not account for errors introduced by a learned
+refinement module; the voxel-level $86.4\%$ recovery figure is an oracle upper
+bound, not a realizable router.  Dynamic FLOPs, latency, memory, and final Dice
+must be evaluated in a separate method study.  The analysis is also
+\emph{decoder-only} by construction: because \method{} alters the decoder while
+holding the encoder identical, every transition isolates decoder capacity, but
+the study says nothing about the encoder, which accounts for the larger share of
 compute.  Whether encoder computation is similarly over-provisioned is a distinct
-question requiring different, representational probes and is left to future work.
+question requiring representational probes rather than a transition pair, and is
+left to future work.
 
 \paragraph{Reproduction gap.}
-Our efficient baseline remains 1.70--2.25 Dice points below the published
+Our efficient baseline remains $1.70$--$2.25$ Dice points below the published
 result, while the full baseline is much closer.  The most plausible unresolved
-difference is data preprocessing: our reconstructed files have identity affine
-metadata, whereas the original work used a processed dataset not distributed
-with the repository.  The enlarged local full--efficient gap could inflate the
-amount of apparent decoder opportunity.  We mitigate this by disclosing all
-values, analyzing two efficient seeds, and limiting claims to controlled local
-comparisons.  A paper-equivalent preprocessing run and matched multi-seed full
-baseline remain important controls.
+difference is preprocessing: our reconstructed files have identity affine
+metadata, whereas the original work used a processed dataset not distributed with
+the code.  We tested the obvious remedy---disabling spatial resampling---and it
+was decisively worse ($\approx\!10$ Dice points), so bypassing resampling is not
+the fix.  The enlarged local full--efficient gap could inflate the apparent
+amount of decoder opportunity; we mitigate this by disclosing all values,
+analyzing two seeds, and limiting claims to controlled local comparisons and net
+(not positive-only) transitions.
 
 \paragraph{Statistical limitations.}
-The dataset contains only 12 validation subjects.  Confidence intervals are
-therefore wide, and millions of voxels must not be interpreted as independent
-observations.  Our early entropy--error coefficient pooled bins across subjects
-and is retained only as a descriptive diagnostic.  Final error predictability
-will use subject-level AUROC/AUPRC and calibration.  Budgets and primary
-endpoints must be declared before examining the corrected O9 results.
+The validation set contains only twelve subjects, so confidence intervals are
+wide and millions of voxels must not be treated as independent.  The
+entropy--error coefficient we report ($r=0.97$) pools bins across subjects and is
+retained only as a descriptive diagnostic; final error predictability should use
+subject-level AUROC/AUPRC and calibration.
 
 \paragraph{Generalization.}
-All completed results currently use one CT dataset and one backbone family.
-Without cross-backbone and cross-modality replication, the finding may be
-specific to 3D UX-Net, the Synapse split, or EffiDec3D's resolution restriction.
-The planned generality ladder uses matched decoder comparisons across the
-EffiDec3D backbone family (3D UX-Net and Swin UNETR, optionally SwinUNETRv2 and
-MedNeXt) and representative tasks from the original EffiDec3D scope (BTCV, FeTA,
-and predeclared MSD lesion/thin-structure tasks).  We restrict the ladder to
-backbones EffiDec3D actually pairs a decoder with, since a matched transition
-comparison is undefined for architectures (e.g.\ UNETR, nnU-Net) that the method
-never equips with an efficient decoder.  The final claim will be narrowed if
-these experiments do not reproduce the direction.
+All completed results use one CT dataset and one backbone.  Without
+cross-backbone and cross-modality replication, the finding may be specific to 3D
+UX-Net, the Synapse split, or \method{}'s resolution restriction.  The planned
+ladder uses matched pairs across the \method{} backbone family (3D UX-Net and
+Swin UNETR, optionally SwinUNETR-V2 and MedNeXt) and representative tasks from
+the original \method{} scope; we restrict it to backbones \method{} actually
+equips with an efficient decoder, since a matched transition comparison is
+undefined otherwise.  The final claim will be narrowed if these experiments do
+not reproduce the direction.
 
 \paragraph{Clinical interpretation.}
 High uncertainty and small-organ difficulty do not imply clinical safety.
-Entropy can miss confidently wrong predictions, and improving average Dice
-does not guarantee preservation of clinically important boundaries.  Any
-future adaptive decoder should therefore retain a conservative fallback and be
-evaluated per organ and per subject, not only by average compute.
+Entropy can miss confidently wrong predictions, and improving average Dice does
+not guarantee preservation of clinically important boundaries.  Any future
+adaptive decoder should retain a conservative fallback and be evaluated per organ
+and per subject, not only by average compute.

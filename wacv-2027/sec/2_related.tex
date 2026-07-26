@@ -1,43 +1,40 @@
 \section{Related Work}
 \label{sec:related}
 
-\paragraph{3D medical image segmentation.}
-U-shaped encoder--decoder networks remain the dominant design for volumetric
-segmentation.  UNETR~\cite{hatamizadeh2022unetr} uses a transformer encoder and
-a convolutional decoder connected by multi-scale skips, while Swin
-UNETR~\cite{tang2022swinunetr} introduces hierarchical shifted-window
-representations.  3D UX-Net~\cite{lee20233duxnet} instead approximates
-hierarchical transformer behavior with large-kernel depthwise convolutions.
-nnU-Net~\cite{isensee2021nnunet} demonstrates that data-dependent pipeline
-configuration and rigorous evaluation can be as important as architectural
-novelty.  These works primarily optimize segmentation accuracy; our study
-instead examines the spatial benefit of the decoder computation already
-present in such systems.
+\paragraph{Efficient decoders for 3D segmentation.}
+U-shaped encoder--decoder networks dominate volumetric segmentation.  Recent
+backbones raise accuracy with heavier computation: UNETR~\cite{hatamizadeh2022unetr}
+and Swin UNETR~\cite{tang2022swinunetr,he2023swinunetrv2} use transformer
+encoders, while 3D UX-Net~\cite{lee20233duxnet} and
+MedNeXt~\cite{roy2023mednext} use large-kernel convolutions, and
+nnU-Net~\cite{isensee2021nnunet} shows that pipeline configuration alone is
+strongly competitive.  In several of these models the decoder, with its wide,
+high-resolution stages, dominates cost.  \method{}~\cite{rahman2025effidec3d}
+uniformly reduces decoder channels and removes high-resolution stages, preserving
+aggregate accuracy across twelve tasks at much lower cost.  These methods answer
+\emph{how much} decoder computation can be removed on average; we instead ask
+\emph{where} the removed computation would have helped, by comparing a matched
+full and efficient decoder rather than proposing a new compression block.
 
-\paragraph{Efficient decoders.}
-EffiDec3D~\cite{rahman2025effidec3d} observes that wide, high-resolution
-decoder stages dominate the cost of several 3D models.  It uses a uniform
-reduced channel width and removes stages whose aggregate accuracy contribution
-is small.  Across 12 tasks, the resulting static decoder preserves competitive
-accuracy at much lower cost.  We take this result as a starting point and ask a
-different question: whether the small residual benefit of the full decoder is
-spatially uniform.  Our work is an evaluation of where the decoder helps, not a
-new compression block.
+\paragraph{Uncertainty and difficulty estimation.}
+Predictive entropy, confidence, and Monte-Carlo dropout~\cite{gal2016dropout} are
+widely used to flag ambiguous predictions.  Such signals identify where a model
+is uncertain, but ambiguity is not the same as decoder benefit: an uncertain
+voxel may remain wrong after additional decoding, and a confident voxel may still
+be correctable.  We therefore evaluate signals against held-out \emph{net
+transitions} between matched decoders, not against error alone.
 
-\paragraph{Uncertainty and selective computation.}
-Predictive entropy and confidence are widely used as uncertainty proxies.
-They identify ambiguous predictions, but ambiguity and decoder benefit are not
-equivalent: an uncertain location may remain wrong after additional decoding,
-whereas a confident error may still be correctable.  Accordingly, we evaluate
-signals against held-out \emph{net transitions} between matched decoders rather
-than against error alone.  We also distinguish arbitrary voxel ranking from
-contiguous region selection, since sparse isolated voxels cannot be processed
-efficiently by standard 3D convolutions.
+\paragraph{Conditional computation and adaptive inference.}
+Dynamic networks allocate computation input-adaptively, spatially, or per
+sample~\cite{han2021dynamic}.  Realizing such allocation for a 3D decoder
+presupposes that the useful computation is spatially concentrated and
+identifiable before it is executed---an empirical premise that is usually assumed
+rather than tested.  Our study isolates and tests exactly this premise; designing
+a trained adaptive decoder is left to future work.
 
 \paragraph{Evaluation and reproducibility.}
-Small medical datasets create substantial seed and split variance, while
-voxel-level statistical tests can produce severe pseudo-replication.
-Our protocol therefore reports seed-level results, discloses deviations from
-published baselines, and bootstraps subjects rather than voxels.  This emphasis
-on auditing what aggregate metrics conceal aligns with the goals of the WACV
-Evaluations \& Datasets track.
+Small medical datasets create substantial seed and split variance, and
+voxel-level statistical tests can produce severe pseudo-replication.  Our protocol
+reports seed-level results, discloses deviations from published baselines, and
+bootstraps subjects rather than voxels.  This emphasis on auditing what aggregate
+metrics conceal aligns with the goals of the WACV Evaluations \& Datasets track.

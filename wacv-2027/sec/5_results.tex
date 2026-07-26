@@ -6,8 +6,8 @@
 \begin{table}[t]
 \centering
 \caption{BTCV controlled reimplementation. Published values are shown only for
-calibration; our paired analyses use the local runs. MAC denotes multiply--
-accumulate operations under our profiler.}
+calibration; our paired analyses use the local runs. MAC denotes
+multiply--accumulate operations under our profiler.}
 \label{tab:baseline}
 \resizebox{\columnwidth}{!}{
 \begin{tabular}{lrrrrr}
@@ -15,30 +15,27 @@ accumulate operations under our profiler.}
 Model & Dice $\uparrow$ & HD95 $\downarrow$ & MAC & Params & Lat.\\
  & & & (G) & (M) & (ms)\\
 \midrule
-Published Full-UX & .7974 & -- & 631.97 & 53.00 & --\\
-Published Effi-UX & .7925 & 10.12 & 51.47 & 3.16 & --\\
+Published \fullmodel{} & .7974 & -- & 631.97 & 53.00 & --\\
+Published \effimodel{} & .7925 & 10.12 & 51.47 & 3.16 & --\\
 \midrule
-Full-UX, seed 0 & .7918 & 9.04 & 578.74 & 53.007 & 40.6\\
-Effi-UX, seed 0 & .7700 & 14.41 & 41.06 & 2.955 & 7.5\\
-Effi-UX, seed 1 & .7755 & 10.17 & 41.06 & 2.955 & 7.6\\
+\fullmodel{}, seed 0 & .7918 & 9.04 & 578.74 & 53.007 & 40.6\\
+\effimodel{}, seed 0 & .7700 & 14.41 & 41.06 & 2.955 & 7.5\\
+\effimodel{}, seed 1 & .7755 & 10.17 & 41.06 & 2.955 & 7.6\\
 \bottomrule
 \end{tabular}}
 \end{table}
 
 Table~\ref{tab:baseline} shows that the full model closely approaches the
 published Dice (a 0.56-point difference), whereas the two efficient runs remain
-1.70--2.25 points below the published efficient model.  Seed 1 nearly matches
-the published HD95.  The two-seed efficient mean Dice is 0.7728.
-Accordingly, seed variance explains part, but not all, of the reproduction gap.
-The local E0--E1 Dice gap (1.63--2.18 points) is larger than the published
-0.49-point gap, and we do not attribute its full magnitude to decoder
-compression.
+1.70--2.25 points below the published efficient model.  The two-seed efficient
+mean is 0.7728, and seed 1 nearly matches the published HD95.  The local
+\fullmodel{}--\effimodel{} Dice gap (1.63--2.18 points) is larger than the
+published 0.49-point gap; we do not attribute its full magnitude to decoder
+compression.  Efficiency trends reproduce strongly: \effimodel{} uses
+$14.1\times$ fewer MACs, $17.9\times$ fewer parameters, $5.3$--$5.4\times$ lower
+latency, and roughly $7.7\times$ lower peak inference memory than \fullmodel{}.
 
-Efficiency trends reproduce strongly: \effimodel{} uses 14.1$\times$ fewer
-MACs, 17.9$\times$ fewer parameters, 5.3--5.4$\times$ lower measured latency,
-and approximately 7.7$\times$ lower peak inference memory than our \fullmodel{}.
-
-\subsection{Errors Are Anatomically Concentrated}
+\subsection{Errors and Uncertainty Are Anatomically Concentrated}
 
 \begin{figure}[t]
 \centering
@@ -46,65 +43,67 @@ and approximately 7.7$\times$ lower peak inference memory than our \fullmodel{}.
 \textbf{(a) Per-organ error.}\\[1mm]
 \includegraphics[width=0.96\columnwidth]{figures/O6_entropy_evolution.png}\\[-1mm]
 \textbf{(b) Entropy over training.}
-\caption{Current anatomical and temporal observations for Effi-UX seed 1.
-Entropy contracts during training but a residual difficult subset remains.}
-\label{fig:anatomy_training}
+\caption{Anatomical and temporal structure of difficulty (\effimodel{}, seed 1).
+Error concentrates at boundaries and small organs; entropy contracts during
+training but a residual difficult subset persists.}
+\label{fig:anatomy}
 \end{figure}
 
-For seed 1, mean boundary error is 0.1892 versus 0.0481 in the eroded interior,
-a ratio of 3.93.  Small and thin structures are disproportionately difficult:
-the organ-size/difficulty Spearman correlation is $-0.544$.  Entropy retains
-substantial association with organ difficulty after controlling for log volume
-(partial $r=0.810$), suggesting that size alone does not explain the signal.
+The premise for selective allocation is that difficulty is not spatially
+uniform.  Mean boundary error is $0.1892$ versus $0.0481$ in the eroded
+interior, a ratio of $3.93$ (Fig.~\ref{fig:anatomy}a).  Small and thin
+structures are disproportionately hard: the organ-size/difficulty Spearman
+correlation is $\rho=-0.54$, and entropy retains strong association with organ
+difficulty after controlling for log volume (partial $r=0.81$), so size alone
+does not explain the signal.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.86\columnwidth]{figures/O2_entropy.png}
-\caption{Voxel entropy distribution for Effi-UX seed 1 (log-count).  Uncertainty
-is spatially sparse: the median voxel entropy is near zero and only $1.18\%$ of
-voxels exceed $0.5$.}
-\label{fig:entropy_dist}
+\caption{Voxel entropy distribution (\effimodel{}, seed 1; log-count).
+Uncertainty is spatially sparse: the median voxel entropy is near zero and only
+$1.18\%$ of voxels exceed $0.5$.}
+\label{fig:entropy}
 \end{figure}
 
-Uncertainty is spatially sparse as well: the median voxel entropy is near zero
-and only $1.18\%$ of voxels exceed $0.5$ (Fig.~\ref{fig:entropy_dist}), so the
-difficult subset occupies a small fraction of the volume.  This is the premise
-that makes selective allocation plausible: most voxels are confidently easy, and
-any benefit from a stronger decoder must come from the sparse remainder.
-
-Difficulty also evolves systematically.  Mean entropy decreases from 0.0279 at
-5k iterations to 0.0166, 0.0126, 0.0123, and 0.0104 at 10k, 20k, 30k, and 45k,
-respectively (Fig.~\ref{fig:anatomy_training}).  Training removes much of the
-global ambiguity but does not eliminate the concentrated residual.
+Uncertainty is likewise sparse: the median voxel entropy is near zero and only
+$1.18\%$ of voxels exceed $0.5$ (Fig.~\ref{fig:entropy}).  Difficulty also
+evolves systematically---mean entropy falls from $0.0279$ at 5k iterations to
+$0.0166$, $0.0126$, $0.0123$, and $0.0104$ at 10k, 20k, 30k, and 45k
+(Fig.~\ref{fig:anatomy}b)---but training removes global ambiguity without
+eliminating the concentrated residual.  Most voxels are confidently easy; any
+benefit from a stronger decoder must come from the sparse remainder.
 
 \subsection{The Full Decoder's Benefit Is Small and Bidirectional}
 
 \begin{table}[t]
 \centering
-\caption{Transition-count observations across efficient-decoder seeds.
-Rates are fractions of evaluated voxels. O9 is a preliminary voxel oracle and
-is not the final contiguous-region result.}
+\caption{Transition-count observations across efficient-decoder seeds. Rates are
+fractions of evaluated voxels. The top-20\% recovery is a voxel oracle
+(Sec.~\ref{sec:study}), not the deployable region result.}
 \label{tab:transitions}
 \begin{tabular}{lrr}
 \toprule
-Metric & E1 seed 0 & E1 seed 1\\
+Metric & seed 0 & seed 1\\
 \midrule
 Positive transition rate & .00339 & .00290\\
 Negative transition rate & .00209 & .00225\\
 Net transition rate & .00130 & .00065\\
-Entropy--net transition $r$ & .665 & .646\\
+Subject entropy--net $r$ & .665 & .646\\
 Bootstrap 95\% CI & [.171,.996] & [.158,.994]\\
 Top-20\% positive recovery & .864 & .864\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The full decoder is not uniformly better.  For seed 0 it improves approximately
-0.339\% of voxel predictions while degrading 0.209\%; for seed 1 the corresponding values
-are 0.290\% and 0.225\%.  Thus the net label-transition benefit is only
-0.065--0.130\% of voxels.  Although this label-level statistic is not identical
-to Dice, it shows why positive and negative transitions must be reported
-together.
+The full decoder is not uniformly better.  For seed 0 it improves $0.339\%$ of
+voxel predictions while degrading $0.209\%$; for seed 1 the values are $0.290\%$
+and $0.225\%$ (Table~\ref{tab:transitions}).  The net label-transition benefit is
+therefore only $0.065$--$0.130\%$ of voxels, largely offset by negative
+transitions.  Although this label-level statistic is not identical to Dice, it
+shows why positive and negative transitions must be reported together: reporting
+positive transitions alone would overstate the decoder's benefit roughly
+twofold.
 
 \subsection{The Benefit Is Spatially Predictable}
 
@@ -114,40 +113,34 @@ together.
 \textbf{(a) Net transition vs.\ entropy.}\\[1mm]
 \includegraphics[width=0.96\columnwidth]{figures/O9_opportunity_corrected.png}\\[-1mm]
 \textbf{(b) Region-level opportunity curve.}
-\caption{Predictability for seed 1.  Panel (b) ranks contiguous $16^3$ blocks
-(plus a $4$-voxel halo) by mean entropy and reports \emph{net} transition utility
-against a matched-random selector with a paired subject bootstrap.}
+\caption{Predictability (seed 1). Net transitions rise with entropy (a); ranking
+contiguous $16^3$ blocks by entropy recovers net transition utility far above a
+matched-random selector (b).}
 \label{fig:opportunity}
 \end{figure}
 
 The subject-level entropy--net-transition correlation is positive for both
-efficient seeds (Table~\ref{tab:transitions}), and its subject-bootstrap lower bound
-remains above zero.  We convert this into a deployable test with a contiguous-region
-selector: non-overlapping $16^3$ blocks are ranked by mean entropy, each selected
-block is expanded by a $4$-voxel context halo, and we measure the \emph{net}
-transition utility (positive minus negative, normalized by all positive transitions)
-against a matched-random selector under a paired subject bootstrap.  At the
-predeclared $20\%$ block budget --- which executes $29.1\%$ of the foreground-union
-volume after halo expansion --- entropy-ranked regions attain a net utility of
-$0.225$ versus $0.043$ for random selection, roughly a five-fold gain, with a paired
-$95\%$ lower bound of $0.056>0$; the advantage remains significant at every budget of
-$10\%$ or more and vanishes only at $5\%$.  Crucially, the selected regions capture
-all positive transitions but also $77.5\%$ of the negative ones, so the honest
-headline is the \emph{net} gain rather than positive recovery alone.  A voxel-level
+seeds, with a subject-bootstrap lower bound above zero
+(Table~\ref{tab:transitions}, Fig.~\ref{fig:opportunity}a).  We convert this into
+a deployable test with the contiguous-region selector of
+Section~\ref{sec:study}.  At the predeclared $20\%$ block budget---which executes
+$29.1\%$ of the foreground-union volume after halo expansion---entropy-ranked
+regions attain a net utility of $0.225$ versus $0.043$ for random selection, a
+roughly fivefold gain, with a paired $95\%$ lower bound of $0.056>0$
+(Fig.~\ref{fig:opportunity}b).  The advantage is significant at every budget of
+$10\%$ or more and vanishes only at $5\%$.  Crucially, the selected regions
+capture all positive transitions but also $77.5\%$ of the negative ones, so the
+honest headline is the \emph{net} gain, not positive recovery.  A voxel-level
 oracle that ranks individual voxels and counts only positive transitions places
-$86.4\%$ of them in the top $20\%$; we report it solely as a non-deployable upper
-bound, since isolated voxels cannot be processed efficiently by standard 3D
-convolutions.  The benefit is therefore not only concentrated but identifiable at
-test time from the efficient model's own uncertainty.
+$86.4\%$ of them in the top $20\%$ (Table~\ref{tab:transitions}); we report it
+solely as a non-deployable upper bound.
 
-\todo{Before submission: add the same corrected region-level curve for a second Full
-seed and for the cross-backbone/cross-dataset cells.}
+Finally, we compare cheap routing signals against held-out net transitions.
+Confidence and entropy behave almost identically ($r=0.663$ and $0.655$);
+Monte-Carlo dropout is not a valid comparator for this checkpoint because the
+architecture has no active dropout, so its stochastic variance is effectively
+zero.  We therefore retain confidence as a required baseline and do not claim
+entropy is uniquely optimal.
 
-\subsection{Routing Signals}
-
-On seed 1, confidence and entropy have similar correlations with net transitions
-(0.663 and 0.655, respectively).  Monte-Carlo dropout is not a valid comparator
-for this checkpoint because the evaluated architecture has no active dropout;
-its measured stochastic variance is effectively zero.  We therefore retain
-confidence as a required cheap baseline and do not claim entropy is uniquely
-optimal.
+\todo{Add the matched Swin UNETR replication and the predeclared FeTA/MSD cells;
+current results are 3D UX-Net on BTCV only.}

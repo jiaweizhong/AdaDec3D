@@ -2,77 +2,74 @@
 \label{sec:experiments}
 
 \paragraph{Objectives.}
-Using the matched \fullmodel{}/\effimodel{} comparison of
-Section~\ref{sec:study}, our analysis establishes where the full decoder's benefit
-is concentrated, how large and how bidirectional it is, and whether the beneficial
-regions can be identified at test time from the efficient model's uncertainty ---
-the points left unresolved by aggregate efficient-decoder evaluation.
+Using the matched comparison of Section~\ref{sec:study}, our analysis
+establishes three things left unresolved by aggregate efficient-decoder
+evaluation: how large and how bidirectional the full decoder's benefit is, where
+it is concentrated anatomically, and whether the beneficial regions can be
+identified at test time from the efficient model's uncertainty.
 Section~\ref{sec:results} reports these in turn, preceded by the
 controlled-reimplementation baselines.
 
 \paragraph{Dataset and split.}
-We use the 13-organ BTCV/Synapse abdominal CT task with 18 training and 12
-validation volumes.  The evaluated organs are spleen, kidneys, gallbladder,
-esophagus, liver, stomach, aorta, inferior vena cava, portal/splenic veins,
-pancreas, and adrenal glands.  Images are intensity-windowed and resampled
-according to the public EffiDec3D training pipeline; training uses $96^3$
-patches.  The same validation subjects are paired across all model comparisons.
+The primary task is the 13-organ BTCV/Synapse abdominal CT benchmark with 18
+training and 12 validation volumes.  The evaluated structures are spleen, right
+and left kidney, gallbladder, esophagus, liver, stomach, aorta, inferior vena
+cava, portal and splenic veins, pancreas, and right and left adrenal glands.
+Images are intensity-windowed and resampled following the public \method{}
+pipeline; training uses $96^3$ patches.  The same validation subjects are paired
+across every model comparison.
 
-\paragraph{Models.}
-\fullmodel{} is the public full 3D UX-Net configuration with feature widths
-$[48,96,192,384]$.  \effimodel{} uses the corresponding EffiDec3D decoder with
-48 channels, additive skip aggregation, and resolution factor two.  Both are
-trained for 45k iterations with Dice--cross-entropy loss and AdamW.  We evaluate
-one \fullmodel{} run and two independently initialized \effimodel{} runs.
-\todo{Add a matched second Full-UX seed or explain why only E1 seed sensitivity
-is used.}
-
-\paragraph{Evaluation.}
-Segmentation quality is reported using mean and per-organ Dice and 95th
-percentile Hausdorff distance (HD95).  Efficiency measurements include
-parameters, MACs, latency, peak inference memory, and training time.
-Sliding-window inference uses a $96^3$ region, batch size four, overlap 0.7,
-and constant blending.  Observation confidence intervals resample subjects.
+\paragraph{Models and training.}
+\fullmodel{} is the public full 3D UX-Net~\cite{lee20233duxnet} configuration
+with feature widths $[48,96,192,384]$; \effimodel{} replaces its decoder with the
+\method{} decoder (48 channels, additive skip aggregation, resolution factor
+two).  Both are trained for 45k iterations with a Dice--cross-entropy loss and
+AdamW.  We evaluate one \fullmodel{} run and two independently initialized
+\effimodel{} runs.  Sliding-window inference uses a $96^3$ window, batch size
+four, overlap 0.7, and constant blending.  We report Dice and 95th-percentile
+Hausdorff distance (HD95), together with parameters, multiply--accumulate
+operations (MACs), latency, and peak inference memory.
 
 \paragraph{Reimplementation status.}
 Our data were reconstructed from the public TransUNet/Synapse release, whose
-NIfTI files have identity affine metadata, whereas the EffiDec3D paper refers
-to a processed \texttt{btcv\_trns} dataset.  Consequently, we present the
-experiment as a \emph{controlled reimplementation}, not an exact reproduction.
-All comparisons within our study use the same local data and evaluation code.
-We report the discrepancy from published numbers in full.
-Because every observation is relational (matched full versus efficient, or a
-single model on identical local data), a residual reproduction gap for any one
-backbone or dataset is disclosed in that cell's table footnote or figure legend
-and does not alter the aggregate direction of the finding; at most it affects the
-estimated \emph{magnitude} of that cell's opportunity, which we bound with net
-(not positive-only) transitions and subject-level bootstrap intervals.
+NIfTI files carry identity affine metadata, whereas \method{} refers to a
+processed \texttt{btcv\_trns} dataset that is not distributed.  We therefore
+present the experiment as a \emph{controlled reimplementation}, not an exact
+reproduction, and disclose the discrepancy from published numbers in full.
+Because every observation is relational---matched full versus efficient on
+identical local data---a residual reproduction gap for any one cell affects at
+most the estimated \emph{magnitude} of that cell's opportunity, which we bound
+with net (not positive-only) transitions and subject-level intervals; it does
+not change the direction of the finding.  We verified that this gap is not a
+precision artifact: re-evaluating the same weights in FP32 and BF16 gives
+identical Dice.
 
 \paragraph{Architecture generality.}
 We organize architecture coverage as a predeclared ladder over the backbones for
-which EffiDec3D actually defines a decoder pair, rather than treating one
-additional model as evidence of universality.  The primary causal comparison is
-the matched full/efficient 3D UX-Net pair (large-kernel CNN); a matched
-Swin UNETR/EffiDec3D pair tests whether the transition pattern transfers to a
-hierarchical Transformer, with SwinUNETRv2 and MedNeXt available as optional
-deeper matched pairs.  We deliberately restrict the ladder to these architectures:
-EffiDec3D builds an efficient decoder only where a large-channel, high-resolution
-decoder bottleneck exists, and does not pair one with UNETR (already lightweight)
-or nnU-Net (which self-configures its decoder).  For those a matched transition
-comparison is undefined, so we do not treat them as part of the study; an
-unofficial EffiDec3D variant would be an ungrounded extension rather than a
-control.
+which \method{} actually defines a decoder pair, rather than treating one extra
+model as proof of universality.  The primary causal comparison is the matched
+3D UX-Net pair (large-kernel CNN); a matched Swin UNETR~\cite{tang2022swinunetr}
+pair tests transfer to a hierarchical Transformer, with
+SwinUNETR-V2~\cite{he2023swinunetrv2} and MedNeXt~\cite{roy2023mednext}
+available as optional deeper pairs.  We deliberately exclude
+UNETR~\cite{hatamizadeh2022unetr} and nnU-Net~\cite{isensee2021nnunet}: \method{}
+builds an efficient decoder only where a wide, high-resolution decoder
+bottleneck exists, and pairs one with neither (UNETR is already lightweight;
+nnU-Net self-configures its decoder).  A matched transition comparison is
+therefore undefined for them, and an unofficial \method{} variant would be an
+ungrounded extension rather than a control.
 
 \paragraph{Dataset generality.}
-The original EffiDec3D evaluation covers FeTA, BTCV, and all ten Medical
-Segmentation Decathlon (MSD) tasks.  We preselect three to four representative
-tasks from that scope: BTCV abdominal CT as the primary multi-organ task; FeTA
-fetal-brain MRI for modality and anatomy shift; MSD Task01 BrainTumour for
-multimodal lesion segmentation; and either MSD Task06 Lung or Task08
-HepaticVessel as a sparse-lesion or thin-structure stress test.  Every dataset
-uses the same positive, negative, and net transition definitions, spatial
-concentration analysis, opportunity curve, and subject-level confidence
-intervals.  The final set is frozen before inspecting results.
+The original \method{} evaluation spans FeTA~\cite{payette2021feta}, BTCV, and
+the ten Medical Segmentation Decathlon (MSD) tasks~\cite{antonelli2022msd}.  We
+preselect three to four representative tasks: BTCV abdominal CT as the primary
+multi-organ task; FeTA fetal-brain MRI for modality and anatomy shift; MSD
+Task01 BrainTumour for multimodal lesion segmentation; and either MSD Task06
+Lung or Task08 HepaticVessel as a sparse-lesion or thin-structure stress test.
+Every dataset uses the same positive, negative, and net transition definitions,
+concentration analysis, opportunity curve, and subject-level intervals, and the
+set is frozen before inspecting results.
 
-\todo{Insert the matched Swin UNETR replication (opt.\ SwinUNETRv2/MedNeXt) and
-the predeclared FeTA/MSD results.}
+\todo{Insert the matched Swin UNETR replication (opt.\ SwinUNETR-V2/MedNeXt) and
+the predeclared FeTA/MSD results; all currently completed numbers are 3D UX-Net
+on BTCV.}

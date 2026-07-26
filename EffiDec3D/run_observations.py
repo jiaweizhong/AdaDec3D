@@ -3,12 +3,17 @@
 """
 Paper A observation gate: O1-O11, generalized across backbones and datasets.
 
+The ALIGNED matrix uses only the backbones EffiDec3D actually pairs a decoder with
+(3DUXNET, SwinUNETR, SwinUNETRv2, MedNeXt): each is a full-vs-efficient pair and
+runs all O1-O11. UNETR/nnUNet are NOT part of the aligned matrix -- EffiDec3D never
+built a decoder pair for them, so a matched transition comparison is undefined.
+
 Two modes, keyed by --network:
-  * MATCHED backbones (3DUXNET, SwinUNETR, SwinUNETRv2, MedNeXt) have an EffiDec3D
-    counterpart -> full-vs-efficient transition analysis; runs all O1-O11.
-  * CONTROL backbones (UNETR, nnUNet) are full-only ecological baselines -> runs
-    the single-model observations O1/O2/O3/O4/O6/O10 (error/entropy concentration),
-    skipping the transition-pair analyses O5/O9/O11.
+  * MATCHED backbones -> full-vs-efficient transition analysis; runs all O1-O11.
+  * CONTROL backbones (UNETR, nnUNet) -> OPTIONAL full-only single-model run
+    (O1/O2/O3/O4/O6/O10 concentration only, no O5/O9/O11). Retained for ad-hoc
+    "does concentration recur on a non-EffiDec3D architecture" checks; never used
+    for decoder-causal claims and not required for the paper.
 
 Class count and per-organ names are derived from the dataset (BTCV13, feta, or any
 dataset in load_datasets_transforms), so the same analysis runs on BTCV/FeTA/MSD.
@@ -20,7 +25,7 @@ Usage (from /root/AdaDec3D/EffiDec3D):
   # matched, FeTA, Swin UNETR
   python run_observations.py --root /root/autodl-tmp/feta-processed --dataset feta \
       --network SwinUNETR --obs_dir /root/obs/swin_feta
-  # ecological control (full only)
+  # optional non-EffiDec3D control (full only; not part of the aligned matrix)
   python run_observations.py --network UNETR --dataset BTCV13 --obs_dir /root/obs/unetr_btcv
 """
 import argparse
@@ -54,10 +59,12 @@ DATASET_NAMES = {"BTCV13": BTCV13_NAMES, "feta": FETA_NAMES}
 # so per-organ observations stay generic across datasets (else class_1..N).
 CLASS_NAMES = list(BTCV13_NAMES)
 
-# Backbones with an EffiDec3D counterpart (matched full-vs-efficient comparison)
-# vs full-only ecological controls (single-model observations only, no O5/O9/O11).
+# Aligned matrix = backbones EffiDec3D actually pairs a decoder with (matched
+# full-vs-efficient comparison, all O1-O11). CONTROL_BACKBONES are OPTIONAL, off-
+# matrix, full-only (single-model observations, no O5/O9/O11) -- kept for ad-hoc
+# checks, never for decoder-causal claims. See module docstring.
 MATCHED_BACKBONES = {"3DUXNET", "SwinUNETR", "SwinUNETRv2", "MedNeXt"}
-CONTROL_BACKBONES = {"UNETR", "nnUNet"}
+CONTROL_BACKBONES = {"UNETR", "nnUNet"}  # optional / off-matrix
 # main_train_BTCV_TU.py --network string per role (== output subfolder name).
 EFFI_NETWORK = {"3DUXNET": "3DUXNET_EffiDec3D", "SwinUNETR": "SwinUNETR_EffiDec3D",
                 "SwinUNETRv2": "SwinUNETRv2_EffiDec3D", "MedNeXt": "MedNeXt_M_EffiDec3D"}
@@ -128,6 +135,11 @@ def build_model(network, role, out_classes, device, img_size=(96, 96, 96),
             m = create_mednextv1_effidec3d(ic, out_classes, 'M', n_channels=feature_size,
                 kernel_size=3, deep_supervision=False)
         else:
+            # Paper's matched comparison is MedNeXt-M-K3, so the full pair member
+            # must also be K3. NOTE: main_train_BTCV_TU.py's `MedNeXt_M` uses
+            # kernel_size=5 -> a checkpoint trained under that name will NOT load
+            # here. Train the matched full MedNeXt at K3 (or set K5 to match a K5
+            # checkpoint, accepting kernel size as a confound).
             from networks.MedNeXt.mednextv1.create_mednext_v1 import create_mednext_v1
             m = create_mednext_v1(ic, out_classes, 'M', kernel_size=3,
                 n_channels=feature_size, deep_supervision=False)

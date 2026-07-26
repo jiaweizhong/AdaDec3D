@@ -15,7 +15,12 @@ adaptive model.  The legacy top-20\% result is a voxel oracle, not a realizable
 router.  Even a block opportunity curve uses full-model predictions only to
 define retrospective benefit; it does not account for errors introduced by a
 learned refinement module.  Dynamic FLOPs, latency, memory, and final Dice must
-therefore be evaluated in a separate method study.
+therefore be evaluated in a separate method study.  Our analysis is also
+\emph{decoder-only} by construction: because EffiDec3D alters the decoder while
+keeping the encoder identical, every transition isolates decoder capacity, but the
+study says nothing about the encoder, which accounts for the larger share of
+compute.  Whether encoder computation is similarly over-provisioned is a distinct
+question requiring different, representational probes and is left to future work.
 
 \paragraph{Reproduction gap.}
 Our efficient baseline remains 1.70--2.25 Dice points below the published
@@ -40,11 +45,14 @@ endpoints must be declared before examining the corrected O9 results.
 All completed results currently use one CT dataset and one backbone family.
 Without cross-backbone and cross-modality replication, the finding may be
 specific to 3D UX-Net, the Synapse split, or EffiDec3D's resolution restriction.
-The planned generality ladder separates matched decoder comparisons (3D UX-Net
-and Swin UNETR) from ecological architecture controls (UNETR and nnU-Net), and
-uses representative tasks from the original EffiDec3D scope (BTCV, FeTA, and
-predeclared MSD lesion/thin-structure tasks).  The final claim will be narrowed
-if these experiments do not reproduce the direction.
+The planned generality ladder uses matched decoder comparisons across the
+EffiDec3D backbone family (3D UX-Net and Swin UNETR, optionally SwinUNETRv2 and
+MedNeXt) and representative tasks from the original EffiDec3D scope (BTCV, FeTA,
+and predeclared MSD lesion/thin-structure tasks).  We restrict the ladder to
+backbones EffiDec3D actually pairs a decoder with, since a matched transition
+comparison is undefined for architectures (e.g.\ UNETR, nnU-Net) that the method
+never equips with an efficient decoder.  The final claim will be narrowed if
+these experiments do not reproduce the direction.
 
 \paragraph{Clinical interpretation.}
 High uncertainty and small-organ difficulty do not imply clinical safety.

@@ -41,18 +41,27 @@ to a processed \texttt{btcv\_trns} dataset.  Consequently, we present the
 experiment as a \emph{controlled reimplementation}, not an exact reproduction.
 All comparisons within our study use the same local data and evaluation code.
 We report the discrepancy from published numbers in full.
+Because every observation is relational (matched full versus efficient, or a
+single model on identical local data), a residual reproduction gap for any one
+backbone or dataset is disclosed in that cell's table footnote or figure legend
+and does not alter the aggregate direction of the finding; at most it affects the
+estimated \emph{magnitude} of that cell's opportunity, which we bound with net
+(not positive-only) transitions and subject-level bootstrap intervals.
 
 \paragraph{Architecture generality.}
-We organize architecture coverage as a predeclared ladder rather than treating
-one additional model as evidence of universality.  The primary causal comparison
-is the matched full/efficient 3D UX-Net pair (large-kernel CNN).  A matched
+We organize architecture coverage as a predeclared ladder over the backbones for
+which EffiDec3D actually defines a decoder pair, rather than treating one
+additional model as evidence of universality.  The primary causal comparison is
+the matched full/efficient 3D UX-Net pair (large-kernel CNN); a matched
 Swin UNETR/EffiDec3D pair tests whether the transition pattern transfers to a
-hierarchical Transformer.  UNETR provides a ViT architecture control, and
-nnU-Net provides a strong self-configuring CNN baseline.  Unless a matched
-EffiDec3D counterpart is implemented under the same protocol, UNETR and nnU-Net
-are used only to compare error and spatial-concentration patterns; differences
-between independently trained models are not attributed specifically to the
-decoder.
+hierarchical Transformer, with SwinUNETRv2 and MedNeXt available as optional
+deeper matched pairs.  We deliberately restrict the ladder to these architectures:
+EffiDec3D builds an efficient decoder only where a large-channel, high-resolution
+decoder bottleneck exists, and does not pair one with UNETR (already lightweight)
+or nnU-Net (which self-configures its decoder).  For those a matched transition
+comparison is undefined, so we do not treat them as part of the study; an
+unofficial EffiDec3D variant would be an ungrounded extension rather than a
+control.
 
 \paragraph{Dataset generality.}
 The original EffiDec3D evaluation covers FeTA, BTCV, and all ten Medical
@@ -65,5 +74,5 @@ uses the same positive, negative, and net transition definitions, spatial
 concentration analysis, opportunity curve, and subject-level confidence
 intervals.  The final set is frozen before inspecting results.
 
-\todo{Insert the matched Swin UNETR replication, UNETR/nnU-Net controls, and
+\todo{Insert the matched Swin UNETR replication (opt.\ SwinUNETRv2/MedNeXt) and
 the predeclared FeTA/MSD results.}

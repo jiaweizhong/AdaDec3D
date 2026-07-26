@@ -425,51 +425,76 @@ tmux new -s e1_train
 `--eval_step 250` (or another divisor of all milestone steps). Files are named
 `milestone_05000.pth`, ..., `milestone_45000.pth`.
 
-### E1 on FeTA (required for O7)
+### Generalization matrix (align with EffiDec3D scope)
 
-O7 needs both an E0-FeTA and an E1-FeTA run with identical schedules.
+Paper A is a **general finding**, not a single-network/dataset result. We align
+**strictly to EffiDec3D's own backbone scope** — the architectures for which the
+original paper actually built an EffiDec3D decoder pair — with a predeclared ladder
+(mirrors the WACV experiments section):
+
+| Backbones | EffiDec3D pair? | Datasets | Observations |
+|---|---|---|---|
+| 3D UX-Net (large-kernel CNN), SwinUNETR (Transformer) | ✅ Full + EffiDec3D | BTCV, FeTA, MSD01 BrainTumour, MSD06 Lung *or* MSD08 HepaticVessel | **all O1–O11** (full-vs-efficient transitions) |
+| SwinUNETRv2, MedNeXt-M-K3 | ✅ Full + EffiDec3D | BTCV (+ optional extension) | **all O1–O11**, optional deeper coverage |
+
+> **Why only these backbones.** EffiDec3D applies its decoder *only* to 3D UX-Net,
+> SwinUNETR, and SwinUNETRv2 (+MedNeXt), because its method targets large-channel /
+> high-resolution decoder stages. Architectures without that decoder bottleneck are
+> **not** given an EffiDec3D pair in the original work: UNETR is already lean
+> (82.6 vs 337.6 GFLOPs), and nnU-Net self-configures its decoder (a fixed EffiDec3D
+> decoder does not fit). We therefore do **not** run UNETR/nnU-Net — a matched
+> transition analysis is undefined for them, and forcing an unofficial EffiDec3D
+> variant would be an ungrounded extension. (If a reviewer asks about non-EffiDec3D
+> architectures, they can be added later as single-model O1/O2/O4/O10 concentration
+> controls only — never for decoder-causal claims.)
+>
+> **Scope — decoder only.** EffiDec3D modifies the *decoder* alone (reduced channels
+> + removed high-res stages); the **encoder is held identical between Full and Effi**.
+> Every transition (O5/O9/O11) is therefore a clean decoder ablation with the encoder
+> constant — which is what licenses attributing the benefit to decoder capacity. It
+> also means Paper A says **nothing about the encoder** (the untouched 57.8% of MACs);
+> encoder over-provisioning is a distinct question deferred to Paper B (see Part 4).
+
+**Training template** (each matched cell = a Full + an EffiDec3D run).
+`--network` is the backbone; the EffiDec3D counterpart appends `_EffiDec3D`:
 
 ```bash
-# E0 FeTA
-python main_train_BTCV_TU.py \
-  --root /root/autodl-tmp/feta-processed --output /root/output/E0_feta \
-  --dataset feta --network 3DUXNET \
-  --lr 0.001 --overlap 0.7 --crop_sample 4 \
-  --max_iter 45000 --eval_step 250 \
+# Matched pair, e.g. SwinUNETR on FeTA (repeat per backbone × dataset)
+NET=SwinUNETR; DS=feta; ROOT=/root/autodl-tmp/feta-processed
+python main_train_BTCV_TU.py --root $ROOT --output /root/output/${NET}_${DS}_full \
+  --dataset $DS --network $NET \
+  --lr 0.001 --overlap 0.7 --crop_sample 4 --max_iter 45000 --eval_step 250 \
   --cache_rate 1.0 --num_workers 8 --gpu 0
-
-# E1 FeTA
-python main_train_BTCV_TU.py \
-  --root /root/autodl-tmp/feta-processed --output /root/output/E1_feta \
-  --dataset feta --network 3DUXNET_EffiDec3D \
-  --ds False \
-  --lr 0.001 --overlap 0.7 --crop_sample 4 \
-  --max_iter 45000 --eval_step 250 \
+python main_train_BTCV_TU.py --root $ROOT --output /root/output/${NET}_${DS}_effi \
+  --dataset $DS --network ${NET}_EffiDec3D --ds False \
+  --lr 0.001 --overlap 0.7 --crop_sample 4 --max_iter 45000 --eval_step 250 \
   --cache_rate 1.0 --num_workers 8 --gpu 0
 ```
 
-### SwinUNETR_EffiDec3D on BTCV (required for O8)
-
-O8 needs both E0-Swin and E1-Swin with identical schedules.
+**Running observations per cell** (all cells are matched pairs → **all O1–O11**;
+class count and organ names come from `--dataset`):
 
 ```bash
-# E0 SwinUNETR
-python main_train_BTCV_TU.py \
-  --root /root/autodl-tmp/btcv-synapse --output /root/output/E0_swin \
-  --dataset BTCV13 --network SwinUNETR \
-  --lr 0.001 --overlap 0.7 --crop_sample 4 \
-  --max_iter 45000 --eval_step 250 \
-  --cache_rate 1.0 --num_workers 8 --gpu 0
-
-# E1 SwinUNETR_EffiDec3D
-python main_train_BTCV_TU.py \
-  --root /root/autodl-tmp/btcv-synapse --output /root/output/E1_swin \
-  --dataset BTCV13 --network SwinUNETR_EffiDec3D \
-  --ds False \
-  --lr 0.001 --overlap 0.7 --crop_sample 4 \
-  --max_iter 45000 --eval_step 250 \
-  --cache_rate 1.0 --num_workers 8 --gpu 0
+# Matched cell → all O1–O11 (needs both full + EffiDec3D checkpoints)
+python run_observations.py --network SwinUNETR --dataset feta \
+  --root /root/autodl-tmp/feta-processed --output /root/output --obs_dir /root/obs/swin_feta
 ```
+
+Each cell writes its own `results.json` + figures under a distinct `--obs_dir`;
+O7 (cross-dataset) and O8 (cross-architecture) aggregate these to test whether the
+concentration/predictability finding holds across the matrix. (`run_observations.py`
+still supports single-model runs for optional non-EffiDec3D controls, but those are
+not part of the aligned matrix.)
+
+> **Reproduction-gap policy (per cell).** Each cell's observations are *within-study*
+> and relational — they compare Full vs EffiDec3D (or analyze one model) on the same
+> local data, split, and eval code. So if a given backbone or dataset trails the
+> published absolute Dice, that gap is **disclosed in a table footnote / figure legend
+> for that cell** and does **not** revise the aggregate conclusion. The only claim a
+> gap can weaken is the *magnitude* of that one cell's opportunity (a larger local
+> Full–Effi gap can inflate apparent transition volume); we guard that with net (not
+> positive-only) transitions and subject-bootstrap CIs. Direction is what O7/O8
+> aggregate, and direction is gap-robust.
 
 ---
 
@@ -477,6 +502,41 @@ python main_train_BTCV_TU.py \
 
 **Prerequisites**: E0 and E1 `best_metric_model.pth` trained and verified.
 Save all figures to `/root/obs/`.
+
+### O-metric glossary, formulas, and contribution map
+
+**Notation** (all per voxel `v` of a validation volume):
+
+- `p_c(v)` — efficient model's softmax probability for class `c` at `v`; `C` classes.
+- `ŷ_e(v) = argmax_c p_c(v)` — efficient (EffiDec3D) prediction; `ŷ_f(v)` — full prediction; `y(v)` — ground truth.
+- `1[·]` — indicator (1 if true, else 0). `err(v) = 1[ŷ(v) ≠ y(v)]` — voxel error.
+- **Entropy** `H(v) = − Σ_{c=1}^{C} p_c(v) · log p_c(v)` — the cheap, ground-truth-free uncertainty signal from the *efficient* model.
+- **Confidence** `conf(v) = max_c p_c(v)`.
+- **Transitions** (efficient → full, per voxel):
+  - Positive `P(v) = 1[ ŷ_e(v) ≠ y(v) ∧ ŷ_f(v) = y(v) ]` — full **improves** what efficient got wrong.
+  - Negative `N(v) = 1[ ŷ_e(v) = y(v) ∧ ŷ_f(v) ≠ y(v) ]` — full **degrades** what efficient got right.
+  - Net `U(v) = P(v) − N(v)`; rates `R_pos = mean_v P(v)`, `R_neg = mean_v N(v)`, `R_net = R_pos − R_neg`.
+
+**The three paper contributions:**
+- **C1 — Transition-count comparison.** Measure *where* the full decoder helps by counting `P/N/U` per voxel with subject-level bootstrap, instead of only aggregate Dice/FLOPs (which count every disagreement as improvement).
+- **C2 — The net benefit is small, bidirectional, and spatially concentrated.** `R_net ≈ 0.1%` and largely offset by `R_neg`; it concentrates at boundaries and small structures.
+- **C3 — The benefit is predictable at test time.** The efficient model's own entropy `H(v)` identifies the beneficial regions without ground truth.
+
+| O | Name | What it measures (formula) | Maps to |
+|---|------|----------------------------|---------|
+| **O1** | Error distribution | boundary-band vs eroded-interior error ratio `mean_{v∈∂} err(v) / mean_{v∈int} err(v)` (=3.93×) | **C2** |
+| **O2** | Entropy distribution | histogram of `H(v)`; sparsity `Pr[H(v) > 0.5]` (=1.18%) | **C2** (premise), supports **C3** |
+| **O3** | Uncertainty–error correlation | `Pearson(H, err)` over entropy bins (=0.97, descriptive; subject-level audit pending) | **C3** |
+| **O4** | Per-organ difficulty | per-class Dice and mean `H`; rank organs by difficulty | **C2** |
+| **O5** | Decoder transition analysis | `P(v)`, `N(v)`, `U(v)`; per-subject `Pearson(binned H, binned U)` + subject bootstrap CI | **C1** + **C2** + **C3** |
+| **O6** | Difficulty evolution | `mean_v H(v)` across training iterations (0.0279→0.0104) | **C2** (residual persists) |
+| **O7** | Cross-dataset consistency | aggregate O5/O9 direction over ≥3 frozen datasets (CT+MRI+lesion) | generality of **C2/C3** |
+| **O8** | Architecture-family consistency | aggregate O5/O9/O11 over matched EffiDec3D backbones (UX-Net, Swin, SwinV2, MedNeXt) | generality of **C1/C2/C3** |
+| **O9** | Selective-allocation opportunity | top-budget `H`-ranked contiguous blocks: `Σ_{sel} P(v) / Σ_all P(v)` vs matched random, paired bootstrap | **C3** *(headline)* |
+| **O10** | Organ size vs difficulty | `Spearman(volume, difficulty)` (=−0.54); partial `r(H, difficulty ∣ log volume)` (=0.81) | **C2** |
+| **O11** | Routing-signal comparison | `corr(signal, U)` for `H` vs `conf` vs MC-dropout; pick the cheap routing signal | **C3** |
+
+**Coverage of the three contributions:** C1 = {O5}; C2 = {O1, O2, O4, O6, O10} (+O5); C3 = {O3, O9, O11} (+O5); generality = {O7, O8}. O5 is the hinge — it defines the transition machinery (C1), shows the effect is small/bidirectional (C2), and shows it rises with entropy (C3).
 
 ### Common notebook setup
 
@@ -920,62 +980,28 @@ report the same positive transition, negative transition, net transition,
 spatial concentration, and opportunity curve with subject-level confidence
 intervals.
 
-**Question**: Do O1–O5 findings replicate on FeTA (fetal brain MRI)?
+**Question**: Do the O5/O9 findings replicate across datasets and modalities?
 
-*Requires E0_feta and E1_feta from Part 2.*
+**Approach**: run the generalized `run_observations.py` on each frozen dataset
+with its matched Full + EffiDec3D checkpoints (class count and organ names are
+derived from `--dataset`), then aggregate the per-cell `results.json`:
 
-```python
-# Repeat O5 analysis with FeTA models and val_loader
-FETA_NAMES = ["IS","WM","CGM","DGM","CE","BS","CSF"]
-
-feta_args = argparse.Namespace(
-    root="/root/autodl-tmp/feta-processed", dataset="feta",
-    mode="validation", crop_sample=4, img_size=[96,96,96]
-)
-_, feta_val, n_cls_feta = data_loader(feta_args)
-_, feta_transform = data_transforms(feta_args)
-feta_files = [{"image": im, "label": lb}
-              for im, lb in zip(feta_val["images"], feta_val["labels"])]
-feta_loader = DataLoader(Dataset(data=feta_files, transform=feta_transform),
-                         batch_size=1, shuffle=False, num_workers=2)
-
-# Resolve checkpoint paths
-import glob as _glob
-_e0f = sorted(_glob.glob("/root/output/E0_feta*/3DUXNET/*/best_metric_model.pth"))
-_e1f = sorted(_glob.glob("/root/output/E1_feta*/3DUXNET_EffiDec3D/*/best_metric_model.pth"))
-assert _e0f and _e1f, "Run E0_feta and E1_feta training first (Observation_Study.md Part 2)"
-full_feta  = load_model("3DUXNET",           _e0f[-1])
-effi_feta  = load_model("3DUXNET_EffiDec3D", _e1f[-1])
-
-# Run identical O5 per-subject analysis for FeTA
-feta_subj_r = []
-with torch.no_grad():
-    for batch in feta_loader:
-        img = batch["image"].cuda()
-        lbl = batch["label"].squeeze(1).long().cpu().squeeze()
-        pred_full = sliding_window_inference_1out(img,(96,96,96),4,full_feta,overlap=0.7).argmax(1).cpu().squeeze()
-        logits_e  = sliding_window_inference_1out(img,(96,96,96),4,effi_feta,overlap=0.7)
-        prob_e    = logits_e.softmax(1).cpu()
-        pred_effi = logits_e.argmax(1).cpu().squeeze()
-        ent = -(prob_e * torch.log(prob_e + 1e-8)).sum(1).squeeze()
-        pos = ((pred_full==lbl) & (pred_effi!=lbl)).float()
-        neg = ((pred_full!=lbl) & (pred_effi==lbl)).float()
-        net = pos - neg
-        s_ent, s_net = [], []
-        for b in range(20):
-            mask = (ent >= ent.quantile(b/20)) & (ent < ent.quantile((b+1)/20))
-            if mask.sum() > 100:
-                s_ent.append(ent[mask].mean().item())
-                s_net.append(net[mask].mean().item())
-        if len(s_ent) >= 5:
-            feta_subj_r.append(pearsonr(s_ent, s_net)[0])
-
-r_feta = float(np.mean(feta_subj_r))
-print(f"FeTA per-subject Pearson r={r_feta:.3f}  (n={len(feta_subj_r)} subjects)")
-print(f"{'GO ✓' if r_feta > 0.40 else 'NO-GO ✗'}  (threshold r > 0.40)")
-
-save_obs("O7", {"feta_gain_entropy_subj_pearson_r": r_feta, "n_subjects": len(feta_subj_r), "go": r_feta > 0.40})
+```bash
+# 3D UX-Net matched pair across the frozen dataset ladder
+for DS in BTCV13 feta Task01_BrainTumour Task06_Lung; do
+  python run_observations.py --network 3DUXNET --dataset $DS \
+    --root /root/autodl-tmp/$DS --output /root/output --obs_dir /root/obs/uxnet_$DS
+done
 ```
+
+Then read each `/root/obs/uxnet_<DS>/results.json` and tabulate, per dataset:
+O5 `subj_pearson_r_mean` + CI, and O9 `region_selector` net utility / paired
+diff-CI at the 20% budget.
+
+**Go criterion (O7)**: the O5 subject-level correlation CI-lower stays `> 0` and
+the O9 region opportunity remains positive on **≥ 3 of the frozen datasets**,
+spanning at least CT + MRI + lesion. The finding is "general" only if the
+direction holds across modality and anatomy shifts, not just BTCV.
 
 ---
 
@@ -985,55 +1011,34 @@ save_obs("O7", {"feta_gain_entropy_subj_pearson_r": r_feta, "n_subjects": len(fe
 |---|---|---|
 | **3D UX-Net + EffiDec3D** | large-kernel CNN | primary matched full/efficient decoder pair |
 | **SwinUNETR + EffiDec3D** | hierarchical Transformer | matched cross-backbone pair |
-| **UNETR** | ViT | architecture control |
-| **nnU-Net** | strong self-configuring CNN baseline | ecological strong baseline |
+| **SwinUNETRv2 + EffiDec3D** | hierarchical Transformer (v2) | optional deeper matched pair |
+| **MedNeXt-M-K3 + EffiDec3D** | large-kernel CNN (ConvNeXt-style) | optional deeper matched pair |
 
-Only matched full/efficient pairs support decoder-specific claims. Unless an
-EffiDec3D counterpart is implemented under the same training protocol, UNETR
-and nnU-Net are controls for error patterns and spatial concentration, not
-causal decoder comparisons.
+All four have an official EffiDec3D decoder pair, so every row supports the full
+transition analysis. We do **not** include UNETR or nnU-Net: EffiDec3D never built
+a decoder pair for them (UNETR is already lean; nnU-Net self-configures its
+decoder), so a matched transition comparison is undefined and any unofficial pair
+would be an ungrounded extension.
 
-**Question**: Does the O5 transition–entropy correlation hold with SwinUNETR instead of UXNET?
+**Question**: Do the transition-concentration observations hold across the
+EffiDec3D backbone family — a second (and optionally third/fourth) matched backbone
+— rather than being specific to 3D UX-Net?
 
-*Requires E0_swin and E1_swin from Part 2.*
+**Approach**: run `run_observations.py` per matched backbone on BTCV; each is a
+full/efficient pair, so each yields all O1–O11:
 
-```python
-import glob as _glob
-_e0s = sorted(_glob.glob("/root/output/E0_swin*/SwinUNETR/*/best_metric_model.pth"))
-_e1s = sorted(_glob.glob("/root/output/E1_swin*/SwinUNETR_EffiDec3D/*/best_metric_model.pth"))
-assert _e0s and _e1s, "Run E0_swin and E1_swin training first (Observation_Study.md Part 2)"
-full_swin = load_model("SwinUNETR",           _e0s[-1])
-effi_swin = load_model("SwinUNETR_EffiDec3D", _e1s[-1])
-
-# Run identical O5 per-subject analysis for SwinUNETR
-swin_subj_r = []
-with torch.no_grad():
-    for batch in val_loader:
-        img = batch["image"].cuda()
-        lbl = batch["label"].squeeze(1).long().cpu().squeeze()
-        pred_full = sliding_window_inference_1out(img,(96,96,96),4,full_swin,overlap=0.7).argmax(1).cpu().squeeze()
-        logits_e  = sliding_window_inference_1out(img,(96,96,96),4,effi_swin,overlap=0.7)
-        prob_e    = logits_e.softmax(1).cpu()
-        pred_effi = logits_e.argmax(1).cpu().squeeze()
-        ent = -(prob_e * torch.log(prob_e + 1e-8)).sum(1).squeeze()
-        pos = ((pred_full==lbl) & (pred_effi!=lbl)).float()
-        neg = ((pred_full!=lbl) & (pred_effi==lbl)).float()
-        net = pos - neg
-        s_ent, s_net = [], []
-        for b in range(20):
-            mask = (ent >= ent.quantile(b/20)) & (ent < ent.quantile((b+1)/20))
-            if mask.sum() > 100:
-                s_ent.append(ent[mask].mean().item())
-                s_net.append(net[mask].mean().item())
-        if len(s_ent) >= 5:
-            swin_subj_r.append(pearsonr(s_ent, s_net)[0])
-
-r_swin = float(np.mean(swin_subj_r))
-print(f"SwinUNETR per-subject Pearson r={r_swin:.3f}  (n={len(swin_subj_r)} subjects)")
-print(f"{'GO ✓' if r_swin > 0.45 else 'NO-GO ✗'}  (threshold r > 0.45)")
-
-save_obs("O8", {"swin_gain_entropy_subj_pearson_r": r_swin, "n_subjects": len(swin_subj_r), "go": r_swin > 0.45})
+```bash
+# Matched EffiDec3D backbones → all O1–O11
+for NET in 3DUXNET SwinUNETR; do        # + SwinUNETRv2 MedNeXt for deeper coverage
+  python run_observations.py --network $NET --dataset BTCV13 \
+    --root /root/autodl-tmp/btcv-synapse --output /root/output --obs_dir /root/obs/${NET}_btcv
+done
 ```
+
+**Go criterion (O8)**: on ≥2 matched backbones the O5/O9 transition–entropy
+direction holds (subj-r CI-lower `> 0`) and the O1/O2/O10 concentration pattern
+recurs → the decoder-benefit concentration is a property of the EffiDec3D backbone
+family, not an artifact of 3D UX-Net.
 
 ---
 
@@ -1350,13 +1355,17 @@ bound at a predeclared budget.
 
 ### Generalization criteria (not yet run)
 
-| Obs | Criterion | Result | Pass? |
-|-----|-----------|--------|-------|
-| O7 | FeTA replication: net-transition/entropy r > 0.40 | pending E0/E1-FeTA | ☐ |
-| O7 | One predeclared MSD lesion/thin-structure task shows the same transition concentration trend | pending MSD pair | ☐ |
-| O8 | SwinUNETR backbone: net-transition/entropy r > 0.45 | pending E0/E1-Swin | ☐ |
-| O8 | UNETR and nnU-Net ecological controls included without decoder-causal claims | pending controls | ☐ |
-| O11 | Entropy is best or tied-best cheap routing signal | confidence 0.663 vs entropy 0.655; MC dropout inactive | ◐ partial |
+These are **within-study** criteria: each cell trains a Full/Effi pair (or a single
+control) under one protocol and checks whether the O1–O11 *direction* recurs.
+Exact reproduction of the paper's absolute Dice is **not** a prerequisite — the
+observations are relational (Full-vs-Effi on identical local data), so they hold
+regardless of any single model's distance from the published number.
+
+| Obs | Axis | Criterion | Result | Pass? |
+|-----|------|-----------|--------|-------|
+| O7 | dataset | net-transition/entropy subj-r CI-lower > 0 on ≥3 frozen datasets spanning CT+MRI+lesion | pending matrix (BTCV/FeTA/MSD01/MSD06-08) | ☐ |
+| O8 | architecture (matched) | ≥2 matched EffiDec3D backbones (Swin, opt. SwinV2/MedNeXt) hold O5/O9 direction (subj-r CI-lower > 0) + O1/O2/O10 concentration | pending E0/E1-Swin | ☐ |
+| O11 | routing | Entropy is best or tied-best cheap routing signal | confidence 0.663 vs entropy 0.655; MC dropout inactive | ◐ partial |
 
 ---
 
@@ -1396,6 +1405,15 @@ Decoder = 42% of compute, dominated by `decoder3` (37%) — where a Paper B
 region-adaptive decoder would act. Rough ceiling: full `decoder3` on ~20% of
 voxels + cheap elsewhere → 41 → ~33 GMac. Encoder (57.8%) is untouched by
 decoder-only routing.
+
+> **Scope boundary — Paper A is decoder-only, and has no encoder observations.**
+> EffiDec3D modifies the decoder alone; the encoder is identical between Full and
+> Effi. So every transition observation (O5/O9/O11) is a clean decoder ablation with
+> the encoder held constant — but O1–O11 therefore say **nothing** about whether the
+> encoder (the larger 57.8% of MACs) is over-provisioned. That question needs a
+> *different* instrument — single-model representational analyses (per-stage effective
+> rank / channel redundancy, stage probing, CKA), since no encoder-reduced pair exists
+> to difference against — and is deferred to Paper B's whole-model adaptivity study.
 
 **Paper A Go decision: PASS** (O2/O3/O5/O9). The efficiency application proceeds in
 [Experiment-Design-AdaDec3D.md](Experiment-Design-AdaDec3D.md), with E1 (77.0%) as
@@ -1472,14 +1490,18 @@ Week 4: Observations — preliminary gate (run_observations.py)   ✓ DIRECTION 
   [~] Statistical audit: subject-level O3, paired/net/region-level O9 still required
   [x] --- CONDITIONAL GO: prototype Paper B, while completing Paper A audit ---
 
-Week 5-6: Extended observations (deferred — need FeTA / SwinUNETR runs)
+Week 5-6: Generalization matrix (run_observations.py --network/--dataset)
   [x] O6: difficulty evolution
-  [ ] O7: FeTA replication (E0_feta + E1_feta)
-  [ ] O8: SwinUNETR consistency (E0_swin + E1_swin)
+  [ ] Architecture axis — matched pairs: retrain E0/E1 for SwinUNETR (opt. SwinV2/MedNeXt), rerun O1-O11
+  [ ] Dataset axis — freeze 3-4 tasks (BTCV, FeTA, MSD01 BrainTumour, MSD06/08),
+      rerun matched UX-Net O1-O11 per dataset; aggregate CI-lower across CT+MRI+lesion
+  [ ] O7: cross-dataset consistency = aggregate over dataset axis (Go: ≥3 datasets)
+  [ ] O8: architecture-family consistency = aggregate over architecture axis
   [x] O10: organ size vs difficulty
   [~] O11: entropy and confidence complete; MC dropout invalid/inactive
   [ ] Corrected O3/O9 statistical analysis and contiguous-region opportunity curve
-  [ ] Matched E0/E1 multi-seed run with paper-equivalent preprocessing
+  [ ] (optional) Matched E0/E1 multi-seed run with paper-equivalent preprocessing
+       — improves absolute numbers; NOT required for within-study O1-O11 direction
   [ ] Patch-level whole-model adaptivity study (extend efficiency beyond decoder's 42%)
 
 Week 7: Paper A draft

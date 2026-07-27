@@ -30,16 +30,11 @@ log() { echo "[$(date '+%H:%M:%S')] $*" | tee -a "$LOG"; }
 
 # ── E0: full MedNeXt-M-K3 (upper bound) ──────────────────────────────────────
 run_E0() {
-    CK=$(ls $OUT/E0_mednext*/MedNeXt_M/BTCV13/best_metric_model.pth 2>/dev/null | head -1 || true)
-    if [ -n "$CK" ]; then
-        log "E0 checkpoint found: $CK — inference only"
-        python main_train_BTCV_TU.py $COMMON --output $OUT/E0_mednext \
-            --network MedNeXt_M --mode test 2>&1 | tee -a "$LOG"
-    else
-        log "E0 not found — training full MedNeXt-M-K3 from scratch"
-        python main_train_BTCV_TU.py $COMMON $TRAIN_ARGS --output $OUT/E0_mednext \
-            --network MedNeXt_M 2>&1 | tee -a "$LOG"
-    fi
+    LM=$(ls $OUT/E0_mednext*/MedNeXt_M/BTCV13/last_model.pth 2>/dev/null | head -1 || true)
+    if [ -n "$LM" ]; then log "E0 resuming from $LM"; else log "E0 training full MedNeXt-M-K3 from scratch"; fi
+    # main_train auto-resumes from last_model.pth and skips the loop if already at max_iter.
+    python main_train_BTCV_TU.py $COMMON $TRAIN_ARGS --output $OUT/E0_mednext \
+        --network MedNeXt_M 2>&1 | tee -a "$LOG"
     log "E0 (MedNeXt_M) done"
 }
 

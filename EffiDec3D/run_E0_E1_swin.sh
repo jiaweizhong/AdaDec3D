@@ -36,17 +36,11 @@ log() { echo "[$(date '+%H:%M:%S')] $*" | tee -a $LOG; }
 
 # ── E0: Full SwinUNETR (upper bound) ─────────────────────────────────────────
 run_E0() {
-    E0_CKPT=$(ls $OUT/E0_swin*/SwinUNETR/BTCV13/best_metric_model.pth 2>/dev/null | head -1 || true)
-    if [ -n "$E0_CKPT" ]; then
-        log "E0 checkpoint found: $E0_CKPT — running test/inference only"
-        python main_train_BTCV_TU.py $COMMON \
-            --output $OUT/E0_swin --network SwinUNETR \
-            --mode test 2>&1 | tee -a $LOG
-    else
-        log "E0 checkpoint not found — training SwinUNETR from scratch"
-        python main_train_BTCV_TU.py $COMMON $TRAIN_ARGS \
-            --output $OUT/E0_swin --network SwinUNETR 2>&1 | tee -a $LOG
-    fi
+    LM=$(ls $OUT/E0_swin*/SwinUNETR/BTCV13/last_model.pth 2>/dev/null | head -1 || true)
+    if [ -n "$LM" ]; then log "E0 resuming from $LM"; else log "E0 (SwinUNETR) training from scratch"; fi
+    # main_train auto-resumes from last_model.pth and skips the loop if already at max_iter.
+    python main_train_BTCV_TU.py $COMMON $TRAIN_ARGS \
+        --output $OUT/E0_swin --network SwinUNETR 2>&1 | tee -a $LOG
     log "E0 (SwinUNETR) done"
 }
 

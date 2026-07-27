@@ -174,7 +174,7 @@ def infer(model, img):
 # --------------------------------------------------------------------------- #
 def O1_error_distribution(val_loader, effi):
     from scipy.ndimage import binary_erosion
-    boundary_err, interior_err = [], []
+    boundary_err, interior_err, subj_ratio = [], [], []
     organ_err = {n: [] for n in CLASS_NAMES}
     with torch.no_grad():
         for batch in val_loader:
@@ -190,13 +190,25 @@ def O1_error_distribution(val_loader, effi):
             fg = (lbl_sq > 0).numpy()
             interior = torch.from_numpy(binary_erosion(fg, iterations=3).astype(np.float32))
             boundary = torch.from_numpy(fg.astype(np.float32)) - interior
-            if boundary.sum() > 0:
-                boundary_err.append(((error * boundary).sum() / boundary.sum()).item())
-            if interior.sum() > 0:
-                interior_err.append(((error * interior).sum() / interior.sum()).item())
+            b_s = (((error * boundary).sum() / boundary.sum()).item() if boundary.sum() > 0 else None)
+            i_s = (((error * interior).sum() / interior.sum()).item() if interior.sum() > 0 else None)
+            if b_s is not None:
+                boundary_err.append(b_s)
+            if i_s is not None:
+                interior_err.append(i_s)
+            if b_s is not None and i_s is not None and i_s > 0:
+                subj_ratio.append(b_s / i_s)
     b_err = float(np.mean(boundary_err)); i_err = float(np.mean(interior_err))
     ratio = b_err / i_err if i_err > 0 else float("nan")
-    print(f"[O1] boundary err={b_err:.3f}  interior err={i_err:.3f}  ratio={ratio:.1f}x")
+    _rng = np.random.default_rng(0)
+    if subj_ratio:
+        _rb = [np.mean(_rng.choice(subj_ratio, len(subj_ratio), replace=True)) for _ in range(2000)]
+        ratio_ci = [float(np.percentile(_rb, 2.5)), float(np.percentile(_rb, 97.5))]
+        ratio_subj_mean = float(np.mean(subj_ratio))
+    else:
+        ratio_ci = [float("nan"), float("nan")]; ratio_subj_mean = float("nan")
+    print(f"[O1] boundary err={b_err:.3f}  interior err={i_err:.3f}  ratio={ratio:.1f}x  "
+          f"subj-mean {ratio_subj_mean:.2f} CI[{ratio_ci[0]:.2f},{ratio_ci[1]:.2f}]")
     names_o1 = [n for n, v in organ_err.items() if v]
     vals_o1 = [float(np.mean(organ_err[n])) for n in names_o1]
     plt.figure(figsize=(11, 4))
@@ -206,6 +218,8 @@ def O1_error_distribution(val_loader, effi):
     plt.tight_layout(); plt.savefig(f"{OBS_DIR}/O1_organ_error.png", dpi=150); plt.close()
     save_obs("O1", {"boundary_error": b_err, "interior_error": i_err,
                     "boundary_interior_ratio": round(ratio, 2),
+                    "boundary_interior_ratio_subject_mean": round(ratio_subj_mean, 3),
+                    "boundary_interior_ratio_ci": [round(ratio_ci[0], 3), round(ratio_ci[1], 3)],
                     "organ_error": {n: round(float(np.mean(v)), 4) for n, v in organ_err.items() if v}})
 
 
@@ -232,29 +246,113 @@ def O2_entropy_distribution(val_loader, effi):
 
 
 def O3_unc_error_corr(val_loader, effi):
-    x_ent, y_err = [], []
+    """Entropy-vs-error predictability.
+
+    Reports two things: (1) the legacy pooled-bin Pearson/Spearman correlation,
+    kept only as a *descriptive* diagnostic because pooling bins across subjects
+    is pseudo-replication and overstates the association; and (2) a subject-level
+    discrimination/calibration audit --- per-subject AUROC and AUPRC of entropy
+    predicting the error voxels, plus ECE of the model's confidence --- aggregated
+    with a subject bootstrap. The Go criterion is AUROC CI-lower > 0.5.
+    """
+    try:                                   # prefer sklearn; fall back to numpy
+        from sklearn.metrics import roc_auc_score, average_precision_score
+        def _auroc(s, y): return float(roc_auc_score(y, s))
+        def _auprc(s, y): return float(average_precision_score(y, s))
+    except Exception:
+        from scipy.stats import rankdata
+        def _auroc(s, y):
+            n_pos = int(y.sum()); n_neg = int((~y).sum())
+            if n_pos == 0 or n_neg == 0:
+                return float("nan")
+            r = rankdata(s)               # average ranks handle entropy ties
+            return float((r[y].sum() - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg))
+        def _auprc(s, y):
+            order = np.argsort(s)[::-1]; ys = y[order].astype(np.float64)
+            tp = np.cumsum(ys); fp = np.cumsum(1 - ys)
+            prec = tp / np.maximum(tp + fp, 1e-9)
+            total = ys.sum()
+            if total == 0:
+                return float("nan")
+            rec = tp / total
+            return float(np.sum(np.diff(np.concatenate([[0.0], rec])) * prec))
+
+    def _ece(conf, correct, n_bins=15):
+        edges = np.linspace(0, 1, n_bins + 1); ece = 0.0
+        for i in range(n_bins):
+            lo, hi = edges[i], edges[i + 1]
+            m = (conf >= lo) & (conf <= hi) if i == n_bins - 1 else (conf >= lo) & (conf < hi)
+            if m.any():
+                ece += m.mean() * abs(correct[m].mean() - conf[m].mean())
+        return float(ece)
+
+    rng = np.random.default_rng(0)
+    x_ent, y_err = [], []                                  # pooled-bin (descriptive)
+    subj_auroc, subj_auprc, subj_ece, subj_prev = [], [], [], []
     with torch.no_grad():
         for batch in val_loader:
             img = batch["image"].cuda()
-            lbl = batch["label"].squeeze(1).long().cpu()
+            lbl = batch["label"].squeeze(1).long().cpu().squeeze()
             logits = infer(effi, img)
             prob = logits.softmax(1).cpu()
+            pred = logits.argmax(1).cpu().squeeze()
             ent = -(prob * torch.log(prob + 1e-8)).sum(1).squeeze()
-            err = (logits.argmax(1).cpu().squeeze() != lbl.squeeze()).float()
-            emax = ent.max().item()
+            conf = prob.max(1).values.squeeze()
+            ent_np = ent.numpy().reshape(-1)
+            err_np = (pred != lbl).numpy().reshape(-1)
+            conf_np = conf.numpy().reshape(-1)
+            # (1) pooled-bin correlation over the whole volume (descriptive).
+            emax = float(ent_np.max())
             for b in range(20):
                 lo, hi = b / 20 * emax, (b + 1) / 20 * emax
-                mask = (ent >= lo) & (ent < hi)
+                mask = (ent_np >= lo) & (ent_np < hi)
                 if mask.sum() > 100:
-                    x_ent.append(ent[mask].mean().item())
-                    y_err.append(err[mask].mean().item())
+                    x_ent.append(float(ent_np[mask].mean())); y_err.append(float(err_np[mask].mean()))
+            # (2) subject-level discrimination/calibration on the foreground union.
+            body = ((lbl > 0) | (pred > 0)).numpy().reshape(-1)
+            idx = np.flatnonzero(body)
+            if idx.size == 0:
+                continue
+            if idx.size > 300000:                          # cap for speed; seeded
+                idx = rng.choice(idx, 300000, replace=False)
+            e = ent_np[idx]; yb = err_np[idx].astype(bool); cb = conf_np[idx]
+            if yb.sum() > 0 and (~yb).sum() > 0:
+                subj_auroc.append(_auroc(e, yb))
+                subj_auprc.append(_auprc(e, yb))
+                subj_prev.append(float(yb.mean()))
+            subj_ece.append(_ece(cb, (~yb).astype(np.float64)))
     r_p = float(pearsonr(x_ent, y_err)[0]); r_s = float(spearmanr(x_ent, y_err)[0])
-    print(f"[O3] Pearson r={r_p:.3f}  Spearman rho={r_s:.3f}  {'GO' if r_p>0.60 else 'NO-GO'} (>0.60)")
+
+    def _boot_ci(vals):
+        vals = np.asarray([v for v in vals if not np.isnan(v)], dtype=np.float64)
+        if vals.size == 0:
+            return float("nan"), [float("nan"), float("nan")]
+        boot = [np.mean(rng.choice(vals, vals.size, replace=True)) for _ in range(2000)]
+        return float(vals.mean()), [float(np.percentile(boot, 2.5)), float(np.percentile(boot, 97.5))]
+
+    auroc_m, auroc_ci = _boot_ci(subj_auroc)
+    auprc_m, auprc_ci = _boot_ci(subj_auprc)
+    ece_m, ece_ci = _boot_ci(subj_ece)
+    prev_m = float(np.mean(subj_prev)) if subj_prev else float("nan")
+    go = bool(not np.isnan(auroc_ci[0]) and auroc_ci[0] > 0.5)
+    print(f"[O3] pooled-bin r={r_p:.3f} rho={r_s:.3f} (descriptive only)")
+    print(f"     subject AUROC={auroc_m:.3f} CI[{auroc_ci[0]:.3f},{auroc_ci[1]:.3f}]  "
+          f"AUPRC={auprc_m:.3f} (err prev={prev_m:.3f})  ECE={ece_m:.3f}  "
+          f"{'GO' if go else 'NO-GO'} (AUROC CI-lower > 0.5)")
     plt.figure(figsize=(6, 5)); plt.scatter(x_ent, y_err, alpha=0.7)
     plt.xlabel("Mean entropy (bin)"); plt.ylabel("Error rate (bin)")
-    plt.title(f"O3: Uncertainty-Error r={r_p:.3f}")
+    plt.title(f"O3: pooled-bin r={r_p:.3f} (descriptive); subj AUROC={auroc_m:.3f}")
     plt.tight_layout(); plt.savefig(f"{OBS_DIR}/O3_unc_error.png", dpi=150); plt.close()
-    save_obs("O3", {"pearson_r": r_p, "spearman_rho": r_s, "go": r_p > 0.60})
+    save_obs("O3", {
+        "subject_auroc_mean": auroc_m, "subject_auroc_ci": auroc_ci,
+        "subject_auprc_mean": auprc_m, "subject_auprc_ci": auprc_ci,
+        "error_prevalence_mean": prev_m,
+        "subject_ece_mean": ece_m, "subject_ece_ci": ece_ci,
+        "n_subjects": len(subj_auroc),
+        "pooled_bin_pearson_r": r_p, "pooled_bin_spearman_rho": r_s,
+        "pearson_r": r_p, "spearman_rho": r_s,   # backward-compat keys
+        "go": go,
+    })
 
 
 def O4_per_organ(val_loader, effi, post_pred, post_lbl):
@@ -288,6 +386,7 @@ def O4_per_organ(val_loader, effi, post_pred, post_lbl):
 
 def O5_decoder_gain(val_loader, effi, full):
     subj_r_pearson, subj_r_spearman = [], []
+    subj_pos_rate, subj_neg_rate = [], []   # per-subject volume transition rates
     g_ent, g_pos, g_neg, g_net = [], [], [], []
     with torch.no_grad():
         for batch in val_loader:
@@ -301,6 +400,7 @@ def O5_decoder_gain(val_loader, effi, full):
             pos = ((pred_full == lbl) & (pred_effi != lbl)).float()
             neg = ((pred_full != lbl) & (pred_effi == lbl)).float()
             net = pos - neg
+            subj_pos_rate.append(float(pos.mean())); subj_neg_rate.append(float(neg.mean()))
             # np.quantile: torch.quantile errors on tensors > 2^24 elements
             edges = np.quantile(ent.flatten().numpy(), np.linspace(0, 1, 21))
             s_ent, s_net = [], []
@@ -321,7 +421,13 @@ def O5_decoder_gain(val_loader, effi, full):
     boot = [np.mean(rng.choice(subj_r_pearson, len(subj_r_pearson), replace=True)) for _ in range(2000)]
     ci_lo, ci_hi = np.percentile(boot, [2.5, 97.5])
     mean_pos, mean_neg = float(np.mean(g_pos)), float(np.mean(g_neg))
+    # Subject-level volume transition rates (rigorous; the bin-averaged rates above
+    # are kept for backward compatibility).
+    net_rate = np.array(subj_pos_rate) - np.array(subj_neg_rate)
+    nr_boot = [np.mean(rng.choice(net_rate, len(net_rate), replace=True)) for _ in range(2000)]
+    nr_ci = [float(np.percentile(nr_boot, 2.5)), float(np.percentile(nr_boot, 97.5))]
     print(f"[O5] subj Pearson r={r_mean:.3f}+/-{r_std:.3f}  95%CI[{ci_lo:.3f},{ci_hi:.3f}]")
+    print(f"     subj net rate={float(net_rate.mean()):.5f}  95%CI[{nr_ci[0]:.5f},{nr_ci[1]:.5f}]")
     print(f"     mean pos_rate={mean_pos:.5f}  neg_rate={mean_neg:.5f}  "
           f"{'GO' if (ci_lo>0 and mean_pos>mean_neg) else 'NO-GO'}")
     idx = np.argsort(g_ent)
@@ -337,6 +443,10 @@ def O5_decoder_gain(val_loader, effi, full):
     bin_net = np.array(g_net)[idx].tolist()
     save_obs("O5", {"subj_pearson_r_mean": r_mean, "subj_pearson_r_ci": [float(ci_lo), float(ci_hi)],
                     "mean_positive_rate": mean_pos, "mean_negative_rate": mean_neg,
+                    "subject_pos_rate_mean": float(np.mean(subj_pos_rate)),
+                    "subject_neg_rate_mean": float(np.mean(subj_neg_rate)),
+                    "subject_net_rate_mean": float(net_rate.mean()),
+                    "subject_net_rate_ci": nr_ci,
                     "bin_ent": xe.tolist(), "bin_net": bin_net,
                     "go": bool(ci_lo > 0 and mean_pos > mean_neg)})
     return xe.tolist(), bin_net
@@ -674,31 +784,67 @@ def O10_organ_size(val_loader, dice_summary, organ_ent):
                      "organ_size": {n: round(s, 0) for n, s in zip(names, sizes)}})
 
 
-def O11_routing_signals(val_loader, effi, full, bin_ent, bin_net):
-    res = {"Entropy": {"corr_btcv": float(pearsonr(bin_ent, bin_net)[0]), "latency_ms": 0.0}}
+def O11_routing_signals(val_loader, effi, full, bin_ent=None, bin_net=None):
+    """Compare cheap routing signals against net transitions, per subject.
 
-    # Confidence = 1 - max(softmax)
-    cs, cg = [], []
+    Each signal is binned within a subject (quantile bins); the per-subject Pearson
+    r between the signal and net transition is bootstrapped over subjects, matching
+    the subject-level protocol used in O5/O3. A paired entropy-vs-confidence
+    difference CI shows whether either signal is reliably better. MC dropout is
+    included only if the architecture has active stochasticity.
+    """
+    rng = np.random.default_rng(0)
+
+    def subj_corr(sig, net):
+        edges = np.quantile(sig.flatten().numpy(), np.linspace(0, 1, 21))
+        s_sig, s_net = [], []
+        for b in range(20):
+            mask = (sig >= float(edges[b])) & (sig < float(edges[b + 1]))
+            if mask.sum() > 100:
+                s_sig.append(sig[mask].mean().item()); s_net.append(net[mask].mean().item())
+        return float(pearsonr(s_sig, s_net)[0]) if len(s_sig) >= 5 else None
+
+    def boot_ci(vals):
+        vals = np.asarray([v for v in vals if v is not None and not np.isnan(v)], dtype=np.float64)
+        if vals.size == 0:
+            return float("nan"), [float("nan"), float("nan")]
+        b = [np.mean(rng.choice(vals, vals.size, replace=True)) for _ in range(2000)]
+        return float(vals.mean()), [float(np.percentile(b, 2.5)), float(np.percentile(b, 97.5))]
+
+    ent_r, conf_r, pair_diff = [], [], []
     with torch.no_grad():
         for batch in val_loader:
             img = batch["image"].cuda(); lbl = batch["label"].squeeze(1).long().cpu().squeeze()
             le = infer(effi, img); pe = le.softmax(1).cpu(); pred_e = le.argmax(1).cpu().squeeze()
             pred_f = infer(full, img).argmax(1).cpu().squeeze()
-            conf = 1 - pe.max(1).values.squeeze()
+            ent = -(pe * torch.log(pe + 1e-8)).sum(1).squeeze()
+            conf = 1 - pe.max(1).values.squeeze()                 # 1-maxprob: high = uncertain
             net = (((pred_f == lbl) & (pred_e != lbl)).float()
                    - ((pred_f != lbl) & (pred_e == lbl)).float())
-            edges = np.quantile(conf.flatten().numpy(), np.linspace(0, 1, 21))
-            for b in range(20):
-                mask = (conf >= float(edges[b])) & (conf < float(edges[b + 1]))
-                if mask.sum() > 100:
-                    cs.append(conf[mask].mean().item()); cg.append(net[mask].mean().item())
-    res["Confidence"] = {"corr_btcv": float(pearsonr(cs, cg)[0]) if len(cs) > 2 else float("nan"),
-                         "latency_ms": 0.0}
+            re = subj_corr(ent, net); rc = subj_corr(conf, net)
+            if re is not None: ent_r.append(re)
+            if rc is not None: conf_r.append(rc)
+            if re is not None and rc is not None: pair_diff.append(re - rc)
 
-    # MC Dropout (T=10) — sanity-check variance first (UXNET uses DropPath, may be ~0)
-    effi.train()
-    mc_ok = True
-    ms, mg = [], []
+    ent_m, ent_ci = boot_ci(ent_r); conf_m, conf_ci = boot_ci(conf_r)
+    if pair_diff:
+        d = np.asarray(pair_diff, dtype=np.float64)
+        db = [np.mean(rng.choice(d, d.size, replace=True)) for _ in range(2000)]
+        diff_m = float(d.mean()); diff_ci = [float(np.percentile(db, 2.5)), float(np.percentile(db, 97.5))]
+    else:
+        diff_m = float("nan"); diff_ci = [float("nan"), float("nan")]
+
+    res = {
+        "Entropy": {"subject_corr_mean": ent_m, "subject_corr_ci": ent_ci, "latency_ms": 0.0},
+        "Confidence": {"subject_corr_mean": conf_m, "subject_corr_ci": conf_ci, "latency_ms": 0.0},
+        "entropy_minus_confidence_mean": diff_m, "entropy_minus_confidence_ci": diff_ci,
+        "n_subjects": len(pair_diff),
+    }
+    if bin_ent is not None and bin_net is not None and len(bin_ent) > 2:
+        res["Entropy"]["pooled_bin_corr"] = float(pearsonr(bin_ent, bin_net)[0])
+
+    # MC Dropout (T=10): only meaningful if the architecture has active dropout.
+    effi.train(); mc_ok = True; mc_r = []
     with torch.no_grad():
         for i, batch in enumerate(val_loader):
             img = batch["image"].cuda(); lbl = batch["label"].squeeze(1).long().cpu().squeeze()
@@ -706,24 +852,26 @@ def O11_routing_signals(val_loader, effi, full, bin_ent, bin_net):
             mc_var = preds.var(0).sum(1).squeeze()
             if i == 0 and mc_var.max().item() < 1e-7:
                 print("[O11] MC Dropout variance ~0 (no active dropout) — skipping MC signal")
-                mc_ok = False
-                break
+                mc_ok = False; break
             pred_e = preds.mean(0).argmax(1).cpu().squeeze()
             pred_f = infer(full, img).argmax(1).cpu().squeeze()
             net = (((pred_f == lbl) & (pred_e != lbl)).float()
                    - ((pred_f != lbl) & (pred_e == lbl)).float())
-            edges = np.quantile(mc_var.flatten().numpy(), np.linspace(0, 1, 21))
-            for b in range(20):
-                mask = (mc_var >= float(edges[b])) & (mc_var < float(edges[b + 1]))
-                if mask.sum() > 100:
-                    ms.append(mc_var[mask].mean().item()); mg.append(net[mask].mean().item())
+            r = subj_corr(mc_var, net)
+            if r is not None: mc_r.append(r)
     effi.eval()
-    res["MC Dropout"] = {"corr_btcv": (float(pearsonr(ms, mg)[0]) if (mc_ok and len(ms) > 2) else float("nan")),
-                         "latency_ms": None, "warn": None if mc_ok else "dropout_inactive"}
+    if mc_ok:
+        mc_m, mc_ci = boot_ci(mc_r)
+        res["MC Dropout"] = {"subject_corr_mean": mc_m, "subject_corr_ci": mc_ci, "latency_ms": None}
+    else:
+        res["MC Dropout"] = {"subject_corr_mean": float("nan"), "latency_ms": None,
+                             "warn": "dropout_inactive"}
 
-    print(f"\n[O11] {'Signal':12s} {'corr(BTCV)':>12}")
-    for sig, v in res.items():
-        print(f"      {sig:12s} {v['corr_btcv']:12.3f}")
+    print(f"\n[O11] {'Signal':12s} {'subj corr':>10}  {'95% CI':>18}")
+    for sig in ("Entropy", "Confidence", "MC Dropout"):
+        v = res[sig]; ci = v.get("subject_corr_ci", [float("nan"), float("nan")])
+        print(f"      {sig:12s} {v['subject_corr_mean']:10.3f}  [{ci[0]:.3f},{ci[1]:.3f}]")
+    print(f"      entropy-confidence diff={diff_m:.3f} CI[{diff_ci[0]:.3f},{diff_ci[1]:.3f}]")
     save_obs("O11", res)
 
 

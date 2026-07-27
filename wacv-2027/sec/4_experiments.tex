@@ -1,75 +1,139 @@
-\section{Experimental Protocol}
-\label{sec:experiments}
+\section{Experimental Setup}
+\label{sec:setup}
 
-\paragraph{Objectives.}
-Using the matched comparison of Section~\ref{sec:study}, our analysis
-establishes three things left unresolved by aggregate efficient-decoder
-evaluation: how large and how bidirectional the full decoder's benefit is, where
-it is concentrated anatomically, and whether the beneficial regions can be
-identified at test time from the efficient model's uncertainty.
-Section~\ref{sec:results} reports these in turn, preceded by the
-controlled-reimplementation baselines.
+\paragraph{Experiment plan.}
+Our study reproduces \method{}~\cite{rahman2025effidec3d} and evaluates it on a full
+backbone $\times$ dataset grid (Table~\ref{tab:plan}).  For each backbone that
+\method{} actually equips with an efficient decoder---3D
+UX-Net~\cite{lee20233duxnet}, Swin UNETR~\cite{tang2022swinunetr}, and optionally
+SwinUNETR-V2~\cite{he2023swinunetrv2} and MedNeXt~\cite{roy2023mednext}---we pair a
+full and an \method{} decoder and run that matched pair on each of three to four
+representative datasets from the \method{} evaluation: BTCV abdominal CT,
+FeTA~\cite{payette2021feta} fetal-brain MRI, and predeclared MSD
+tasks~\cite{antonelli2022msd} (Task01 BrainTumour, and Task06 Lung or Task08
+HepaticVessel).  Every grid cell is therefore a matched full/efficient pair on which
+the full metric suite is computed; cross-dataset consistency is read across each row
+and cross-backbone consistency down each column.
+UNETR~\cite{hatamizadeh2022unetr} and nnU-Net~\cite{isensee2021nnunet} are excluded
+because \method{} builds no decoder pair for them, so a matched flip comparison is
+undefined.
+
+\begin{table}[t]
+\centering
+\caption{Predeclared backbone $\times$ dataset grid. Each cell is a matched
+full/\method{} decoder pair sharing one encoder, run through the full metric suite.
+$\ast$: completed; remaining cells in progress.}
+\label{tab:plan}
+\resizebox{\columnwidth}{!}{
+\begin{tabular}{lcccc}
+\toprule
+Backbone & BTCV & FeTA & MSD-BrTu & MSD-Lung/HV \\
+ & (CT) & (MRI) & (MRI) & (CT) \\
+\midrule
+3D UX-Net (CNN)        & \checkmark$^\ast$ & \checkmark & \checkmark & \checkmark \\
+Swin UNETR (Trans.)    & \checkmark & \checkmark & \checkmark & \checkmark \\
+SwinUNETR-V2 (opt.)    & \checkmark & \checkmark & \checkmark & \checkmark \\
+MedNeXt-M-K3 (opt.)    & \checkmark & \checkmark & \checkmark & \checkmark \\
+\bottomrule
+\end{tabular}}
+\end{table}
 
 \paragraph{Dataset and split.}
 The primary task is the 13-organ BTCV/Synapse abdominal CT benchmark with 18
-training and 12 validation volumes.  The evaluated structures are spleen, right
-and left kidney, gallbladder, esophagus, liver, stomach, aorta, inferior vena
-cava, portal and splenic veins, pancreas, and right and left adrenal glands.
-Images are intensity-windowed and resampled following the public \method{}
-pipeline; training uses $96^3$ patches.  The same validation subjects are paired
-across every model comparison.
+training and 12 validation volumes: spleen, right and left kidney, gallbladder,
+esophagus, liver, stomach, aorta, inferior vena cava, portal and splenic veins,
+pancreas, and right and left adrenal glands.  Images are intensity-windowed and
+resampled following the public \method{} pipeline; the same validation subjects are
+paired across all model comparisons on a given dataset.
 
-\paragraph{Models and training.}
-\fullmodel{} is the public full 3D UX-Net~\cite{lee20233duxnet} configuration
-with feature widths $[48,96,192,384]$; \effimodel{} replaces its decoder with the
-\method{} decoder (48 channels, additive skip aggregation, resolution factor
-two).  Both are trained for 45k iterations with a Dice--cross-entropy loss and
-AdamW.  We evaluate one \fullmodel{} run and two independently initialized
-\effimodel{} runs.  Sliding-window inference uses a $96^3$ window, batch size
-four, overlap 0.7, and constant blending.  We report Dice and 95th-percentile
-Hausdorff distance (HD95), together with parameters, multiply--accumulate
-operations (MACs), latency, and peak inference memory.
+\paragraph{Matched models.}
+Within each cell the two models share an identical encoder and differ \emph{only} in
+the decoder: the full decoder versus the \method{} decoder (channels reduced to the
+minimum encoder width, additive skip aggregation, resolution factor two).  Holding
+the encoder fixed makes any prediction difference attributable to decoder capacity
+alone; consequently the study characterizes the decoder and draws no conclusions
+about the encoder.
 
-\paragraph{Reimplementation status.}
-Our data were reconstructed from the public TransUNet/Synapse release, whose
-NIfTI files carry identity affine metadata, whereas \method{} refers to a
-processed \texttt{btcv\_trns} dataset that is not distributed.  We therefore
-present the experiment as a \emph{controlled reimplementation}, not an exact
-reproduction, and disclose the discrepancy from published numbers in full.
-Because every observation is relational---matched full versus efficient on
-identical local data---a residual reproduction gap for any one cell affects at
-most the estimated \emph{magnitude} of that cell's opportunity, which we bound
-with net (not positive-only) transitions and subject-level intervals; it does
-not change the direction of the finding.  We verified that this gap is not a
-precision artifact: re-evaluating the same weights in FP32 and BF16 gives
-identical Dice.
+\paragraph{Implementation.}
+We reproduce the \method{} training protocol on a single NVIDIA RTX~5090 (32\,GB,
+Blackwell) under PyTorch~2.6 / CUDA~12.8 with MONAI, using BF16 mixed precision
+(no loss scaling).  Each model is trained for 45{,}000 optimizer steps
+(validation every 250) with AdamW at learning rate $10^{-3}$, a
+Dice--cross-entropy loss, four $96^3$ random-crop samples per volume, and full
+in-memory caching.  Sliding-window inference uses a $96^3$ window, batch size four,
+overlap 0.7, and constant blending.  We evaluate one full run and two independently
+initialized \method{} runs per cell to expose seed sensitivity.  Segmentation
+quality is reported with Dice and 95th-percentile Hausdorff distance (HD95), and
+efficiency with parameters, multiply--accumulate operations (MACs), latency, and
+peak memory.
 
-\paragraph{Architecture generality.}
-We organize architecture coverage as a predeclared ladder over the backbones for
-which \method{} actually defines a decoder pair, rather than treating one extra
-model as proof of universality.  The primary causal comparison is the matched
-3D UX-Net pair (large-kernel CNN); a matched Swin UNETR~\cite{tang2022swinunetr}
-pair tests transfer to a hierarchical Transformer, with
-SwinUNETR-V2~\cite{he2023swinunetrv2} and MedNeXt~\cite{roy2023mednext}
-available as optional deeper pairs.  We deliberately exclude
-UNETR~\cite{hatamizadeh2022unetr} and nnU-Net~\cite{isensee2021nnunet}: \method{}
-builds an efficient decoder only where a wide, high-resolution decoder
-bottleneck exists, and pairs one with neither (UNETR is already lightweight;
-nnU-Net self-configures its decoder).  A matched transition comparison is
-therefore undefined for them, and an unofficial \method{} variant would be an
-ungrounded extension rather than a control.
+\paragraph{Core quantities.}
+Let $\hat{y}_{\mathrm{E}}(v)$, $\hat{y}_{\mathrm{F}}(v)$, and $y(v)$ be the
+efficient prediction, full prediction, and ground-truth label at voxel $v$.  We
+measure where the full decoder changes predictions with \emph{prediction flips},
+the standard tool for comparing two classifiers on paired
+data~\cite{yan2021pct,cormier2016churn}:
+\begin{align}
+P(v) &= \mathbb{1}\!\left[\hat{y}_{\mathrm{E}}(v)\neq y(v)\ \wedge\ \hat{y}_{\mathrm{F}}(v)=y(v)\right], \label{eq:pflip}\\
+N(v) &= \mathbb{1}\!\left[\hat{y}_{\mathrm{E}}(v)=y(v)\ \wedge\ \hat{y}_{\mathrm{F}}(v)\neq y(v)\right], \label{eq:nflip}\\
+U(v) &= P(v)-N(v), \label{eq:net}
+\end{align}
+a \emph{positive} flip (full corrects efficient), a \emph{negative} flip (full
+degrades efficient), and the \emph{net} flip.  $P$ and $N$ are exactly the discordant
+cells of the paired-agreement table behind McNemar's classifier-comparison
+test~\cite{mcnemar1947,dietterich1998}; volume rates are
+$R_{\mathrm{pos}}=\mathrm{mean}_v P(v)$, $R_{\mathrm{neg}}=\mathrm{mean}_v N(v)$, and
+$R_{\mathrm{net}}=R_{\mathrm{pos}}-R_{\mathrm{neg}}$.  As test-time signals computable
+from the efficient model alone we use predictive entropy
+$H(v)=-\sum_{c} p_c(v)\log p_c(v)$, confidence $\max_c p_c(v)$, and Monte-Carlo
+dropout variance~\cite{gal2016dropout}.
 
-\paragraph{Dataset generality.}
-The original \method{} evaluation spans FeTA~\cite{payette2021feta}, BTCV, and
-the ten Medical Segmentation Decathlon (MSD) tasks~\cite{antonelli2022msd}.  We
-preselect three to four representative tasks: BTCV abdominal CT as the primary
-multi-organ task; FeTA fetal-brain MRI for modality and anatomy shift; MSD
-Task01 BrainTumour for multimodal lesion segmentation; and either MSD Task06
-Lung or Task08 HepaticVessel as a sparse-lesion or thin-structure stress test.
-Every dataset uses the same positive, negative, and net transition definitions,
-concentration analysis, opportunity curve, and subject-level intervals, and the
-set is frozen before inspecting results.
+\paragraph{Characterization metrics.}
+We group the analysis into three questions; each metric is computed per grid cell and
+aggregated over subjects with a bootstrap, since the twelve validation volumes---not
+the correlated voxels---are the independent units.
 
-\todo{Insert the matched Swin UNETR replication (opt.\ SwinUNETR-V2/MedNeXt) and
-the predeclared FeTA/MSD results; all currently completed numbers are 3D UX-Net
-on BTCV.}
+\smallskip\noindent\textit{(1) Heterogeneity: is the benefit evenly distributed?}
+\begin{itemize}\setlength\itemsep{1pt}
+  \item \textbf{O1, boundary error ratio.} Mean voxel error on the eroded boundary
+  band divided by the eroded-interior error; ${>}1$ indicates boundary-concentrated
+  error.
+  \item \textbf{O4, per-organ difficulty.} Per-class Dice and mean entropy $H$,
+  ranking the structures the decoder struggles on.
+  \item \textbf{O10, size--difficulty relation.} Spearman $\rho$ between organ volume
+  and difficulty, and the partial correlation of $H$ and error given $\log$-volume.
+\end{itemize}
+
+\smallskip\noindent\textit{(2) Concentration: does a small subset carry most net benefit?}
+\begin{itemize}\setlength\itemsep{1pt}
+  \item \textbf{O2, entropy sparsity.} $\Pr[H(v)>\tau]$, the fraction of high-entropy
+  voxels.
+  \item \textbf{O5, uncertainty--benefit correlation.} Subject-level Pearson $r(H,U)$
+  between binned entropy and net flips.
+  \item \textbf{O9$^{\text{orc}}$, voxel recovery.}
+  $\sum_{\text{top-}k\%}P(v)\,/\,\sum P(v)$, the share of positive flips in the
+  highest-entropy $k\%$ of voxels---a non-deployable upper bound.
+  \item \textbf{O6, training persistence.} Mean entropy across checkpoints, testing
+  whether concentration is a training transient.
+\end{itemize}
+
+\smallskip\noindent\textit{(3) Predictability: can a test-time signal find the regions?}
+\begin{itemize}\setlength\itemsep{1pt}
+  \item \textbf{O3, flip discrimination and calibration.} AUROC and AUPRC of entropy
+  predicting flips~\cite{hendrycks2017baseline}, and expected calibration error
+  (ECE)~\cite{guo2017calibration}.
+  \item \textbf{O9, opportunity curve.} A risk--coverage
+  curve~\cite{geifman2017selective} over contiguous $16^3$ blocks (plus a $4$-voxel
+  halo) ranked by entropy, reporting net-flip utility recovered versus a
+  matched-random selector.
+  \item \textbf{O11, routing-signal comparison.} Subject-level correlation of entropy,
+  confidence, and MC-dropout with net flips.
+\end{itemize}
+
+\smallskip\noindent Cross-dataset (\textbf{O7}) and cross-backbone (\textbf{O8})
+consistency re-evaluate these metrics across the rows and columns of
+Table~\ref{tab:plan}.
+
+\todo{Completed results below are the 3D UX-Net/BTCV grid cell. Remaining cells
+(other backbones and datasets) are in progress; cross-backbone (columns) and
+cross-dataset (rows) consistency are reported once enough cells are filled.}

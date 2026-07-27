@@ -9,7 +9,7 @@
 
 | | Paper A — this document | Paper B |
 |---|---|---|
-| **Claim** | Dice and FLOPs alone are insufficient to explain efficient decoder design; positive, negative, and net transitions reveal where additional decoder computation helps (**observation only**) | AdaDec3D realizes region-adaptive decoding — **iso-accuracy at lower executed cost** |
+| **Claim** | Dice and FLOPs alone are insufficient to explain efficient decoder design; positive, negative, and net flips reveal where additional decoder computation helps (**observation only**) | AdaDec3D realizes region-adaptive decoding — **iso-accuracy at lower executed cost** |
 | **Venue** | MIDL / MLMI / ISBI | MICCAI 2026 / TMI |
 | **Gate** | O2/O3/O5/O9 pass ✅ (all passed 2026-07-25) | O7, O8, O11 + AdaDec3D beats controls |
 | **Key result** | Preliminary cross-seed evidence that decoder benefit is small, concentrated and predictable; corrected regional analysis still required | **DICE ≈ EffiDec3D at meaningfully lower executed MACs** (input-adaptive) |
@@ -17,7 +17,7 @@
 > **Scope note**: Paper A is an **observation paper** — it characterizes *where*
 > extra decoder capacity changes predictions in spatially concentrated and partly predictable regions
 > and does **not** claim realizable efficiency (that is Paper B). O5's small,
-> concentrated net transition (0.13%) is read here as evidence that decoder
+> concentrated net flip (0.13%) is read here as evidence that decoder
 > capacity is *over-provisioned* — a finding that **motivates** the Paper B
 > efficiency direction, but is not itself an efficiency claim. The MAC-headroom
 > analysis in Part 4 is likewise Paper B motivation, reported here for context.
@@ -383,7 +383,7 @@ gap. Therefore:
 | O3 | Pearson 0.973; Spearman 0.975 | Descriptive only; current pooled-bin estimator overstates inferential strength |
 | O5 | Subject mean Pearson **0.646**, bootstrap CI [0.158, 0.994]; positive 0.290% vs negative 0.225% | Direction replicates seed 0, but net effect is only about **0.065% of voxels** |
 | O6 | Mean entropy falls 0.0279 → 0.0104 from 5k to 45k | Difficulty contracts during training but does not disappear |
-| O9 | Top 10/20/30% entropy voxels recover 58.7/86.4/95.2% of positive transitions | Strong oracle opportunity; not yet deployable regional compute evidence |
+| O9 | Top 10/20/30% entropy voxels recover 58.7/86.4/95.2% of positive flips | Strong oracle opportunity; not yet deployable regional compute evidence |
 | O10 | Size–difficulty Spearman −0.544; partial entropy–difficulty r 0.810 | Small organs are harder, while entropy retains information beyond size |
 | O11 | Entropy r 0.655; confidence r 0.663; MC dropout inactive | Confidence is a valid cheap baseline, tied with entropy; MC-dropout is inactive (EffiDec3D uses DropPath, variance ≈ 0 — auto-detected and skipped, not a failure) |
 
@@ -402,8 +402,8 @@ as final evidence:
 1. **O3:** the current implementation pools entropy bins from all subjects and
    correlates their bin means. Report subject-level AUROC/AUPRC for voxel error,
    calibration curves, and a subject-bootstrap confidence interval instead.
-2. **O9 transitions:** the current recovery curve counts only positive E0-over-E1
-   transitions. Add a **net transition** curve (`positive − negative`) so a region
+2. **O9 flips:** the current recovery curve counts only positive E0-over-E1
+   flips. Add a **net flip** curve (`positive − negative`) so a region
    that improves some E1 errors but also degrades correct E1 predictions is penalized.
 3. **O9 bootstrap:** resample the same subject indices for entropy and random
    policies (paired bootstrap). Store both CI bounds and require the lower bound
@@ -442,7 +442,7 @@ original paper actually built an EffiDec3D decoder pair — with a predeclared l
 
 | Backbones | EffiDec3D pair? | Datasets | Observations |
 |---|---|---|---|
-| 3D UX-Net (large-kernel CNN), SwinUNETR (Transformer) | ✅ Full + EffiDec3D | BTCV, FeTA, MSD01 BrainTumour, MSD06 Lung *or* MSD08 HepaticVessel | **all O1–O11** (full-vs-efficient transitions) |
+| 3D UX-Net (large-kernel CNN), SwinUNETR (Transformer) | ✅ Full + EffiDec3D | BTCV, FeTA, MSD01 BrainTumour, MSD06 Lung *or* MSD08 HepaticVessel | **all O1–O11** (full-vs-efficient flips) |
 | SwinUNETRv2, MedNeXt-M-K3 | ✅ Full + EffiDec3D | BTCV (+ optional extension) | **all O1–O11**, optional deeper coverage |
 
 > **Why only these backbones.** EffiDec3D applies its decoder *only* to 3D UX-Net,
@@ -451,14 +451,14 @@ original paper actually built an EffiDec3D decoder pair — with a predeclared l
 > **not** given an EffiDec3D pair in the original work: UNETR is already lean
 > (82.6 vs 337.6 GFLOPs), and nnU-Net self-configures its decoder (a fixed EffiDec3D
 > decoder does not fit). We therefore do **not** run UNETR/nnU-Net — a matched
-> transition analysis is undefined for them, and forcing an unofficial EffiDec3D
+> flip analysis is undefined for them, and forcing an unofficial EffiDec3D
 > variant would be an ungrounded extension. (If a reviewer asks about non-EffiDec3D
 > architectures, they can be added later as single-model O1/O2/O4/O10 concentration
 > controls only — never for decoder-causal claims.)
 >
 > **Scope — decoder only.** EffiDec3D modifies the *decoder* alone (reduced channels
 > + removed high-res stages); the **encoder is held identical between Full and Effi**.
-> Every transition (O5/O9/O11) is therefore a clean decoder ablation with the encoder
+> Every flip (O5/O9/O11) is therefore a clean decoder ablation with the encoder
 > constant — which is what licenses attributing the benefit to decoder capacity. It
 > also means Paper A says **nothing about the encoder** (the untouched 57.8% of MACs);
 > encoder over-provisioning is a distinct question deferred to Paper B (see Part 4).
@@ -521,8 +521,8 @@ lower bound is borderline.
 > published absolute Dice, that gap is **disclosed in a table footnote / figure legend
 > for that cell** and does **not** revise the aggregate conclusion. The only claim a
 > gap can weaken is the *magnitude* of that one cell's opportunity (a larger local
-> Full–Effi gap can inflate apparent transition volume); we guard that with net (not
-> positive-only) transitions and subject-bootstrap CIs. Direction is what O7/O8
+> Full–Effi gap can inflate apparent flip volume); we guard that with net (not
+> positive-only) flips and subject-bootstrap CIs. Direction is what O7/O8
 > aggregate, and direction is gap-robust.
 
 ---
@@ -541,13 +541,13 @@ Save all figures to `/root/obs/`.
 - `1[·]` — indicator (1 if true, else 0). `err(v) = 1[ŷ(v) ≠ y(v)]` — voxel error.
 - **Entropy** `H(v) = − Σ_{c=1}^{C} p_c(v) · log p_c(v)` — the cheap, ground-truth-free uncertainty signal from the *efficient* model.
 - **Confidence** `conf(v) = max_c p_c(v)`.
-- **Transitions** (efficient → full, per voxel):
+- **Flips** (efficient → full, per voxel):
   - Positive `P(v) = 1[ ŷ_e(v) ≠ y(v) ∧ ŷ_f(v) = y(v) ]` — full **improves** what efficient got wrong.
   - Negative `N(v) = 1[ ŷ_e(v) = y(v) ∧ ŷ_f(v) ≠ y(v) ]` — full **degrades** what efficient got right.
   - Net `U(v) = P(v) − N(v)`; rates `R_pos = mean_v P(v)`, `R_neg = mean_v N(v)`, `R_net = R_pos − R_neg`.
 
 **The three paper contributions:**
-- **C1 — Transition-count comparison.** Measure *where* the full decoder helps by counting `P/N/U` per voxel with subject-level bootstrap, instead of only aggregate Dice/FLOPs (which count every disagreement as improvement).
+- **C1 — Flip-count comparison.** Measure *where* the full decoder helps by counting `P/N/U` per voxel with subject-level bootstrap, instead of only aggregate Dice/FLOPs (which count every disagreement as improvement).
 - **C2 — The net benefit is small, bidirectional, and spatially concentrated.** `R_net ≈ 0.1%` and largely offset by `R_neg`; it concentrates at boundaries and small structures.
 - **C3 — The benefit is predictable at test time.** The efficient model's own entropy `H(v)` identifies the beneficial regions without ground truth.
 
@@ -557,7 +557,7 @@ Save all figures to `/root/obs/`.
 | **O2** | Entropy distribution | histogram of `H(v)`; sparsity `Pr[H(v) > 0.5]` (=1.18%) | **C2** (premise), supports **C3** |
 | **O3** | Uncertainty–error correlation | `Pearson(H, err)` over entropy bins (=0.97, descriptive; subject-level audit pending) | **C3** |
 | **O4** | Per-organ difficulty | per-class Dice and mean `H`; rank organs by difficulty | **C2** |
-| **O5** | Decoder transition analysis | `P(v)`, `N(v)`, `U(v)`; per-subject `Pearson(binned H, binned U)` + subject bootstrap CI | **C1** + **C2** + **C3** |
+| **O5** | Decoder flip analysis | `P(v)`, `N(v)`, `U(v)`; per-subject `Pearson(binned H, binned U)` + subject bootstrap CI | **C1** + **C2** + **C3** |
 | **O6** | Difficulty evolution | `mean_v H(v)` across training iterations (0.0279→0.0104) | **C2** (residual persists) |
 | **O7** | Cross-dataset consistency | aggregate O5/O9 direction over ≥3 frozen datasets (CT+MRI+lesion) | generality of **C2/C3** |
 | **O8** | Architecture-family consistency | aggregate O5/O9/O11 over matched EffiDec3D backbones (UX-Net, Swin, SwinV2, MedNeXt) | generality of **C1/C2/C3** |
@@ -565,7 +565,7 @@ Save all figures to `/root/obs/`.
 | **O10** | Organ size vs difficulty | `Spearman(volume, difficulty)` (=−0.54); partial `r(H, difficulty ∣ log volume)` (=0.81) | **C2** |
 | **O11** | Routing-signal comparison | `corr(signal, U)` for `H` vs `conf` vs MC-dropout; pick the cheap routing signal | **C3** |
 
-**Coverage of the three contributions:** C1 = {O5}; C2 = {O1, O2, O4, O6, O10} (+O5); C3 = {O3, O9, O11} (+O5); generality = {O7, O8}. O5 is the hinge — it defines the transition machinery (C1), shows the effect is small/bidirectional (C2), and shows it rises with entropy (C3).
+**Coverage of the three contributions:** C1 = {O5}; C2 = {O1, O2, O4, O6, O10} (+O5); C3 = {O3, O9, O11} (+O5); generality = {O7, O8}. O5 is the hinge — it defines the flip machinery (C1), shows the effect is small/bidirectional (C2), and shows it rises with entropy (C3).
 
 ### Common notebook setup
 
@@ -837,11 +837,11 @@ save_obs("O4", {"dice": dice_summary, "entropy": ent_summary})
 
 ---
 
-### O5 — Decoder Transition Analysis *(critical Go/No-Go gate)*
+### O5 — Decoder Flip Analysis *(critical Go/No-Go gate)*
 
 **Question**: Does a stronger decoder produce net benefit primarily in high-entropy voxels?
 
-Report **positive** and **negative** transitions separately — positive alone overstates benefit.
+Report **positive** and **negative** flips separately — positive alone overstates benefit.
 
 ```python
 from scipy.stats import pearsonr, spearmanr
@@ -905,7 +905,7 @@ print(f"Per-subject Spearman ρ: {rho_subj_mean:.3f}")
 print(f"Mean positive rate={mean_pos:.5f}  negative rate={mean_neg:.5f}")
 print(f"(Pooled Pearson is descriptive only — bins within subject are correlated)")
 
-# Figure: global net-transition curve (descriptive) with per-subject r in title
+# Figure: global net-flip curve (descriptive) with per-subject r in title
 # Sort ALL four arrays together by entropy to keep curves aligned
 _sort_idx = np.argsort(global_bin_ent)
 x_plot = np.array(global_bin_ent)[_sort_idx]
@@ -917,10 +917,10 @@ plt.figure(figsize=(8, 5))
 plt.plot(x_plot, y_pos, "g--o", markersize=3, alpha=0.6, label="Positive rate")
 plt.plot(x_plot, y_neg, "r--o", markersize=3, alpha=0.6, label="Negative rate")
 plt.plot(x_plot, y_plot, "b-o", markersize=4,
-         label=f"Net transition (subj-r={r_subj_mean:.2f} [{r_ci_lo:.2f},{r_ci_hi:.2f}])")
+         label=f"Net flip (subj-r={r_subj_mean:.2f} [{r_ci_lo:.2f},{r_ci_hi:.2f}])")
 plt.axhline(0, color="k", linewidth=0.8, linestyle=":")
 plt.xlabel("Mean entropy (bin)"); plt.ylabel("Rate")
-plt.title("O5: Decoder Transitions vs Uncertainty")
+plt.title("O5: Decoder Flips vs Uncertainty")
 plt.legend(); plt.tight_layout()
 plt.savefig("/root/obs/O5_decoder_gain.png", dpi=150)
 plt.show()
@@ -1005,7 +1005,7 @@ paper (FeTA, BTCV, and the ten MSD tasks) without reproducing all 12 datasets:
 | 4 | **MSD Task06 Lung** or **Task08 HepaticVessel** | CT lesion / thin vessel | small, sparse, or elongated target stress test |
 
 Freeze the final set of 3–4 datasets before inspecting results. On every dataset,
-report the same positive transition, negative transition, net transition,
+report the same positive flip, negative flip, net flip,
 spatial concentration, and opportunity curve with subject-level confidence
 intervals.
 
@@ -1044,12 +1044,12 @@ direction holds across modality and anatomy shifts, not just BTCV.
 | **MedNeXt-M-K3 + EffiDec3D** | large-kernel CNN (ConvNeXt-style) | optional deeper matched pair |
 
 All four have an official EffiDec3D decoder pair, so every row supports the full
-transition analysis. We do **not** include UNETR or nnU-Net: EffiDec3D never built
+flip analysis. We do **not** include UNETR or nnU-Net: EffiDec3D never built
 a decoder pair for them (UNETR is already lean; nnU-Net self-configures its
-decoder), so a matched transition comparison is undefined and any unofficial pair
+decoder), so a matched flip comparison is undefined and any unofficial pair
 would be an ungrounded extension.
 
-**Question**: Do the transition-concentration observations hold across the
+**Question**: Do the flip-concentration observations hold across the
 EffiDec3D backbone family — a second (and optionally third/fourth) matched backbone
 — rather than being specific to 3D UX-Net?
 
@@ -1064,7 +1064,7 @@ for NET in 3DUXNET SwinUNETR; do        # + SwinUNETRv2 MedNeXt for deeper cover
 done
 ```
 
-**Go criterion (O8)**: on ≥2 matched backbones the O5/O9 transition–entropy
+**Go criterion (O8)**: on ≥2 matched backbones the O5/O9 flip–entropy
 direction holds (subj-r CI-lower `> 0`) and the O1/O2/O10 concentration pattern
 recurs → the decoder-benefit concentration is a property of the EffiDec3D backbone
 family, not an artifact of 3D UX-Net.
@@ -1074,15 +1074,15 @@ family, not an artifact of 3D UX-Net.
 ### O9 — Selective-Allocation Opportunity *(headline result for Paper A)*
 
 **Question**: At a predeclared compute budget, can entropy select contiguous
-regions with more favorable **net transitions** than matched random regions?
+regions with more favorable **net flips** than matched random regions?
 
 The corrected implementation is in `EffiDec3D/run_observations.py`. It reports:
 
 1. A voxel-wise entropy oracle as a non-deployable upper bound.
 2. Non-overlapping 16³ blocks ranked by mean entropy.
 3. A 4-voxel context halo around every selected block.
-4. Net transition
-   `(E0-correct/E1-wrong − E0-wrong/E1-correct) / all positive transitions`.
+4. Net flip
+   `(E0-correct/E1-wrong − E0-wrong/E1-correct) / all positive flips`.
 5. A paired subject bootstrap: entropy and random use exactly the same resampled
    subject indices.
 6. Both CI bounds, actual halo-expanded volume and subject-level values.
@@ -1108,17 +1108,17 @@ Outputs:
 
 - `/root/obs-seed1-corrected/O9_opportunity_corrected.png`
 - `results.json["O9_corrected"]`
-- Per-subject positive/negative counts, net transitions and executed-volume fractions
+- Per-subject positive/negative counts, net flips and executed-volume fractions
   under `O9_corrected.subject_results`
 
-The old `results.json["O9"]` is retained only as a legacy positive-transition
+The old `results.json["O9"]` is retained only as a legacy positive-flip
 oracle and must not be used as the final Paper A result.
 
 #### Corrected O9 results (seed 1) — **PASS**
 
 Refreshed run (`results/obs-seed1/`, full E0 + seed-1 EffiDec3D, 12 subjects,
 100 random repeats, 2000-sample paired subject bootstrap). Net utility =
-`(positive − negative) / all positive transitions`. Two selectors:
+`(positive − negative) / all positive flips`. Two selectors:
 
 **Voxel oracle** (non-deployable upper bound):
 
@@ -1146,7 +1146,7 @@ achieve net utility **0.225 vs 0.043 for matched random**, with a paired subject
 bootstrap lower bound of **0.056 > 0** → the selection is significantly better than
 random. The direction holds at every budget ≥10% (paired CI-lower `> 0` for 10/20/30/50%),
 failing only at 5% (CI includes 0), so there is a minimum viable budget. Honest
-nuance: capturing 100% of positive transitions also captures **77.5% of negative**
+nuance: capturing 100% of positive flips also captures **77.5% of negative**
 ones, so the *net* gain (0.225) — not positive recovery alone — is the correct headline;
 the positive-only 86.4% voxel figure is an oracle upper bound, not a deployable claim.
 This upgrades O9 from the legacy positive-only voxel oracle to a **net, paired,
@@ -1157,7 +1157,7 @@ Repeat the command with the seed-0 E1 checkpoint and a separate
 before checking their subject-level results.
 
 **Predeclared Go criterion**: at the 20% block budget, the entropy region selector
-has a positive mean net transition and the lower bound of the paired 95% CI for
+has a positive mean net flip and the lower bound of the paired 95% CI for
 `entropy − matched random` is above zero. The same direction must hold for both
 E1 seeds. The 10% and 30% budgets are secondary sensitivity analyses.
 
@@ -1275,7 +1275,7 @@ Run after O5. Evaluate five signals on the BTCV validation set:
 | Boundary Probability | distance-to-foreground-boundary map | moderate |
 
 For each signal compute:
-- Pearson correlation with per-bin O5 net transition
+- Pearson correlation with per-bin O5 net flip
 - Inference latency overhead (ms/volume vs baseline)
 - Stability: BTCV vs FeTA correlation difference
 
@@ -1409,13 +1409,13 @@ confidence as Paper B baselines; it does not establish entropy as uniquely best.
 | Obs | Intended criterion | Seed 0 | Seed 1 | Status |
 |-----|--------------------|--------|--------|--------|
 | O2 | Strongly skewed entropy | median 0.0011; 1.31% > 0.5 | median 0.00035; 1.18% > 0.5 | ✅ replicated |
-| O3 | Entropy predicts voxel error | pooled-bin r = 0.971 | pooled-bin r = 0.973 | ⚠ estimator audit required |
+| O3 | Entropy predicts voxel error | pooled-bin r = 0.971 | pooled-bin r = 0.973 | ⚠ pooled-bin overstates; subject-level AUROC/AUPRC + calibration still required |
 | O5 | Net benefit rises with entropy | subj-r 0.665, CI [0.171, 0.996] | subj-r 0.646, CI [0.158, 0.994] | ✅ direction replicated |
 | O9 | Entropy beats matched random | — | region 20%: net 0.225 vs random 0.043, paired CI-lower 0.056 > 0 | ✅ corrected (net/paired/region) |
 
 These results pass the **prototype gate**: uncertainty-guided regional refinement
 is sufficiently motivated to prototype Paper B. **O9 is now complete** — the
-corrected region-level analysis (net transitions, contiguous 16³ blocks + halo,
+corrected region-level analysis (net flips, contiguous 16³ blocks + halo,
 paired subject bootstrap) retains a positive lower bound (0.056) at the predeclared
 20% budget, so it clears the audit that was outstanding. The remaining open item for
 the final Paper A submission gate is **O3**, which still needs a subject-level
@@ -1431,7 +1431,7 @@ regardless of any single model's distance from the published number.
 
 | Obs | Axis | Criterion | Result | Pass? |
 |-----|------|-----------|--------|-------|
-| O7 | dataset | net-transition/entropy subj-r CI-lower > 0 on ≥3 frozen datasets spanning CT+MRI+lesion | pending matrix (BTCV/FeTA/MSD01/MSD06-08) | ☐ |
+| O7 | dataset | net-flip/entropy subj-r CI-lower > 0 on ≥3 frozen datasets spanning CT+MRI+lesion | pending matrix (BTCV/FeTA/MSD01/MSD06-08) | ☐ |
 | O8 | architecture (matched) | ≥2 matched EffiDec3D backbones (Swin, opt. SwinV2/MedNeXt) hold O5/O9 direction (subj-r CI-lower > 0) + O1/O2/O10 concentration | pending E0/E1-Swin | ☐ |
 | O11 | routing | Entropy is best or tied-best cheap routing signal | confidence 0.663 vs entropy 0.655; MC dropout inactive | ◐ partial |
 
@@ -1439,7 +1439,7 @@ regardless of any single model's distance from the published number.
 
 ### Interpretation — why Dice and FLOPs are not enough (Paper A finding)
 
-O5's net transition is **small**: for seed 0 the positive/negative transition rates
+O5's net flip is **small**: for seed 0 the positive/negative flip rates
 are 0.339%/0.209% (about 0.130% net), while for seed 1 they are
 0.290%/0.225% (about 0.065% net). The direction is stable, although our enlarged
 E0–E1 DICE gap means the magnitude cannot yet be claimed as an exact reproduction
@@ -1452,7 +1452,7 @@ predictable (O9). The three observations line up:
 
 - O2: only about 1.2–1.3% of voxels have entropy above 0.5; difficulty is spatially sparse.
 - O5: the full decoder's extra capacity has a small net voxel effect, concentrated in high-entropy bins.
-- O9: voxel-wise entropy ranking identifies a 20% oracle region carrying about 86% of positive transitions.
+- O9: voxel-wise entropy ranking identifies a 20% oracle region carrying about 86% of positive flips.
 
 > **These are observations, not an efficiency claim.** They *motivate* the Paper B
 > efficiency direction (region-adaptive decoding) but do not themselves demonstrate
@@ -1476,7 +1476,7 @@ decoder-only routing.
 
 > **Scope boundary — Paper A is decoder-only, and has no encoder observations.**
 > EffiDec3D modifies the decoder alone; the encoder is identical between Full and
-> Effi. So every transition observation (O5/O9/O11) is a clean decoder ablation with
+> Effi. So every flip observation (O5/O9/O11) is a clean decoder ablation with
 > the encoder held constant — but O1–O11 therefore say **nothing** about whether the
 > encoder (the larger 57.8% of MACs) is over-provisioned. That question needs a
 > *different* instrument — single-model representational analyses (per-stage effective
@@ -1491,39 +1491,34 @@ the iso-accuracy target.
 
 ## Part 5: Deliverables
 
-### Notebooks
+### Producer
 
-| Notebook | Observations |
-|---|---|
-| `obs_error.ipynb` | O1 |
-| `obs_entropy.ipynb` | O2, O10 |
-| `obs_correlation.ipynb` | O3, O4 |
-| `obs_decoder_gain.ipynb` | O5, O9 |
-| `obs_evolution.ipynb` | O6 |
-| `obs_crossdataset.ipynb` | O7, O8 |
-| `obs_routing_signal.ipynb` | O11 |
+All O1–O11 metrics and figures come from one script,
+`EffiDec3D/run_observations.py` (one invocation per grid cell → `results.json`
++ PNGs). The reproduction baselines (Table 1) come from training
+(`main_train_BTCV_TU.py` metrics CSV) and `profile_macs.py`, **not** from
+`run_observations.py`.
 
-### Figures (Paper A)
+### Figures (Paper A) → producing output
 
-| ID | Content |
-|---|---|
-| Fig 1 | Error map: boundary vs interior (O1) |
-| Fig 2 | Entropy heatmap overlay (O2) |
-| Fig 3 | Entropy–error scatter by bin (O3) |
-| Fig 4 | Organ-wise difficulty bar plot (O4) |
-| Fig 5 | Net transition vs entropy curve (O5) |
-| Fig 6 | Difficulty evolution over training (O6) |
-| **Fig 7** | **Opportunity curve: entropy vs random (O9) — headline** |
-| Fig 8 | Organ size vs difficulty scatter (O10) |
+| Paper figure | Content | run_observations output |
+|---|---|---|
+| Fig 1 (Heterogeneity) | per-organ error bar (O1) | `O1_organ_error.png` |
+| Fig 2 (Concentration) | entropy sparsity (O2) + net-flip vs entropy (O5) | `O2_entropy.png`, `O5_decoder_gain.png` |
+| Fig 3 (Predictability) | region opportunity curve (O9) | `O9_opportunity_corrected.png` |
+| supp. | entropy–error scatter (O3), entropy evolution (O6) | `O3_unc_error.png`, `O6_entropy_evolution.png` |
 
-### Tables (Paper A)
+O10 is reported as ρ / partial-r numbers (no figure); O4 per-organ numbers feed Fig 1.
 
-| ID | Content |
-|---|---|
-| T1 | Organ-wise DICE, entropy, positive/negative transitions (O4, O5) |
-| T2 | Cross-dataset replication (O7) |
-| T3 | Backbone consistency (O8) |
-| T4 | Routing signal comparison (O11) |
+### Tables (Paper A) → source
+
+| Paper table | Content | Source |
+|---|---|---|
+| Table 1 | baseline Dice/HD95/MAC/params/latency | training CSV + `profile_macs.py` |
+| Table 2 | flip rates R_pos/R_neg/R_net + subject CI (O5) | `results.json["O5"]` |
+| Table (plan) | backbone × dataset grid | manual |
+| Predictability (text) | O3 AUROC/AUPRC/ECE; O9 net + paired CI; O11 subj corr | `results.json["O3","O9_corrected","O11"]` |
+| pending | cross-dataset (O7), cross-backbone (O8) | grid aggregation (≥2 cells) |
 
 ---
 
@@ -1555,7 +1550,7 @@ Week 4: Observations — preliminary gate (run_observations.py)   ✓ DIRECTION 
   [x] O11: entropy/confidence comparable; MC dropout inactive
   [x] MAC profiling: decoder = 42.2% (decoder3 37%); encoder 57.8%
   [x] BF16 innocent (FP32 revalidation Δ=0.0000)
-  [~] Statistical audit: subject-level O3, paired/net/region-level O9 still required
+  [~] Statistical audit: corrected O9 DONE (net/paired/region — PASS); subject-level O3 discrimination/calibration still required
   [x] --- CONDITIONAL GO: prototype Paper B, while completing Paper A audit ---
 
 Week 5-6: Generalization matrix (run_observations.py --network/--dataset)
@@ -1574,6 +1569,8 @@ Week 5-6: Generalization matrix (run_observations.py --network/--dataset)
   [ ] Patch-level whole-model adaptivity study (extend efficiency beyond decoder's 42%)
 
 Week 7: Paper A draft
-  [ ] Write Paper A manuscript
-  [ ] Target venue: MIDL / MLMI / ISBI (submission typically Aug–Oct)
+  [~] Paper A manuscript first draft written (wacv-2027/, 7 pp, compiles clean;
+       full O1-O11 on 3D UX-Net/BTCV) — \todo markers remain for the pending
+       SwinUNETR + FeTA/MSD generality cells
+  [ ] Target venue: WACV 2027 E&D Track (primary; deadline 2026-08-28) — see Paper-Narrative §9
 ```

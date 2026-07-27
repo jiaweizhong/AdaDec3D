@@ -442,15 +442,15 @@ original paper actually built an EffiDec3D decoder pair — with a predeclared l
 
 > **Coverage = cross / L-shape (~6–7 cells), not the full grid.** Anchor at
 > **UX-Net/BTCV** (also the frozen-encoder factorial backbone): dataset axis = UX-Net
-> across BTCV/FeTA/MSD-BrainTumour/MSD-Lung(or HepaticVessel); backbone axis = BTCV
-> across UX-Net/SwinUNETR/(opt. SwinUNETRv2 or MedNeXt). Each cell is a standard
+> across **BTCV / FeTA / MSD Task08 HepaticVessel**; backbone axis = BTCV
+> across **UX-Net / SwinUNETR / MedNeXt-M-K3** (three families). Each cell is a standard
 > Full-vs-Effi pair (the 4-corner factorial is UX-Net/BTCV only); O7 aggregates rows,
 > O8 aggregates columns.
 
 | Backbones | EffiDec3D pair? | Datasets | Observations |
 |---|---|---|---|
-| 3D UX-Net (large-kernel CNN), SwinUNETR (Transformer) | ✅ Full + EffiDec3D | BTCV, FeTA, MSD01 BrainTumour, MSD06 Lung *or* MSD08 HepaticVessel | **all O1–O11** (full-vs-efficient flips) |
-| SwinUNETRv2, MedNeXt-M-K3 | ✅ Full + EffiDec3D | BTCV (+ optional extension) | **all O1–O11**, optional deeper coverage |
+| 3D UX-Net (large-kernel CNN) | ✅ Full + EffiDec3D | BTCV, FeTA, MSD08 HepaticVessel (dataset axis) | **all O1–O11** (full-vs-efficient flips) |
+| SwinUNETR (Transformer), MedNeXt-M-K3 (ConvNeXt) | ✅ Full + EffiDec3D | BTCV (architecture axis) | **all O1–O11** |
 
 > **Why only these backbones.** EffiDec3D applies its decoder *only* to 3D UX-Net,
 > SwinUNETR, and SwinUNETRv2 (+MedNeXt), because its method targets large-channel /
@@ -566,7 +566,7 @@ Save all figures to `/root/obs/`.
 |---|------|----------------------------|---------|
 | **O1** | Error distribution | boundary-band vs eroded-interior error ratio `mean_{v∈∂} err(v) / mean_{v∈int} err(v)` (=3.93×) | **C2** |
 | **O2** | Entropy distribution | histogram of `H(v)`; sparsity `Pr[H(v) > 0.5]` (=1.18%) | **C2** (premise), supports **C3** |
-| **O3** | Uncertainty–error correlation | `Pearson(H, err)` over entropy bins (=0.97, descriptive; subject-level audit pending) | **C3** |
+| **O3** | Predictability of flips (primary) / error (baseline) | subject-level AUROC/AUPRC of entropy predicting **positive flip** (needs Full pair); error-prediction + ECE as baseline; pooled-bin `Pearson(H,err)=0.97` descriptive only | **C3** |
 | **O4** | Per-organ difficulty | per-class Dice and mean `H`; rank organs by difficulty | **C2** |
 | **O5** | Decoder flip analysis | `P(v)`, `N(v)`, `U(v)`; per-subject `Pearson(binned H, binned U)` + subject bootstrap CI | **C1** + **C2** + **C3** |
 | **O6** | Difficulty evolution | `mean_v H(v)` across training iterations (0.0279→0.0104) | **C2** (residual persists) |
@@ -1010,12 +1010,13 @@ paper (FeTA, BTCV, and the ten MSD tasks) without reproducing all 12 datasets:
 
 | Priority | Dataset | Modality / task | Role |
 |---:|---|---|---|
-| 1 | **BTCV** | abdominal CT, 13 organs | primary multi-organ experiment |
+| 1 | **BTCV** | abdominal CT, 13 organs | primary multi-organ experiment (anchor) |
 | 2 | **FeTA 2021** | fetal brain MRI, 7 tissues | cross-modality and cross-anatomy replication |
-| 3 | **MSD Task01 BrainTumour** | multimodal brain MRI, lesion segmentation | organ→lesion generalization |
-| 4 | **MSD Task06 Lung** or **Task08 HepaticVessel** | CT lesion / thin vessel | small, sparse, or elongated target stress test |
+| 3 | **MSD Task08 HepaticVessel** | abdominal CT, thin vessels + small lesions | thin-structure stress test for the high-resolution decoder |
 
-Freeze the final set of 3–4 datasets before inspecting results. On every dataset,
+Dataset axis is **frozen at these three** (UX-Net across all three); the third is
+HepaticVessel — chosen over BrainTumour because FeTA already covers MRI and
+HepaticVessel directly stresses the high-res-decoder question. Freeze before inspecting results. On every dataset,
 report the same positive flip, negative flip, net flip,
 spatial concentration, and opportunity curve with subject-level confidence
 intervals.

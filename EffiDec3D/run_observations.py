@@ -247,15 +247,17 @@ def O2_entropy_distribution(val_loader, effi):
     save_obs("O2", {"percentiles": pcts, "fraction_above_0.5": frac_high, "go_skewed": bool(skewed)})
 
 
-def O3_unc_error_corr(val_loader, effi):
-    """Entropy-vs-error predictability.
+def O3_unc_error_corr(val_loader, effi, full=None):
+    """Entropy-based predictability (on-thesis: predicting FLIPS, not just error).
 
-    Reports two things: (1) the legacy pooled-bin Pearson/Spearman correlation,
-    kept only as a *descriptive* diagnostic because pooling bins across subjects
-    is pseudo-replication and overstates the association; and (2) a subject-level
-    discrimination/calibration audit --- per-subject AUROC and AUPRC of entropy
-    predicting the error voxels, plus ECE of the model's confidence --- aggregated
-    with a subject bootstrap. The Go criterion is AUROC CI-lower > 0.5.
+    Primary (needs `full`): per-subject AUROC/AUPRC of the efficient model's entropy
+    predicting where the full decoder produces a **positive flip** (efficient wrong,
+    full right) --- i.e. can a test-time signal locate where extra decoder computation
+    helps. This is the novel, on-narrative metric. Baselines retained: per-subject
+    AUROC/AUPRC/ECE of entropy predicting the efficient model's own **error** (a
+    well-studied misclassification-detection quantity), and the descriptive pooled-bin
+    entropy--error correlation (pseudo-replicated, diagnostic only). Go: flip AUROC
+    (or error AUROC when no full pair) CI-lower > 0.5.
     """
     try:                                   # prefer sklearn; fall back to numpy
         from sklearn.metrics import roc_auc_score, average_precision_score
@@ -291,6 +293,8 @@ def O3_unc_error_corr(val_loader, effi):
     rng = np.random.default_rng(0)
     x_ent, y_err = [], []                                  # pooled-bin (descriptive)
     subj_auroc, subj_auprc, subj_ece, subj_prev = [], [], [], []
+    subj_fauroc, subj_fauprc, subj_fprev = [], [], []      # flip-prediction (primary)
+    predict_flip = full is not None and full is not effi
     with torch.no_grad():
         for batch in val_loader:
             img = batch["image"].cuda()
@@ -323,6 +327,14 @@ def O3_unc_error_corr(val_loader, effi):
                 subj_auprc.append(_auprc(e, yb))
                 subj_prev.append(float(yb.mean()))
             subj_ece.append(_ece(cb, (~yb).astype(np.float64)))
+            if predict_flip:                               # entropy -> positive flip
+                pred_f = infer(full, img).argmax(1).cpu().squeeze()
+                posflip = ((pred_f == lbl) & (pred != lbl)).numpy().reshape(-1)
+                yf = posflip[idx].astype(bool)
+                if yf.sum() > 0 and (~yf).sum() > 0:
+                    subj_fauroc.append(_auroc(e, yf))
+                    subj_fauprc.append(_auprc(e, yf))
+                    subj_fprev.append(float(yf.mean()))
     r_p = float(pearsonr(x_ent, y_err)[0]); r_s = float(spearmanr(x_ent, y_err)[0])
 
     def _boot_ci(vals):
@@ -332,20 +344,34 @@ def O3_unc_error_corr(val_loader, effi):
         boot = [np.mean(rng.choice(vals, vals.size, replace=True)) for _ in range(2000)]
         return float(vals.mean()), [float(np.percentile(boot, 2.5)), float(np.percentile(boot, 97.5))]
 
-    auroc_m, auroc_ci = _boot_ci(subj_auroc)
+    auroc_m, auroc_ci = _boot_ci(subj_auroc)        # error-prediction (baseline)
     auprc_m, auprc_ci = _boot_ci(subj_auprc)
     ece_m, ece_ci = _boot_ci(subj_ece)
     prev_m = float(np.mean(subj_prev)) if subj_prev else float("nan")
-    go = bool(not np.isnan(auroc_ci[0]) and auroc_ci[0] > 0.5)
+    fauroc_m, fauroc_ci = _boot_ci(subj_fauroc)     # flip-prediction (primary)
+    fauprc_m, fauprc_ci = _boot_ci(subj_fauprc)
+    fprev_m = float(np.mean(subj_fprev)) if subj_fprev else float("nan")
+    err_go = bool(not np.isnan(auroc_ci[0]) and auroc_ci[0] > 0.5)
+    flip_go = bool(not np.isnan(fauroc_ci[0]) and fauroc_ci[0] > 0.5)
+    go = flip_go if predict_flip else err_go        # headline gate = flip when available
     print(f"[O3] pooled-bin r={r_p:.3f} rho={r_s:.3f} (descriptive only)")
-    print(f"     subject AUROC={auroc_m:.3f} CI[{auroc_ci[0]:.3f},{auroc_ci[1]:.3f}]  "
-          f"AUPRC={auprc_m:.3f} (err prev={prev_m:.3f})  ECE={ece_m:.3f}  "
-          f"{'GO' if go else 'NO-GO'} (AUROC CI-lower > 0.5)")
+    if predict_flip:
+        print(f"     FLIP  AUROC={fauroc_m:.3f} CI[{fauroc_ci[0]:.3f},{fauroc_ci[1]:.3f}]  "
+              f"AUPRC={fauprc_m:.3f} (pos-flip prev={fprev_m:.4f})  "
+              f"{'GO' if flip_go else 'NO-GO'} (AUROC CI-lower > 0.5)")
+    print(f"     error AUROC={auroc_m:.3f} CI[{auroc_ci[0]:.3f},{auroc_ci[1]:.3f}]  "
+          f"AUPRC={auprc_m:.3f} (err prev={prev_m:.3f})  ECE={ece_m:.3f}  (baseline)")
     plt.figure(figsize=(6, 5)); plt.scatter(x_ent, y_err, alpha=0.7)
     plt.xlabel("Mean entropy (bin)"); plt.ylabel("Error rate (bin)")
-    plt.title(f"O3: pooled-bin r={r_p:.3f} (descriptive); subj AUROC={auroc_m:.3f}")
+    plt.title(f"O3: pooled-bin r={r_p:.3f} (descriptive); flip AUROC={fauroc_m:.3f}")
     plt.tight_layout(); plt.savefig(f"{OBS_DIR}/O3_unc_error.png", dpi=150); plt.close()
     save_obs("O3", {
+        # primary: entropy predicts positive flips (needs full pair)
+        "flip_auroc_mean": fauroc_m, "flip_auroc_ci": fauroc_ci,
+        "flip_auprc_mean": fauprc_m, "flip_auprc_ci": fauprc_ci,
+        "positive_flip_prevalence_mean": fprev_m, "flip_go": flip_go,
+        "n_subjects_flip": len(subj_fauroc),
+        # baseline: entropy predicts the efficient model's own error
         "subject_auroc_mean": auroc_m, "subject_auroc_ci": auroc_ci,
         "subject_auprc_mean": auprc_m, "subject_auprc_ci": auprc_ci,
         "error_prevalence_mean": prev_m,
@@ -1093,7 +1119,7 @@ def main():
     # Single-model observations (run for both matched and control).
     O1_error_distribution(val_loader, analyzed)
     O2_entropy_distribution(val_loader, analyzed)
-    O3_unc_error_corr(val_loader, analyzed)
+    O3_unc_error_corr(val_loader, analyzed, full=(full if effi is not None else None))
     dice_summary, organ_ent = O4_per_organ(val_loader, analyzed, post_pred, post_lbl)
     O6_difficulty_evolution(val_loader, args_ns.output, args_ns.dataset, device,
                             network, role, out_classes)

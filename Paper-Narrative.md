@@ -53,7 +53,11 @@ Paper B 必须进一步证明两件 Paper A 没有证明的事：
 
 ### 首选
 
-**Rethinking Efficient Decoder Design: A Systematic Characterization of Where Decoder Computation Helps**
+**Rethinking Decoder Redundancy in Efficient 3D Medical Image Segmentation**
+
+（与 L-shape 范围匹配：3 datasets × 3 architectures + frozen-encoder 因子分解；
+"redundancy" 这个较强的词由 frozen-encoder + channel/resolution 分解支撑，避免被读成
+只是两个独立模型间的 prediction churn。措辞上用 "consistent"，不要写 "universal"。）
 
 这个标题明确包含：
 
@@ -271,14 +275,17 @@ per-stage effective rank / probing / CKA 等不同工具）。
 | **BTCV** | abdominal CT, 13 organs | 主实验；多器官、尺度差异与边界复杂度丰富 |
 | **FeTA 2021** | fetal brain MRI, 7 tissues | 跨模态、跨解剖域，并与 EffiDec3D 原文直接对齐 |
 | **MSD BrainTumour (Task01)** | brain MRI, multimodal lesion segmentation | 从器官分割扩展到异质性病灶 |
-| **MSD Lung (Task06)** 或 **HepaticVessel (Task08)** | thoracic CT lesion / abdominal CT vessel | 选择一个测试小目标、细长结构或高类别不平衡的任务 |
+| **MSD HepaticVessel (Task08)** | abdominal CT，细长血管 + 小病灶 | 直接压力测试去除高分辨率 decoder 后细长结构/边界是否更敏感 |
 
 最终固定其中 3–4 个，不根据结果好坏事后挑选。每个数据集报告相同的 positive flip、negative flip、net flip、spatial concentration 和 opportunity curve，并使用 subject-level confidence intervals。
 
 **Generality 采用 cross / L-shape（~6–7 cells），不做全排列**（reviewer 建议，避免过度
 计算）：以 **UX-Net / BTCV 为锚点**（也是 §因子分解的 backbone），
-- **数据集轴 = UX-Net** 跑 BTCV / FeTA / MSD-BrainTumour / MSD-Lung(或HepaticVessel)；
-- **backbone 轴 = BTCV** 跑 UX-Net / SwinUNETR /（可选 SwinUNETRv2 或 MedNeXt）。
+- **数据集轴 = UX-Net** 跑 **BTCV / FeTA / MSD Task08 HepaticVessel**（CT 多器官 / MRI 胎脑 / CT 细长血管+小病灶）；
+- **backbone 轴 = BTCV** 跑 **UX-Net / SwinUNETR / MedNeXt-M-K3**（large-kernel CNN / Transformer / ConvNeXt 式，三个不同 family）。
+
+主张用 "consistent across three architectures and three datasets"，**不要**写
+"universal / holds in all architectures"。
 每个 cell 是标准 Full-vs-Effi pair（**不**重复 4-corner 因子分解，那只在 UX-Net/BTCV 做），
 只检验 headline flip 方向是否跨行（O7 跨数据集）/跨列（O8 跨 backbone）一致。
 
@@ -331,8 +338,8 @@ per-stage effective rank / probing / CKA 等不同工具）。
 
 使用统一坐标展示：
 
-- BTCV / FeTA / MSD BrainTumour / MSD Lung 或 HepaticVessel；
-- 3D UX-Net + EffiDec3D / SwinUNETR + EffiDec3D（+ 可选 SwinUNETRv2 / MedNeXt）；
+- BTCV / FeTA / MSD HepaticVessel（数据集轴，UX-Net）；
+- 3D UX-Net / SwinUNETR / MedNeXt-M-K3（架构轴，BTCV）；
 - 不同训练 checkpoint；
 - 多个随机 seed。
 

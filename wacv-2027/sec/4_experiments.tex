@@ -2,40 +2,37 @@
 \label{sec:setup}
 
 \paragraph{Experiment plan.}
-Our study reproduces \method{}~\cite{rahman2025effidec3d} and evaluates it on a full
-backbone $\times$ dataset grid (Table~\ref{tab:plan}).  For each backbone that
-\method{} actually equips with an efficient decoder---3D
-UX-Net~\cite{lee20233duxnet}, Swin UNETR~\cite{tang2022swinunetr}, and optionally
-SwinUNETR-V2~\cite{he2023swinunetrv2} and MedNeXt~\cite{roy2023mednext}---we pair a
-full and an \method{} decoder and run that matched pair on each of three to four
-representative datasets from the \method{} evaluation: BTCV abdominal CT,
-FeTA~\cite{payette2021feta} fetal-brain MRI, and predeclared MSD
-tasks~\cite{antonelli2022msd} (Task01 BrainTumour, and Task06 Lung or Task08
-HepaticVessel).  Every grid cell is therefore a matched full/efficient pair on which
-the full metric suite is computed; cross-dataset consistency is read across each row
-and cross-backbone consistency down each column.
-UNETR~\cite{hatamizadeh2022unetr} and nnU-Net~\cite{isensee2021nnunet} are excluded
-because \method{} builds no decoder pair for them, so a matched flip comparison is
-undefined.
+Our study reproduces \method{}~\cite{rahman2025effidec3d} and evaluates it with an
+\emph{L-shaped} protocol (Table~\ref{tab:plan}) that separately tests cross-dataset
+and cross-architecture consistency without an expensive full factorial.  A
+\textbf{dataset axis} runs the matched 3D UX-Net~\cite{lee20233duxnet} pair on three
+diverse tasks from the \method{} evaluation---BTCV abdominal CT,
+FeTA~\cite{payette2021feta} fetal-brain MRI, and MSD Task08
+HepaticVessel~\cite{antonelli2022msd} (CT, thin vessels/small lesions)---and an
+\textbf{architecture axis} runs matched pairs on BTCV for three backbone families:
+3D UX-Net (large-kernel CNN), Swin UNETR~\cite{tang2022swinunetr} (hierarchical
+Transformer), and MedNeXt-M-K3~\cite{roy2023mednext} (ConvNeXt-style CNN).  The two
+axes share the 3D UX-Net/BTCV anchor, which also carries the mechanism analysis
+below.  UNETR~\cite{hatamizadeh2022unetr} and nnU-Net~\cite{isensee2021nnunet} are
+excluded because \method{} builds no decoder pair for them, so a matched flip
+comparison is undefined.
 
 \begin{table}[t]
 \centering
-\caption{Predeclared backbone $\times$ dataset grid. Each cell is a matched
-full/\method{} decoder pair sharing one encoder, run through the full metric suite.
-$\ast$: completed; remaining cells in progress.}
+\caption{L-shaped protocol. The 3D UX-Net row tests cross-dataset consistency; the
+BTCV column tests cross-architecture consistency; they meet at the UX-Net/BTCV anchor
+($\ast$, completed). Off-axis cells (--) are not run.}
 \label{tab:plan}
-\resizebox{\columnwidth}{!}{
-\begin{tabular}{lcccc}
+\begin{tabular}{lccc}
 \toprule
-Backbone & BTCV & FeTA & MSD-BrTu & MSD-Lung/HV \\
- & (CT) & (MRI) & (MRI) & (CT) \\
+Backbone & BTCV & FeTA & HepaticVessel \\
+ & (CT) & (MRI) & (CT) \\
 \midrule
-3D UX-Net (CNN)        & \checkmark$^\ast$ & \checkmark & \checkmark & \checkmark \\
-Swin UNETR (Trans.)    & \checkmark & \checkmark & \checkmark & \checkmark \\
-SwinUNETR-V2 (opt.)    & \checkmark & \checkmark & \checkmark & \checkmark \\
-MedNeXt-M-K3 (opt.)    & \checkmark & \checkmark & \checkmark & \checkmark \\
+3D UX-Net (CNN)        & \checkmark$^\ast$ & \checkmark & \checkmark \\
+Swin UNETR (Trans.)    & \checkmark & -- & -- \\
+MedNeXt-M-K3 (ConvNeXt) & \checkmark & -- & -- \\
 \bottomrule
-\end{tabular}}
+\end{tabular}
 \end{table}
 
 \paragraph{Dataset and split.}

@@ -17,11 +17,10 @@ Dataset & \fullmodel{} & \effimodel{} & pub.\ \effimodel{} & $\Delta$ \\
 \midrule
 BTCV (CT, 13-organ) & .792 & .773 & .793 & $-.020$ \\
 FeTA (MRI) & -- & -- & -- & -- \\
-MSD BrainTumour & -- & -- & -- & -- \\
-MSD Lung / HepaticVessel & -- & -- & -- & -- \\
+HepaticVessel (CT) & -- & -- & -- & -- \\
 \bottomrule
 \end{tabular}
-\todo{Fill FeTA/MSD rows as cells complete.}
+\todo{Fill FeTA/HepaticVessel rows as the dataset-axis cells complete.}
 \end{table}
 
 We reproduce the matched \fullmodel{}/\effimodel{} pair and report its fidelity per
@@ -155,14 +154,15 @@ entropy is uniquely optimal.
 \label{sec:mechanism}
 
 The comparisons above use end-to-end models, which share the encoder architecture but
-not its weights. To attribute the effect to decoder capacity alone, we freeze one
-trained encoder and train the $2\times2$ decoder factorial on identical features,
-then compare Full$\rightarrow$channel-only, Full$\rightarrow$resolution-only, and
+not its weights. As a further, causally cleaner check, we \emph{freeze} one trained
+encoder and train the $2\times2$ decoder factorial on identical features, then compare
+Full$\rightarrow$channel-only, Full$\rightarrow$resolution-only, and
 Full$\rightarrow$combined \method{}
-\todo{fill per-factor flip rates and boundary profiles from the frozen-encoder run;
-hypothesis: dropping the high-resolution stage produces flips concentrated nearer the
-boundary, while channel reduction is spatially diffuse and smaller, explaining why
-both are removable with little aggregate Dice change}.  Because the encoder is frozen
-and was optimized for the full decoder, ``the efficient decoder still nearly matches''
-is a conservative statement of redundancy, and the differences are attributable to the
-decoder rather than to encoder retraining.
+\todo{report per-factor flip rates and boundary profiles from the frozen-encoder run;
+hypothesis to test: dropping the high-resolution stage yields flips concentrated
+nearer the boundary, while channel reduction is spatially diffuse and smaller, which
+would explain why both are removable with little aggregate Dice change}.  Because the
+frozen encoder was optimized for the full decoder, a near-match by the efficient
+decoder on those features would be a \emph{conservative} statement of redundancy.  We
+present this regime as validation of the decoder attribution rather than as the
+primary result.

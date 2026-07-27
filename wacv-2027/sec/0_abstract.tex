@@ -1,7 +1,25 @@
 \begin{abstract}
-The ABSTRACT is to be in fully justified italicized text, at the top of the left-hand column, below the author and affiliation information.
-Use the word ``Abstract'' as the title, in 12-point Times, boldface type, centered relative to the column, initially capitalized.
-The abstract is to be in 10-point, single-spaced type.
-Leave two blank lines after the Abstract, then begin the main text.
-Look at previous \confName\ abstracts to get a feel for style and length.
+The decoder is the core feature-recovery module of U-Net architectures for 3D
+medical image segmentation, fusing multi-scale features and restoring spatial
+detail. Recent designs, especially transformer-based decoders, sharply increase its
+cost, and efficient methods such as EffiDec3D respond by shrinking wide,
+high-resolution decoder stages---removing $80$--$90\%$ of decoder parameters and
+FLOPs across 3D UX-Net, MedNeXt-M-K3 and SwinUNETR with little loss in Dice.
+This success, however, rests on the empirical assumption that decoder computation is
+static and globally redundant; it does not explain \emph{why} the computation is
+removable, \emph{where} the decoder still matters, or whether those regions can be
+identified at test time. We present a systematic characterization of decoder
+redundancy along three axes---\emph{heterogeneity}, \emph{concentration}, and
+\emph{predictability}---by counting per-voxel prediction \emph{flips} between matched
+full and efficient decoders, with a frozen shared-encoder control that attributes the
+changes to the decoder alone and a channel/resolution factor decomposition that
+separates the two sources of redundancy. We find the full decoder's net benefit is
+small and bidirectional (about $0.1\%$ of voxels), spatially concentrated at organ
+boundaries and small structures, and identifiable from the efficient model's own
+uncertainty---entropy-ranked regions recover its net benefit at roughly five times
+the matched-random rate at a fixed budget. These trends are consistent across three
+architectures and three datasets \todo{confirm once the L-shape cells complete},
+indicating that decoder redundancy is structured and predictable rather than uniform.
+Our analysis provides an evaluation protocol and design guidance for more efficient,
+region-adaptive segmentation decoders.
 \end{abstract}

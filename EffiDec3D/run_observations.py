@@ -1007,6 +1007,141 @@ def O_surface_metrics(val_loader, analyzed, out_classes):
     save_obs("O_surface", res)
 
 
+def O_pareto(val_loader, effi, full, block_size=16, halo=4):
+    """Fig 2 (headline): multi-signal region opportunity curve. Rank contiguous
+    ``block_size`` blocks by several signals and plot the net-flip utility recovered
+    vs. selection budget --- true-flip ORACLE (upper bound), entropy, confidence,
+    a boundary proxy, and matched random (with 95% CI). Utility per block is the net
+    flip within the block, normalized by all positive flips in the subject."""
+    from scipy.ndimage import distance_transform_edt, binary_erosion
+    budgets = np.array([5, 10, 20, 30, 50]); n_random = 100; n_boot = 2000
+    signals = ["oracle", "entropy", "confidence", "boundary"]
+    rec = {s: [] for s in signals + ["random"]}
+    srng = np.random.default_rng(0); brng = np.random.default_rng(1)
+    with torch.no_grad():
+        for batch in val_loader:
+            img = batch["image"].cuda()
+            lbl = batch["label"].squeeze(1).long().cpu().squeeze().numpy()
+            pred_f = infer(full, img).argmax(1).cpu().squeeze().numpy()
+            le = infer(effi, img); prob_e = le.softmax(1).cpu()
+            pred_e = le.argmax(1).cpu().squeeze().numpy()
+            ent = (-(prob_e * torch.log(prob_e + 1e-8)).sum(1)).squeeze().numpy()
+            conf = (1 - prob_e.max(1).values.squeeze()).numpy()   # 1-maxprob: high=uncertain
+            pos = ((pred_f == lbl) & (pred_e != lbl)).astype(np.float32)
+            neg = ((pred_f != lbl) & (pred_e == lbl)).astype(np.float32)
+            net = pos - neg
+            body = (lbl > 0) | (pred_f > 0) | (pred_e > 0)
+            tp = float(pos[body].sum())
+            if tp == 0:
+                continue
+            fg = lbl > 0
+            bnd = fg & ~binary_erosion(fg, iterations=1) if fg.any() else fg
+            dist = distance_transform_edt(~bnd) if bnd.any() else np.zeros_like(ent)
+            shp = ent.shape
+            cores = [(slice(z, min(z + block_size, shp[0])),
+                      slice(y, min(y + block_size, shp[1])),
+                      slice(x, min(x + block_size, shp[2])))
+                     for z in range(0, shp[0], block_size)
+                     for y in range(0, shp[1], block_size)
+                     for x in range(0, shp[2], block_size)]
+            util, s_ent, s_conf, s_bnd = [], [], [], []
+            for c in cores:
+                bm = body[c]
+                if bm.any():
+                    util.append(float(net[c][bm].sum() / tp))
+                    s_ent.append(float(ent[c][bm].mean()))
+                    s_conf.append(float(conf[c][bm].mean()))
+                    s_bnd.append(float(-dist[c][bm].mean()))      # nearer boundary = higher
+                else:
+                    util.append(0.0); s_ent.append(-np.inf); s_conf.append(-np.inf); s_bnd.append(-np.inf)
+            util = np.array(util)
+            score = {"entropy": np.array(s_ent), "confidence": np.array(s_conf),
+                     "boundary": np.array(s_bnd), "oracle": util}
+            nb = len(cores)
+            subj = {s: [] for s in rec}
+            for bud in budgets:
+                k = max(1, int(np.ceil(nb * bud / 100)))
+                for s in signals:
+                    top = np.argsort(score[s])[::-1][:k]
+                    subj[s].append(float(util[top].sum()))
+                rr = [float(util[srng.choice(nb, k, replace=False)].sum()) for _ in range(n_random)]
+                subj["random"].append(float(np.mean(rr)))
+            for s in rec:
+                rec[s].append(subj[s])
+    if not rec["oracle"]:
+        print("[O_pareto] no positive flips; skipping"); return
+    out = {"budgets_pct": budgets.tolist(), "block_size": int(block_size)}
+    colors = {"oracle": "black", "entropy": "steelblue", "confidence": "darkorange",
+              "boundary": "seagreen", "random": "gray"}
+    plt.figure(figsize=(7, 5))
+    for s in ["oracle", "entropy", "confidence", "boundary", "random"]:
+        arr = np.asarray(rec[s], dtype=np.float64)        # (subjects, budgets)
+        m = arr.mean(0)
+        boot = np.array([arr[brng.integers(arr.shape[0], size=arr.shape[0])].mean(0)
+                         for _ in range(n_boot)])
+        lo, hi = np.percentile(boot, 2.5, axis=0), np.percentile(boot, 97.5, axis=0)
+        ls = "--" if s == "random" else "-"
+        plt.plot(budgets, m * 100, ls, marker="o", color=colors[s], label=s)
+        if s in ("random", "entropy"):
+            plt.fill_between(budgets, lo * 100, hi * 100, color=colors[s], alpha=.15)
+        out[s] = {"net_recovered_mean": m.round(6).tolist(),
+                  "ci_lower": lo.round(6).tolist(), "ci_upper": hi.round(6).tolist()}
+    plt.xlabel("Fraction of regions given the full decoder (%)")
+    plt.ylabel("Net flip utility recovered (%)")
+    plt.title("Selective-allocation opportunity: signals vs.\\ random")
+    plt.legend(); plt.tight_layout()
+    plt.savefig(f"{OBS_DIR}/O_pareto.png", dpi=150); plt.close()
+    save_obs("O_pareto", out)
+    print(f"[O_pareto] multi-signal opportunity curve saved ({len(rec['oracle'])} subjects)")
+
+
+def O_anatomy(val_loader, effi, full):
+    """Fig 3: per-organ decoder benefit (net flip within each organ's GT voxels) and
+    the organ-size vs. net-flip relationship --- the benefit-based counterparts of the
+    error-based O1/O4/O10."""
+    from scipy.stats import spearmanr
+    o_pos = {n: [] for n in CLASS_NAMES}; o_neg = {n: [] for n in CLASS_NAMES}
+    o_size = {n: [] for n in CLASS_NAMES}
+    with torch.no_grad():
+        for batch in val_loader:
+            img = batch["image"].cuda()
+            lbl = batch["label"].squeeze(1).long().cpu().squeeze().numpy()
+            pred_f = infer(full, img).argmax(1).cpu().squeeze().numpy()
+            pred_e = infer(effi, img).argmax(1).cpu().squeeze().numpy()
+            pos = (pred_f == lbl) & (pred_e != lbl)
+            neg = (pred_f != lbl) & (pred_e == lbl)
+            for c, name in enumerate(CLASS_NAMES, start=1):
+                m = (lbl == c)
+                if m.sum() > 0:
+                    o_pos[name].append(float(pos[m].mean()))
+                    o_neg[name].append(float(neg[m].mean()))
+                    o_size[name].append(float(m.sum()))
+    names = [n for n in CLASS_NAMES if o_pos[n]]
+    pos_m = [float(np.mean(o_pos[n])) for n in names]
+    neg_m = [float(np.mean(o_neg[n])) for n in names]
+    net_m = [p - q for p, q in zip(pos_m, neg_m)]
+    size = [float(np.mean(o_size[n])) for n in names]
+    rho = float(spearmanr(size, net_m)[0]) if len(names) > 2 else float("nan")
+    print(f"[O_anatomy] per-organ net flip; size~net Spearman={rho:.3f}")
+    fig, axs = plt.subplots(1, 2, figsize=(12, 4))
+    xs = np.arange(len(names))
+    axs[0].bar(xs - 0.2, pos_m, 0.4, color="seagreen", alpha=.7, label="positive")
+    axs[0].bar(xs + 0.2, neg_m, 0.4, color="firebrick", alpha=.7, label="negative")
+    axs[0].plot(xs, net_m, "b-o", ms=3, label="net")
+    axs[0].axhline(0, color="k", lw=.6, ls=":")
+    axs[0].set_xticks(xs); axs[0].set_xticklabels(names, rotation=45, ha="right")
+    axs[0].set_ylabel("flip rate"); axs[0].set_title("(a) Per-organ decoder benefit"); axs[0].legend()
+    axs[1].scatter(size, net_m, color="steelblue")
+    for i, n in enumerate(names):
+        axs[1].annotate(n, (size[i], net_m[i]), fontsize=7)
+    axs[1].set_xscale("log"); axs[1].axhline(0, color="k", lw=.6, ls=":")
+    axs[1].set_xlabel("organ size (voxels, log)"); axs[1].set_ylabel("net flip rate")
+    axs[1].set_title(f"(b) Size vs.\\ benefit (Spearman ${rho:.2f}$)")
+    fig.tight_layout(); fig.savefig(f"{OBS_DIR}/O_anatomy.png", dpi=150); plt.close(fig)
+    save_obs("O_anatomy", {"organ": names, "positive_rate": pos_m, "negative_rate": neg_m,
+                           "net_rate": net_m, "organ_size": size, "size_net_spearman": rho})
+
+
 def main():
     global OBS_DIR, RESULTS_FILE, CLASS_NAMES
     p = argparse.ArgumentParser()
@@ -1130,11 +1265,14 @@ def main():
     if effi is not None:
         bin_ent, bin_net = O5_decoder_gain(val_loader, effi, full)
         O_boundary_flips(val_loader, effi, full)           # E3: boundary-resolved flips
+        O_anatomy(val_loader, effi, full)                  # Fig 3: per-organ benefit + size
         O9_opportunity(val_loader, effi, full, block_size=args_ns.o9_block_size,
                        halo=args_ns.o9_halo, primary_budget=args_ns.o9_primary_budget,
                        foreground=args_ns.o9_foreground,
                        provenance={"network": network, "dataset": args_ns.dataset,
                                    "full_checkpoint": e0[-1], "effi_checkpoint": e1[-1]})
+        O_pareto(val_loader, effi, full, block_size=args_ns.o9_block_size,
+                 halo=args_ns.o9_halo)                     # Fig 2: multi-signal Pareto
         O11_routing_signals(val_loader, effi, full, bin_ent, bin_net)
     else:
         print("[O5/O9/O11] skipped — ecological control has no EffiDec3D pair")

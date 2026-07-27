@@ -31,9 +31,30 @@ our reconstructed identity-affine data rather than the paper's processed set, an
 FP32-versus-BF16 check ruled out a numerical cause.  Efficiency reproduces the
 published reductions: \effimodel{} uses $14.1\times$ fewer MACs, $17.9\times$ fewer
 parameters, $\sim\!5\times$ lower latency, and $\sim\!7.7\times$ lower peak memory.
+The same pattern holds on the architecture axis (Table~\ref{tab:arch}): on BTCV,
+Swin UNETR reproduces its published full model ($0.805$ vs.\ $0.8013$) and its
+\method{} decoder cuts MACs $6.5\times$ at a $2.6$-point Dice cost---a smaller
+reduction than 3D UX-Net's, matching \method{}'s own per-backbone figures.
 Treating these matched models as fixed, the rest of the paper characterizes
 \emph{where} the full decoder's extra computation changes predictions---the question
 \method{}'s aggregate evaluation leaves open.
+
+\begin{table}[t]
+\centering
+\caption{Architecture axis (BTCV): reproduction and efficiency of the matched
+full/\method{} pair per backbone. Dice is Full$\rightarrow$\method{}; reductions are
+Full$/$\method{}. MedNeXt pending.}
+\label{tab:arch}
+\begin{tabular}{lcccc}
+\toprule
+Backbone & Dice (F$\rightarrow$E) & MAC$\downarrow$ & Param$\downarrow$ & Lat$\downarrow$ \\
+\midrule
+3D UX-Net    & .792$\rightarrow$.773 & $14.1\times$ & $17.9\times$ & $5.4\times$ \\
+Swin UNETR   & .805$\rightarrow$.779 & $6.5\times$  & $5.7\times$  & $2.3\times$ \\
+MedNeXt-M-K3 & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Heterogeneity Metrics}
 \label{sec:heterogeneity}

@@ -378,10 +378,10 @@ elif args.network == 'MedNeXt_B':
 
 elif args.network == 'MedNeXt_M':
     model = create_mednext_v1(
-        args.n_channels, 
-        out_classes, 
-        'M', 
-        kernel_size=5,
+        args.n_channels,
+        out_classes,
+        'M',
+        kernel_size=3,   # K3 to match MedNeXt-M-K3 + the EffiDec3D pair (clean matched pair)
         n_channels=args.feature_size,
         deep_supervision=args.ds #False
     ).to(device)

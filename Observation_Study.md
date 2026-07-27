@@ -438,7 +438,14 @@ tmux new -s e1_train
 Paper A is a **general finding**, not a single-network/dataset result. We align
 **strictly to EffiDec3D's own backbone scope** — the architectures for which the
 original paper actually built an EffiDec3D decoder pair — with a predeclared ladder
-(mirrors the WACV experiments section):
+(mirrors the WACV experiments section).
+
+> **Coverage = cross / L-shape (~6–7 cells), not the full grid.** Anchor at
+> **UX-Net/BTCV** (also the frozen-encoder factorial backbone): dataset axis = UX-Net
+> across BTCV/FeTA/MSD-BrainTumour/MSD-Lung(or HepaticVessel); backbone axis = BTCV
+> across UX-Net/SwinUNETR/(opt. SwinUNETRv2 or MedNeXt). Each cell is a standard
+> Full-vs-Effi pair (the 4-corner factorial is UX-Net/BTCV only); O7 aggregates rows,
+> O8 aggregates columns.
 
 | Backbones | EffiDec3D pair? | Datasets | Observations |
 |---|---|---|---|
@@ -456,12 +463,16 @@ original paper actually built an EffiDec3D decoder pair — with a predeclared l
 > architectures, they can be added later as single-model O1/O2/O4/O10 concentration
 > controls only — never for decoder-causal claims.)
 >
-> **Scope — decoder only.** EffiDec3D modifies the *decoder* alone (reduced channels
-> + removed high-res stages); the **encoder is held identical between Full and Effi**.
-> Every flip (O5/O9/O11) is therefore a clean decoder ablation with the encoder
-> constant — which is what licenses attributing the benefit to decoder capacity. It
-> also means Paper A says **nothing about the encoder** (the untouched 57.8% of MACs);
-> encoder over-provisioning is a distinct question deferred to Paper B (see Part 4).
+> **Two regimes (encoder confound fix).** End-to-end Full/Effi share the encoder
+> *architecture* but **not its weights** (trained independently), so their flips are a
+> *model-level* difference, not pure decoder capacity. We therefore add a **frozen
+> shared-encoder** regime: freeze one trained encoder, train the decoder variants on
+> identical features → differences are decoder-caused. On the frozen encoder we run a
+> **2×2 channel/resolution factor decomposition** (Full / channel-only / resolution-only
+> / combined Effi) to attribute the removable computation, and a **null pair** (two
+> Full seeds) as the seed-noise floor. Paper A still says **nothing about the encoder**
+> (the untouched 57.8% of MACs) — that is Paper B. See Part 4 for the frozen-encoder
+> protocol.
 
 **Training template** (each matched cell = a Full + an EffiDec3D run).
 `--network` is the backbone; the EffiDec3D counterpart appends `_EffiDec3D`:
@@ -1474,14 +1485,21 @@ region-adaptive decoder would act. Rough ceiling: full `decoder3` on ~20% of
 voxels + cheap elsewhere → 41 → ~33 GMac. Encoder (57.8%) is untouched by
 decoder-only routing.
 
-> **Scope boundary — Paper A is decoder-only, and has no encoder observations.**
-> EffiDec3D modifies the decoder alone; the encoder is identical between Full and
-> Effi. So every flip observation (O5/O9/O11) is a clean decoder ablation with
-> the encoder held constant — but O1–O11 therefore say **nothing** about whether the
-> encoder (the larger 57.8% of MACs) is over-provisioned. That question needs a
-> *different* instrument — single-model representational analyses (per-stage effective
-> rank / channel redundancy, stage probing, CKA), since no encoder-reduced pair exists
-> to difference against — and is deferred to Paper B's whole-model adaptivity study.
+> **Encoder confound + decoder-only scope.** End-to-end Full/Effi share the encoder
+> *architecture* but not its *weights*, so end-to-end flips are model-level, not pure
+> decoder capacity. The **frozen shared-encoder** regime (freeze one encoder, train
+> the decoder variants on identical features) makes the attribution causal; on it we
+> run the **2×2 channel/resolution factor decomposition** and a **null pair** (two Full
+> seeds) as the seed-noise floor. Even so, Paper A says **nothing** about whether the
+> encoder (the larger 57.8% of MACs) is over-provisioned — that needs different
+> instruments (per-stage effective rank, probing, CKA) and is deferred to Paper B.
+>
+> **Frozen-encoder protocol (E1):** reuse trained Full-UX as the frozen encoder;
+> `main_train_BTCV_TU.py --freeze_encoder --encoder_ckpt <E0> --resolution_factor
+> {1,2} --n_decoder_channels {C_full,48}`; analyze pairs with `run_observations.py
+> --e0_rf/--e0_nchan/--e1_rf/--e1_nchan` (see `run_frozen_factorial.sh`). Boundary-
+> resolved flips, NSD, and the O9 `--o9_foreground` denominator option are in
+> `run_observations.py`.
 
 **Paper A Go decision: PASS** (O2/O3/O5/O9). The efficiency application proceeds in
 [Experiment-Design-AdaDec3D.md](Experiment-Design-AdaDec3D.md), with E1 (77.0%) as

@@ -95,6 +95,11 @@ parser.add_argument('--num_workers', type=int, default=2, help='Number of worker
 parser.add_argument('--seed', type=int, default=0, help='Determinism seed (default 0 = original EffiDec3D)')
 parser.add_argument('--skip_spatial_resampling', action='store_true',
                     help='BTCV13 only: drop Orientationd+Spacingd (control for identity-affine TransUNet Synapse data)')
+parser.add_argument('--freeze_encoder', action='store_true',
+                    help='Load --encoder_ckpt into the encoder and freeze it; train the decoder only '
+                         '(frozen shared-encoder factor decomposition, decoder-only causal control).')
+parser.add_argument('--encoder_ckpt', default='',
+                    help='Checkpoint whose encoder weights are loaded+frozen when --freeze_encoder is set.')
 
 args = parser.parse_args()
 
@@ -423,6 +428,25 @@ elif args.network == 'TransBTS':
 
 print('Chosen Network Architecture: {}'.format(args.network))
 
+# Frozen shared-encoder control: load encoder weights from --encoder_ckpt and freeze
+# them so only the decoder is trained. Encoder submodules are name-prefixed uxnet_3d/
+# encoder (3D UX-Net & EffiDec3D) or swinViT/encoder (Swin). Analysis runs in eval
+# mode, so the frozen features are deterministic (DropPath off) despite train-time.
+_ENCODER_PREFIXES = ('uxnet_3d', 'encoder', 'swinViT')
+if args.freeze_encoder:
+    assert args.encoder_ckpt, '--freeze_encoder requires --encoder_ckpt'
+    _enc_sd = torch.load(args.encoder_ckpt, map_location='cpu')
+    _enc_sd = _enc_sd.get('model_state_dict', _enc_sd) if isinstance(_enc_sd, dict) else _enc_sd
+    _enc_sd = {k: v for k, v in _enc_sd.items() if k.startswith(_ENCODER_PREFIXES)}
+    model.load_state_dict(_enc_sd, strict=False)   # decoder keys intentionally absent
+    _n_frozen = 0
+    for _name, _p in model.named_parameters():
+        if _name.startswith(_ENCODER_PREFIXES):
+            _p.requires_grad = False
+            _n_frozen += 1
+    print(f'[freeze_encoder] loaded {len(_enc_sd)} encoder tensors from {args.encoder_ckpt}; '
+          f'froze {_n_frozen} encoder params; training decoder only')
+
 # Repo networks (UXNET, EffiDec3D variants) take a `mode` kwarg via **kwargs; MONAI
 # nets (SwinUNETR, UNETR, ...) do not. Detect once so the train loop calls correctly.
 import inspect as _inspect
@@ -448,10 +472,11 @@ params_m  = params_m  / 1e6
 loss_function = DiceCELoss(to_onehot_y=True, softmax=True)
 print('Loss for training: {}'.format('DiceCELoss'))
 
+_trainable = [p for p in model.parameters() if p.requires_grad]   # excludes frozen encoder
 if args.optim == 'AdamW':
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
+    optimizer = torch.optim.AdamW(_trainable, lr=args.lr)
 elif args.optim == 'Adam':
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = torch.optim.Adam(_trainable, lr=args.lr)
 print('Optimizer for training: {}, learning rate: {}'.format(args.optim, args.lr))
 # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.9, patience=1000)
 scaler = GradScaler('cuda', enabled=(_amp_dtype == torch.float16))

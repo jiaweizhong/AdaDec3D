@@ -67,26 +67,29 @@ Paper B 必须进一步证明两件 Paper A 没有证明的事：
 1. **Where Does Decoder Computation Matter in Efficient 3D Medical Image Segmentation?**
 2. **Understanding the Spatially Concentrated Benefit of Decoder Computation**
 3. **Understanding Where Additional Decoder Capacity Helps in Efficient 3D Medical Image Segmentation**
-4. **A Small Fraction of Voxels Accounts for Most Positive Decoder Transitions**
+4. **A Small Fraction of Voxels Accounts for Most Positive Decoder Flips**
 
 第 4 个标题只有在 O9 得到足够强、跨 seed 稳定的 Pareto 结果后才能使用，不能预先假设具体比例。
 
 ---
 
-## 3. 核心概念：Decoder Benefit and Prediction Transitions
+## 3. 核心概念：Decoder Benefit and Prediction Flips
 
 论文不能只讨论“哪里容易错”或“哪里 entropy 高”。这些问题已有大量研究，单独不足以形成强贡献。
 
 核心分析对象不是“哪里容易错”，而是额外 decoder capacity 引起的逐 voxel
-**prediction transitions**。用最朴素的指标计数表达，**不引入新造的连续“效用”量**：
+**prediction flips**。用最朴素的指标计数表达，**不引入新造的连续“效用”量**：
 
-- **Positive transition** $P(v)=\mathbb{1}[\hat y_{\mathrm{Effi}}(v)\neq y(v)\ \wedge\ \hat y_{\mathrm{Full}}(v)=y(v)]$：EffiDec3D 错、Full decoder 对，即额外 decoder 改善了预测；
-- **Negative transition** $N(v)=\mathbb{1}[\hat y_{\mathrm{Effi}}(v)=y(v)\ \wedge\ \hat y_{\mathrm{Full}}(v)\neq y(v)]$：EffiDec3D 对、Full decoder 错，即额外 decoder 使预测退化；
-- **Net transition** $U(v)=P(v)-N(v)$；聚合率 $R_{\mathrm{net}}=\mathrm{mean}_v P(v)-\mathrm{mean}_v N(v)$。
+- **Positive flip** $P(v)=\mathbb{1}[\hat y_{\mathrm{Effi}}(v)\neq y(v)\ \wedge\ \hat y_{\mathrm{Full}}(v)=y(v)]$：EffiDec3D 错、Full decoder 对，即额外 decoder 改善了预测；
+- **Negative flip** $N(v)=\mathbb{1}[\hat y_{\mathrm{Effi}}(v)=y(v)\ \wedge\ \hat y_{\mathrm{Full}}(v)\neq y(v)]$：EffiDec3D 对、Full decoder 错，即额外 decoder 使预测退化；
+- **Net flip** $U(v)=P(v)-N(v)$；聚合率 $R_{\mathrm{net}}=\mathrm{mean}_v P(v)-\mathrm{mean}_v N(v)$。
 
-> 早期草稿曾用连续量 $\Delta(v)=\ell_{\mathrm{Effi}}(v)-\ell_{\mathrm{Full}}(v)$（“marginal
-> utility”）作为核心量；现已**弃用**，改用上述离散标签转移，避免另造术语，并与
-> Observation_Study 的 O-metric glossary 及正文保持一致（`grep -ri marginal` 应为 0）。
+> **术语来源（重要）：** "flip" 不是自造概念。positive/negative flip 是回归无关
+> 模型更新文献中的既有术语（Yan et al., *Positive-Congruent Training*, CVPR 2021；
+> Cormier et al., *Prediction Churn*, NeurIPS 2016），也正是 McNemar 配对分类器检验
+> 2×2 表中的两个 discordant cell（McNemar 1947；Dietterich 1998）。论文用 "flip" 并
+> 引用这些工作，而非 "transition/marginal utility"。早期草稿的连续量
+> $\Delta(v)=\ell_{\mathrm{Effi}}-\ell_{\mathrm{Full}}$ 已弃用（`grep -ri marginal` 应为 0）。
 
 这样可以避免把任何 prediction disagreement 都错误解释成“full decoder 带来改善”。
 
@@ -105,15 +108,21 @@ Paper A 不声称第五层 **realizable efficiency**；这一层属于 AdaDec3D 
 
 ## 4. 一句话 Thesis 与贡献
 
-### Central thesis
+### Central thesis（additive，不是批判 Dice/FLOPs）
 
-论文最大的卖点不是 “we discovered decoder redundancy”，而是：
+定位是**补全 EffiDec3D 未回答的问题**，而不是批评聚合指标：
 
-> **We show why Dice and FLOPs alone are insufficient to understand efficient decoder design.**
+> **EffiDec3D shows decoder computation is *removable* (empirical ablation); we
+> explain *why* it is removable and *where* decoder computation still helps.**
 
-Dice 和 FLOPs 只给出整例精度与总计算量，无法揭示额外 decoder computation 在哪里改善预测、在哪里使预测退化，以及这些变化是否集中且可预测。空间分析是支撑这一主张的证据，而不是需要另造术语包装的最终卖点。
+EffiDec3D 通过 ablation 证明"删了 Dice 不掉"，但没有解释为什么可删、哪些区域仍依赖
+decoder。本文用 flip 分析回答这一机制问题。可在 Introduction 直接引用 EffiDec3D：
+*"Prior work such as EffiDec3D demonstrates that large portions of decoder computation
+can be removed with little loss in Dice; however, these choices are justified by
+empirical ablation, leaving open where decoder computation actually contributes."*
+不要写成"Dice 和 FLOPs 不足/insufficient"式的批判。
 
-如果实验只能证明 positive transitions 集中，却不能证明部署时信号可预测它，应将 thesis 缩减为：
+如果实验只能证明 positive flips 集中，却不能证明部署时信号可预测它，应将 thesis 缩减为：
 
 > The benefit of additional decoder capacity varies substantially across spatial regions and anatomical structures.
 
@@ -121,12 +130,12 @@ Dice 和 FLOPs 只给出整例精度与总计算量，无法揭示额外 decoder
 
 论文集中在**三条**贡献，不再写成四条发散的贡献：
 
-1. **C1 — 超越 Dice/FLOPs 的 transition-count 比较**
+1. **C1 — 超越 Dice/FLOPs 的 flip-count 比较**
    不再只比较整幅图像的 Dice/FLOPs，而是逐 voxel 计数 positive、negative 和 net
-   transitions，并做 subject-level bootstrap，避免把任何 disagreement 当作改善。
+   flips，并做 subject-level bootstrap，避免把任何 disagreement 当作改善。
 
 2. **C2 — decoder 收益小、双向且空间集中**
-   聚合 net 收益很小（约 0.1% voxels）且被 negative transitions 大量抵消，但高度
+   聚合 net 收益很小（约 0.1% voxels）且被 negative flips 大量抵消，但高度
    非均匀：集中在器官边界（boundary error 3.93× interior）与小器官（size–difficulty
    $\rho=-0.54$；控制 log size 后 entropy 仍解释 difficulty，partial $r=0.81$）。
 
@@ -161,14 +170,14 @@ EffiDec3D 等方法通过统一通道压缩和分辨率限制显著降低 decode
 
 #### Paragraph 4 — 本文做什么
 
-构造 matched lightweight/full decoder comparison，在相同数据和尽可能受控的 encoder 条件下记录 voxel-level decoder benefit 和 prediction transitions。围绕空间集中度、解剖分布、训练演化和可预测性进行系统分析，并用 subject-level bootstrap 和跨域实验检验稳健性。
+构造 matched lightweight/full decoder comparison，在相同数据和尽可能受控的 encoder 条件下记录 voxel-level decoder benefit 和 prediction flips。围绕空间集中度、解剖分布、训练演化和可预测性进行系统分析，并用 subject-level bootstrap 和跨域实验检验稳健性。
 
 #### Paragraph 5 — 主要发现
 
 最终按真实结果填写：
 
-- `[X]%` 的候选区域解释了 `[Y]%` 的 positive/net transitions；
-- positive/net transitions 在 boundary 和 small/difficult organs 上更集中；
+- `[X]%` 的候选区域解释了 `[Y]%` 的 positive/net flips；
+- positive/net flips 在 boundary 和 small/difficult organs 上更集中；
 - entropy 或其他 deployable signal 在 held-out subjects 上优于 matched random/boundary controls；
 - 这一趋势在 `[datasets]` 和 `[backbones]` 上保持一致/部分一致。
 
@@ -193,50 +202,37 @@ Related Work 的落点应是：
 
 ### 5.3 Study Design 的组织
 
-不要按 O1–O11 写成十一组互相独立的小实验。正文合并成三个 scientific findings：
+不要按 O1–O11 写成十一组互相独立的小实验。Results 按**三个问题（=三组 metrics）**组织，
+与正文 §Results 完全一致：
 
-#### Finding I — Decoder benefit is spatially concentrated
+#### Heterogeneity metrics — 收益是否均匀？
 
-对应 O1、O2、O5、O9：
+对应 **O1、O4、O10**（+ boundary-resolved flips、null-pair）：boundary vs interior 误差比、
+per-organ difficulty、organ size–difficulty（含偏相关）；并把"误差集中在边界"升级为
+"**net flip** 也向边界集中"（distance-to-boundary 分桶 + NSD），且超过 Full-vs-Full 的
+null-pair 地板。
 
-- error 与 entropy 的空间稀疏性；
-- positive/negative/net transitions；
-- transition concentration curve；
-- oracle、deployable signal、random control 的 selective-allocation curve。
+#### Concentration metrics — 少量区域是否贡献大部分净收益？
 
-#### Finding II — Decoder benefit has anatomical structure
+对应 **O2、O5、O9-oracle、O6**：entropy sparsity；subject-level $r(H,U)$；voxel-oracle
+top-k recovery（非部署上界）；训练演化（集中是否为暂态）。
 
-对应 O3、O4、O10：
+#### Predictability metrics — 测试时信号能否定位这些区域？
 
-- uncertainty 与 error 的关系；
-- boundary distance 分析；
-- organ-wise decoder benefit；
-- organ volume 与 difficulty/decoder benefit 的相关或偏相关分析。
+对应 **O3、O9-region、O11**：flip discrimination（AUROC/AUPRC）+ calibration（ECE）；
+region-level risk–coverage / opportunity curve；entropy/confidence/MC-dropout signal 比较。
 
-重点不是简单得出“小器官更难”，而是回答：
-
-> 在控制器官大小或 boundary proportion 后，routing signal 是否仍能解释 decoder benefit？
-
-#### Finding III — Concentration is stable and predictable
-
-对应 O6、O7、O8、O11：
-
-- 随训练 checkpoint 的变化；
-- CT → MRI、multi-organ → lesion/organ 跨数据集；
-- 3D UX-Net + EffiDec3D → SwinUNETR + EffiDec3D（+ 可选 SwinUNETRv2、MedNeXt）跨 matched decoder pair；
-- entropy、margin、MC-dropout、boundary proxy 等 signal comparison。
-
-> **不含 UNETR / nnU-Net。** 它们没有官方 EffiDec3D pair，matched transition 无从定义，
-> 不纳入 generality matrix（详见 §5.4）。
-
-O11 如果涉及训练 router 或方法组件，应移到 Paper B；Paper A 只比较无需 AdaDec3D 训练即可计算的 signals。
+> **Mechanism（因子分解，frozen encoder）** 单列一个 subsection：Full→channel-only /
+> Full→resolution-only / Full→combined，回答"高分辨率 stage 与宽通道各自为什么可删"。
+> **不含 UNETR / nnU-Net**（无官方 EffiDec3D pair）。O11 只比较无需 AdaDec3D 训练即可
+> 计算的 signals；涉及训练 router 的组件移到 Paper B。
 
 ### 5.4 Generality protocol
 
 Generality 必须同时覆盖 architecture family 与 dataset diversity，不能只增加一个
 SwinUNETR 实验后声称普适。**严格对齐 EffiDec3D 原文实际构建过 decoder pair 的
 backbone**——即 3D UX-Net、SwinUNETR、SwinUNETRv2、MedNeXt——每个都是 matched
-full/efficient pair，可做完整 O1–O11 transition 分析：
+full/efficient pair，可做完整 O1–O11 flip 分析：
 
 | 层级 | 模型 | 代表性 | 在 Paper A 中的作用 |
 |---|---|---|---|
@@ -246,15 +242,27 @@ full/efficient pair，可做完整 O1–O11 transition 分析：
 
 **不纳入 UNETR 与 nnU-Net。** EffiDec3D 从未为它们构建 decoder pair（UNETR 本身已
 经很轻，82.6 vs 337.6 GFLOPs；nnU-Net 自配置 decoder，固定 EffiDec3D decoder 不适
-用）。对它们而言 matched transition 比较无从定义，强行拼一个非官方 EffiDec3D 版本属于
+用）。对它们而言 matched flip 比较无从定义，强行拼一个非官方 EffiDec3D 版本属于
 无根据的扩展。若 reviewer 追问非 EffiDec3D 架构，最多把它们作为 single-model 的
 O1/O2/O10 concentration 参照，**绝不用于 decoder-causal claim**。
 
-**Scope — decoder only。** EffiDec3D 只改 decoder（统一通道压缩 + 去高分辨率层），
-**encoder 在 Full 与 Effi 之间完全一致**。因此每个 transition（O5/O9/O11）都是 encoder
-恒定下的干净 decoder 消融——这正是把收益归因于 decoder capacity 的依据；同时也意味着
-Paper A 对 **encoder（未触及的约 57.8% MACs）不作任何结论**，encoder 是否过配属于
-Paper B 的问题（需要 per-stage effective rank / probing / CKA 等不同工具，而非 transition pair）。
+**因果控制 — 两个 regime（reviewer 关键修正）。** 端到端的 Full/Effi 只共享 encoder
+**架构**、不共享**权重**，所以端到端 flip 混入了 encoder 权重/优化差异，不能直接归因于
+decoder。因此采用两个 regime：
+
+1. **End-to-end（ecological）**：真实部署差异，但 flip 是"模型级"差异；
+2. **Frozen shared encoder（causal）**：取一个训练好的 encoder，冻结，在**相同特征**上
+   只训 decoder 变体 → 差异纯粹来自 decoder capacity。
+
+在 frozen encoder 上做 **2×2 因子分解**（全部在 EffiDec3D decoder family 内，仅两个旋钮
+变化）：full（保留高分辨率 stage、宽通道）/ channel-only（宽→48 通道）/ resolution-only
+（去高分辨率 stage）/ combined Effi。pairwise flip（Full→channel-only、Full→resolution-only、
+Full→combined）分离"哪个因子改变哪些区域"。frozen encoder 是按 full decoder 调出来的，
+所以"efficient 在冻结特征上仍近似匹配"是**保守**的冗余证据。**null pair**（同架构、仅
+seed 不同的两个 Full）给出 seed 噪声地板，Full-vs-Effi 的 flip 必须超过它。
+
+Paper A 对 **encoder（未触及的约 57.8% MACs）不作结论**（是否过配属于 Paper B，需
+per-stage effective rank / probing / CKA 等不同工具）。
 
 数据集与 EffiDec3D 原文的评估范围对齐。原文覆盖 FeTA、BTCV 和 MSD 十项任务；Paper A 不必重复十二项，但应预先选择 3–4 个有代表性的任务：
 
@@ -265,7 +273,14 @@ Paper B 的问题（需要 per-stage effective rank / probing / CKA 等不同工
 | **MSD BrainTumour (Task01)** | brain MRI, multimodal lesion segmentation | 从器官分割扩展到异质性病灶 |
 | **MSD Lung (Task06)** 或 **HepaticVessel (Task08)** | thoracic CT lesion / abdominal CT vessel | 选择一个测试小目标、细长结构或高类别不平衡的任务 |
 
-最终固定其中 3–4 个，不根据结果好坏事后挑选。每个数据集报告相同的 positive transition、negative transition、net transition、spatial concentration 和 opportunity curve，并使用 subject-level confidence intervals。
+最终固定其中 3–4 个，不根据结果好坏事后挑选。每个数据集报告相同的 positive flip、negative flip、net flip、spatial concentration 和 opportunity curve，并使用 subject-level confidence intervals。
+
+**Generality 采用 cross / L-shape（~6–7 cells），不做全排列**（reviewer 建议，避免过度
+计算）：以 **UX-Net / BTCV 为锚点**（也是 §因子分解的 backbone），
+- **数据集轴 = UX-Net** 跑 BTCV / FeTA / MSD-BrainTumour / MSD-Lung(或HepaticVessel)；
+- **backbone 轴 = BTCV** 跑 UX-Net / SwinUNETR /（可选 SwinUNETRv2 或 MedNeXt）。
+每个 cell 是标准 Full-vs-Effi pair（**不**重复 4-corner 因子分解，那只在 UX-Net/BTCV 做），
+只检验 headline flip 方向是否跨行（O7 跨数据集）/跨列（O8 跨 backbone）一致。
 
 ---
 
@@ -279,10 +294,10 @@ Paper B 的问题（需要 per-stage effective rank / probing / CKA 等不同工
 2. ground truth；
 3. EffiDec3D prediction；
 4. full decoder prediction；
-5. positive/negative transition map；
+5. positive/negative flip map；
 6. entropy 或最佳 deployable signal。
 
-图注必须强调 error map、uncertainty map 和 transition map 是三个不同概念。
+图注必须强调 error map、uncertainty map 和 flip map 是三个不同概念。
 
 ### Figure 2 — 全文核心 Pareto 图
 
@@ -292,11 +307,11 @@ Paper B 的问题（需要 per-stage effective rank / probing / CKA 等不同工
 
 纵轴：
 
-> Fraction of total positive/net transitions covered
+> Fraction of total positive/net flips covered
 
 曲线至少包括：
 
-- oracle transition ranking；
+- oracle flip ranking；
 - entropy 或最佳 deployable signal；
 - confidence/margin；
 - boundary proxy；
@@ -336,8 +351,8 @@ Paper B 的问题（需要 per-stage effective rank / probing / CKA 等不同工
 报告每个 deployable signal 对 held-out decoder benefit 的：
 
 - Pearson/Spearman correlation；
-- AUROC/AUPRC（若将 positive transition 定义为二分类）；
-- top-k transition coverage；
+- AUROC/AUPRC（若将 positive flip 定义为二分类）；
+- top-k flip coverage；
 - 相对 matched random control 的提升；
 - subject-level 95% confidence interval。
 
@@ -349,7 +364,7 @@ Paper B 的问题（需要 per-stage effective rank / probing / CKA 等不同工
 
 如果满足：
 
-- transition concentration 明显；
+- flip concentration 明显；
 - deployable signal 显著优于 controls；
 - 跨 seed、backbone 或 dataset 稳定；
 
@@ -359,7 +374,7 @@ Paper B 的问题（需要 per-stage effective rank / probing / CKA 等不同工
 
 ### Medium narrative
 
-如果 transitions 集中，但 entropy 等信号预测一般：
+如果 flips 集中，但 entropy 等信号预测一般：
 
 > the benefit of decoder computation is strongly heterogeneous, but identifying regions that will improve remains an open problem.
 
@@ -390,8 +405,8 @@ Paper B 的问题（需要 per-stage effective rank / probing / CKA 等不同工
 1. **把 error 当作 decoder benefit**
    高误差区域不一定能被更强 decoder 修复。
 
-2. **只报告 positive transitions**  
-   必须同时报告 negative transitions 和 net transitions。
+2. **只报告 positive flips**  
+   必须同时报告 negative flips 和 net flips。
 
 3. **把 oracle hybrid prediction 当作真实加速**  
    Paper A 的 selective allocation 是 opportunity analysis，不是 executed FLOPs reduction。
@@ -456,8 +471,8 @@ WACV 2027 的 E&D Track 明确包括：
 
 **综合判断**：学术认可度高于 ICBBE/MMM，但短篇格式要求叙事非常聚焦。建议只保留：
 
-- positive、negative 与 net transition 定义；
-- transition concentration/opportunity curve 主图；
+- positive、negative 与 net flip 定义；
+- flip concentration/opportunity curve 主图；
 - deployable signal vs controls；
 - 一项跨 backbone 或跨 dataset 验证。
 
@@ -567,8 +582,8 @@ ISBI 专注 biological and medical imaging 的数学、算法和计算问题，�
 由于主论文只有四页，正文建议只保留：
 
 1. matched Full/EffiDec comparison；
-2. positive、negative 与 net transition 定义；
-3. positive、negative、net transitions；
+2. positive、negative 与 net flip 定义；
+3. positive、negative、net flips；
 4. selective-allocation Pareto curve；
 5. entropy/boundary/random controls；
 6. 一项跨 backbone 或跨 dataset 验证。
@@ -631,7 +646,7 @@ SCI/SCIE 通常指期刊，不是会议。常规期刊全年滚动投稿，因�
 
 ## 12. Paper A 摘要骨架
 
-> Efficient decoders substantially reduce the cost of volumetric medical image segmentation, but Dice and FLOPs alone do not explain how decoder simplification changes predictions. They cannot reveal where additional decoder capacity improves a prediction, where it degrades one, or whether these changes are spatially concentrated and predictable. We compare matched lightweight and full decoders and explicitly separate positive, negative, and net prediction transitions. Across [datasets], [backbones], and [seeds], we analyze their concentration, anatomical distribution, training evolution, and predictability. We find that [result 1], with [X]% of candidate regions accounting for [Y]% of net transitions. These transitions are concentrated in [result 2] and can be identified by [signal] significantly better than random, boundary, and confidence controls on held-out subjects [result 3]. Our findings show why aggregate accuracy and computation are insufficient for understanding efficient decoder design and provide an evaluation protocol for future region-adaptive decoders.
+> Efficient decoders such as EffiDec3D remove large portions of decoder computation with little loss in Dice, but justify this by empirical ablation, leaving open why the computation is removable and where decoder computation still helps. We answer this with a prediction-flip analysis of matched full and efficient decoders, separating positive, negative, and net flips, and isolate the effect with a frozen shared encoder that varies only the decoder. Across [datasets], [backbones], and [seeds], we find the full decoder's net benefit is [result 1], with [X]% of candidate regions accounting for [Y]% of net flips, concentrated at [result 2], and identifiable at test time by [signal] above random, boundary, and confidence controls on held-out subjects [result 3]. A channel/resolution factor decomposition attributes the removable computation to [result 4]. These findings explain what EffiDec3D's ablation left unexplained and provide an evaluation protocol for region-adaptive decoders.
 
 在实验完成前保留方括号，不提前填写预期数值。
 

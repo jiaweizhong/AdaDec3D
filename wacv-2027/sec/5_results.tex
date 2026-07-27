@@ -79,7 +79,11 @@ organ-dependent (Fig.~\ref{fig:organ}), with the adrenal glands, pancreas, and
 veins hardest, and it scales with structure size: the organ-size/difficulty
 Spearman correlation is $\rho=-0.54$, and entropy still explains organ difficulty
 after controlling for log volume (partial $r=0.81$).  Decoder benefit is therefore
-heterogeneous across region, organ, and scale.
+heterogeneous across region, organ, and scale.  Crucially, resolving flips by
+distance to the GT boundary shows the \emph{net flip} rate itself---not just
+error---rises toward the boundary \todo{per-bin net flips + NSD from re-run}, and
+this effect exceeds a same-architecture null pair (Full seed~0 vs.\ seed~1)
+\todo{null-pair floor}, ruling out seed noise.
 
 \subsection{Concentration Metrics}
 \label{sec:concentration}
@@ -146,3 +150,19 @@ $0.655$ and $0.663$}, and Monte-Carlo dropout is invalid for this checkpoint bec
 the architecture has no active dropout (its stochastic variance is effectively
 zero).  We therefore retain confidence as a required baseline and do not claim
 entropy is uniquely optimal.
+
+\subsection{Mechanism: Which Factor Is Removable}
+\label{sec:mechanism}
+
+The comparisons above use end-to-end models, which share the encoder architecture but
+not its weights. To attribute the effect to decoder capacity alone, we freeze one
+trained encoder and train the $2\times2$ decoder factorial on identical features,
+then compare Full$\rightarrow$channel-only, Full$\rightarrow$resolution-only, and
+Full$\rightarrow$combined \method{}
+\todo{fill per-factor flip rates and boundary profiles from the frozen-encoder run;
+hypothesis: dropping the high-resolution stage produces flips concentrated nearer the
+boundary, while channel reduction is spatially diffuse and smaller, explaining why
+both are removable with little aggregate Dice change}.  Because the encoder is frozen
+and was optimized for the full decoder, ``the efficient decoder still nearly matches''
+is a conservative statement of redundancy, and the differences are attributable to the
+decoder rather than to encoder retraining.

@@ -94,21 +94,23 @@ def save_obs(tag, metrics):
 
 
 def build_model(network, role, out_classes, device, img_size=(96, 96, 96),
-                feature_size=48):
+                feature_size=48, resolution_factor=2, n_decoder_channels=48):
     """Build Full ('full') or EffiDec3D ('effi') model for `network`.
 
     Mirrors main_train_BTCV_TU.py instantiation. MedNeXt uses kernel size 3 to
     match the paper's ``MedNeXt-M-K3`` comparison. Only MATCHED_BACKBONES have an
-    'effi' role.
+    'effi' role. `resolution_factor`/`n_decoder_channels` parameterize the EffiDec3D
+    decoder for the frozen-encoder factor decomposition (E1): the four corners are
+    all role='effi' with (rf, nchan) in {(1,C_full),(1,48),(2,C_full),(2,48)}.
     """
     ic = 1
     if network == "3DUXNET":
         from networks.UXNet_3D.network_backbone import UXNET, UXNET_EffiDec3D
         if role == "effi":
             m = UXNET_EffiDec3D(in_chans=ic, out_chans=out_classes, depths=[2, 2, 2, 2],
-                feat_size=[48, 96, 192, 384], n_decoder_channels=48, drop_path_rate=0,
-                layer_scale_init_value=1e-6, spatial_dims=3,
-                skip_aggregation="addition", resolution_factor=2)
+                feat_size=[48, 96, 192, 384], n_decoder_channels=n_decoder_channels,
+                drop_path_rate=0, layer_scale_init_value=1e-6, spatial_dims=3,
+                skip_aggregation="addition", resolution_factor=resolution_factor)
         else:
             m = UXNET(in_chans=ic, out_chans=out_classes, depths=[2, 2, 2, 2],
                 feat_size=[48, 96, 192, 384], drop_path_rate=0,
@@ -119,8 +121,8 @@ def build_model(network, role, out_classes, device, img_size=(96, 96, 96),
             from networks.swin_unetr_effidec3d import SwinUNETR_EffiDec3D
             m = SwinUNETR_EffiDec3D(img_size=img_size, in_channels=ic,
                 out_channels=out_classes, feature_size=feature_size,
-                n_decoder_channels=48, resolution_factor=2, use_checkpoint=False,
-                skip_aggregation="addition", use_v2=use_v2)
+                n_decoder_channels=n_decoder_channels, resolution_factor=resolution_factor,
+                use_checkpoint=False, skip_aggregation="addition", use_v2=use_v2)
         elif use_v2:
             from networks.swin_unetr_effidec3d import SwinUNETR as SwinFull
             m = SwinFull(img_size=img_size, in_channels=ic, out_channels=out_classes,
@@ -453,7 +455,7 @@ def O5_decoder_gain(val_loader, effi, full):
 
 
 def O9_opportunity(val_loader, effi, full, block_size=16, halo=4, primary_budget=20,
-                   provenance=None):
+                   provenance=None, foreground="union"):
     """Estimate selective-decoding opportunity without overstating the result.
 
     Two selectors are reported:
@@ -534,7 +536,12 @@ def O9_opportunity(val_loader, effi, full, block_size=16, halo=4, primary_budget
             pos = ((pred_full == lbl) & (pred_effi != lbl)).numpy().astype(np.float32)
             neg = ((pred_full != lbl) & (pred_effi == lbl)).numpy().astype(np.float32)
             net = pos - neg
-            body = ((lbl > 0) | (pred_full > 0) | (pred_effi > 0)).numpy()
+            if foreground == "all":
+                body = np.ones(lbl.shape, dtype=bool)
+            elif foreground == "gt":
+                body = (lbl > 0).numpy()
+            else:   # union(GT, Full, Effi) — predeclared main result
+                body = ((lbl > 0) | (pred_full > 0) | (pred_effi > 0)).numpy()
             entropy = ent.numpy()
             total_positive = float(pos[body].sum())
             if total_positive == 0:
@@ -696,7 +703,8 @@ def O9_opportunity(val_loader, effi, full, block_size=16, halo=4, primary_budget
     save_obs("O9_corrected", {
         "budgets_pct": budgets.tolist(),
         "primary_budget_pct": int(primary_budget),
-        "utility_definition": "(positive-negative)/all_positive_transitions",
+        "utility_definition": "(positive-negative)/all_positive_flips",
+        "foreground": foreground,
         "n_subjects": len(subject_results),
         "n_random_repeats": n_random,
         "n_bootstrap": n_bootstrap,
@@ -875,6 +883,104 @@ def O11_routing_signals(val_loader, effi, full, bin_ent=None, bin_net=None):
     save_obs("O11", res)
 
 
+def O_boundary_flips(val_loader, effi, full, bins=(1, 2, 4, 8)):
+    """E3: distance-to-GT-boundary resolved flips. Tests whether the decoder *benefit*
+    (net flip), not merely error, concentrates near boundaries. Bins foreground-union
+    voxels by Euclidean distance to the nearest GT foreground boundary; reports per-bin
+    positive/negative/net flip rates with a subject bootstrap CI on the net rate.
+    """
+    from scipy.ndimage import distance_transform_edt, binary_erosion
+    edges = [0.0] + list(bins) + [float("inf")]
+    nb = len(edges) - 1
+    labels = [f"{int(edges[i])}-{'inf' if np.isinf(edges[i+1]) else int(edges[i+1])}" for i in range(nb)]
+    subj_pos = [[] for _ in range(nb)]; subj_neg = [[] for _ in range(nb)]; subj_net = [[] for _ in range(nb)]
+    with torch.no_grad():
+        for batch in val_loader:
+            img = batch["image"].cuda()
+            lbl = batch["label"].squeeze(1).long().cpu().squeeze()
+            pred_f = infer(full, img).argmax(1).cpu().squeeze()
+            pred_e = infer(effi, img).argmax(1).cpu().squeeze()
+            pos = ((pred_f == lbl) & (pred_e != lbl)).numpy().astype(np.float32)
+            neg = ((pred_f != lbl) & (pred_e == lbl)).numpy().astype(np.float32)
+            fg = (lbl > 0).numpy()
+            if not fg.any():
+                continue
+            boundary = fg & ~binary_erosion(fg, iterations=1)
+            if not boundary.any():
+                continue
+            dist = distance_transform_edt(~boundary)
+            dom = fg | (pred_e.numpy() > 0) | (pred_f.numpy() > 0)
+            for i in range(nb):
+                m = dom & (dist >= edges[i]) & (dist < edges[i + 1])
+                if m.sum() > 0:
+                    subj_pos[i].append(float(pos[m].mean()))
+                    subj_neg[i].append(float(neg[m].mean()))
+                    subj_net[i].append(float(pos[m].mean() - neg[m].mean()))
+    rng = np.random.default_rng(0)
+    pos_m, neg_m, net_m, net_ci = [], [], [], []
+    for i in range(nb):
+        pos_m.append(float(np.mean(subj_pos[i])) if subj_pos[i] else float("nan"))
+        neg_m.append(float(np.mean(subj_neg[i])) if subj_neg[i] else float("nan"))
+        if subj_net[i]:
+            arr = np.asarray(subj_net[i], dtype=np.float64)
+            net_m.append(float(arr.mean()))
+            if arr.size > 1:
+                bs = [np.mean(rng.choice(arr, arr.size, replace=True)) for _ in range(2000)]
+                net_ci.append([float(np.percentile(bs, 2.5)), float(np.percentile(bs, 97.5))])
+            else:
+                net_ci.append([float("nan"), float("nan")])
+        else:
+            net_m.append(float("nan")); net_ci.append([float("nan"), float("nan")])
+    print("[O_boundary] distance-to-boundary net flip rate (near -> far):")
+    for i in range(nb):
+        print(f"      {labels[i]:>6} vox: pos={pos_m[i]:.5f} neg={neg_m[i]:.5f} net={net_m[i]:.5f}")
+    xs = np.arange(nb)
+    plt.figure(figsize=(7, 4))
+    plt.plot(xs, pos_m, "g--o", label="positive"); plt.plot(xs, neg_m, "r--o", label="negative")
+    plt.plot(xs, net_m, "b-o", label="net"); plt.axhline(0, color="k", lw=.7, ls=":")
+    plt.xticks(xs, labels); plt.xlabel("distance to GT boundary (voxels)")
+    plt.ylabel("flip rate"); plt.title("Boundary-resolved flips"); plt.legend()
+    plt.tight_layout(); plt.savefig(f"{OBS_DIR}/O_boundary_flips.png", dpi=150); plt.close()
+    save_obs("O_boundary_flips", {"bins_voxels": labels, "positive_rate": pos_m,
+                                  "negative_rate": neg_m, "net_rate": net_m, "net_ci": net_ci,
+                                  "note": "distance to nearest GT boundary; net=pos-neg per bin"})
+
+
+def O_surface_metrics(val_loader, analyzed, out_classes):
+    """E4: per-organ Normalized Surface Dice (NSD) at 1- and 2-voxel tolerance (MONAI).
+    A surface-level metric for the 'high-res decoder serves boundaries' claim, rather
+    than only voxel label flips.
+    """
+    try:
+        from monai.metrics import compute_surface_dice
+    except Exception:
+        print("[O_surface] monai compute_surface_dice unavailable; skipping"); return
+    taus = [1.0, 2.0]
+    onehot = AsDiscrete(to_onehot=out_classes)
+    onehot_p = AsDiscrete(argmax=True, to_onehot=out_classes)
+    per_tau = {t: [] for t in taus}
+    with torch.no_grad():
+        for batch in val_loader:
+            img = batch["image"].cuda(); lbl = batch["label"].cpu()
+            logits = infer(analyzed, img).cpu()
+            yp = onehot_p(logits.squeeze(0)).unsqueeze(0)
+            yt = onehot(lbl.squeeze(0)).unsqueeze(0)
+            for t in taus:
+                nsd = compute_surface_dice(yp, yt, class_thresholds=[t] * (out_classes - 1),
+                                           include_background=False)
+                per_tau[t].append(nsd.numpy())
+    res = {}
+    for t in taus:
+        arr = np.concatenate(per_tau[t], axis=0)   # (N, C-1)
+        res[f"nsd_tau{int(t)}_mean"] = float(np.nanmean(arr))
+        res[f"nsd_tau{int(t)}_per_organ"] = {
+            CLASS_NAMES[c]: round(float(np.nanmean(arr[:, c])), 4)
+            for c in range(arr.shape[1]) if c < len(CLASS_NAMES)}
+    print(f"[O_surface] NSD tau1={res.get('nsd_tau1_mean', float('nan')):.4f}  "
+          f"tau2={res.get('nsd_tau2_mean', float('nan')):.4f}")
+    save_obs("O_surface", res)
+
+
 def main():
     global OBS_DIR, RESULTS_FILE, CLASS_NAMES
     p = argparse.ArgumentParser()
@@ -892,6 +998,16 @@ def main():
                    help="Directory for figures and results.json")
     p.add_argument("--e0_ckpt", default=None, help="Explicit full-model checkpoint")
     p.add_argument("--e1_ckpt", default=None, help="Explicit EffiDec3D checkpoint")
+    # Frozen-encoder factor decomposition (E1): build each side as an EffiDec3D-family
+    # decoder with explicit knobs instead of the default full/effi roles. When any of
+    # these is set for a side, that side is built as role='effi' with (rf, nchan).
+    p.add_argument("--e0_rf", type=int, default=None, help="E0 EffiDec3D resolution_factor (factorial)")
+    p.add_argument("--e0_nchan", type=int, default=None, help="E0 EffiDec3D n_decoder_channels (factorial)")
+    p.add_argument("--e1_rf", type=int, default=None, help="E1 EffiDec3D resolution_factor (factorial)")
+    p.add_argument("--e1_nchan", type=int, default=None, help="E1 EffiDec3D n_decoder_channels (factorial)")
+    p.add_argument("--o9_foreground", default="union", choices=["all", "gt", "union"],
+                   help="O9 denominator/evaluation domain: all voxels, GT foreground, "
+                        "or union(GT,Full,Effi) [default; predeclared main result]")
     p.add_argument("--only_o9", action="store_true",
                    help="Run only the corrected O9 analysis (matched backbones only)")
     p.add_argument("--o9_block_size", type=int, default=16,
@@ -929,23 +1045,35 @@ def main():
     print(f"Network: {network} ({'matched' if matched else 'control'})  "
           f"dataset: {args_ns.dataset}  classes: {out_classes}  val cases: {len(val_files)}\n")
 
+    # Factorial override: if a side's rf/nchan is given, build it as an EffiDec3D-family
+    # decoder with those knobs (frozen-encoder E1 corners) instead of full/effi roles.
+    e0_factorial = args_ns.e0_rf is not None or args_ns.e0_nchan is not None
+    e1_factorial = args_ns.e1_rf is not None or args_ns.e1_nchan is not None
+
     # Full model (always present).
     e0 = ([args_ns.e0_ckpt] if args_ns.e0_ckpt else
           sorted(glob.glob(f"{args_ns.output}/*/{full_folder}/{args_ns.dataset}/best_metric_model.pth")))
     assert e0, f"No full checkpoint under {args_ns.output}/*/{full_folder}/{args_ns.dataset}/"
-    full = load_ckpt(build_model(network, "full", out_classes, device, feature_size=fsize),
-                     e0[-1], device)
-    print(f"Full: {e0[-1]}")
+    if e0_factorial:
+        full = load_ckpt(build_model(network, "effi", out_classes, device, feature_size=fsize,
+                                     resolution_factor=(args_ns.e0_rf or 2),
+                                     n_decoder_channels=(args_ns.e0_nchan or 48)), e0[-1], device)
+        print(f"Full (factorial rf={args_ns.e0_rf},nchan={args_ns.e0_nchan}): {e0[-1]}")
+    else:
+        full = load_ckpt(build_model(network, "full", out_classes, device, feature_size=fsize),
+                         e0[-1], device)
+        print(f"Full: {e0[-1]}")
 
-    # EffiDec3D counterpart (matched backbones only).
+    # EffiDec3D counterpart (matched backbones only, or explicit factorial side).
     effi, e1 = None, None
-    if matched:
+    if matched or e1_factorial:
         e1 = ([args_ns.e1_ckpt] if args_ns.e1_ckpt else
               sorted(glob.glob(f"{args_ns.output}/*/{EFFI_NETWORK[network]}/{args_ns.dataset}/best_metric_model.pth")))
         if e1:
-            effi = load_ckpt(build_model(network, "effi", out_classes, device, feature_size=fsize),
-                             e1[-1], device)
-            print(f"Effi: {e1[-1]}")
+            effi = load_ckpt(build_model(network, "effi", out_classes, device, feature_size=fsize,
+                                         resolution_factor=(args_ns.e1_rf or 2),
+                                         n_decoder_channels=(args_ns.e1_nchan or 48)), e1[-1], device)
+            print(f"Effi (rf={args_ns.e1_rf or 2},nchan={args_ns.e1_nchan or 48}): {e1[-1]}")
         else:
             print(f"[warn] no EffiDec3D checkpoint for {network}; falling back to single-model mode")
     analyzed = effi if effi is not None else full   # model whose error/entropy we characterize
@@ -956,6 +1084,7 @@ def main():
             print("[O9] needs a matched full+EffiDec3D pair; nothing to do"); return
         O9_opportunity(val_loader, effi, full, block_size=args_ns.o9_block_size,
                        halo=args_ns.o9_halo, primary_budget=args_ns.o9_primary_budget,
+                       foreground=args_ns.o9_foreground,
                        provenance={"network": network, "dataset": args_ns.dataset,
                                    "full_checkpoint": e0[-1], "effi_checkpoint": e1[-1]})
         print(f"\nDone. Corrected O9 figure + results.json in {OBS_DIR}")
@@ -969,12 +1098,15 @@ def main():
     O6_difficulty_evolution(val_loader, args_ns.output, args_ns.dataset, device,
                             network, role, out_classes)
     O10_organ_size(val_loader, dice_summary, organ_ent)
+    O_surface_metrics(val_loader, analyzed, out_classes)   # E4: per-organ NSD
 
     # Matched-only observations (need the full-vs-EffiDec3D transition pair).
     if effi is not None:
         bin_ent, bin_net = O5_decoder_gain(val_loader, effi, full)
+        O_boundary_flips(val_loader, effi, full)           # E3: boundary-resolved flips
         O9_opportunity(val_loader, effi, full, block_size=args_ns.o9_block_size,
                        halo=args_ns.o9_halo, primary_budget=args_ns.o9_primary_budget,
+                       foreground=args_ns.o9_foreground,
                        provenance={"network": network, "dataset": args_ns.dataset,
                                    "full_checkpoint": e0[-1], "effi_checkpoint": e1[-1]})
         O11_routing_signals(val_loader, effi, full, bin_ent, bin_net)

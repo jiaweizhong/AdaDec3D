@@ -46,13 +46,35 @@ pancreas, and right and left adrenal glands.  Images are intensity-windowed and
 resampled following the public \method{} pipeline; the same validation subjects are
 paired across all model comparisons on a given dataset.
 
-\paragraph{Matched models.}
-Within each cell the two models share an identical encoder and differ \emph{only} in
-the decoder: the full decoder versus the \method{} decoder (channels reduced to the
-minimum encoder width, additive skip aggregation, resolution factor two).  Holding
-the encoder fixed makes any prediction difference attributable to decoder capacity
-alone; consequently the study characterizes the decoder and draws no conclusions
-about the encoder.
+\paragraph{Two comparison regimes.}
+Within each cell the full and \method{} models share the same encoder
+\emph{architecture} and differ in the decoder (channels reduced to the minimum
+encoder width, additive skip aggregation, resolution factor two).  We analyze them
+under two regimes. (i)~\textbf{End-to-end (ecological).} Both models are trained
+independently, so they share the encoder architecture but not its weights; their
+flips reflect the deployed full-vs-efficient difference but conflate decoder capacity
+with encoder-weight and optimization differences. (ii)~\textbf{Frozen shared encoder
+(causal).} We take one trained encoder, freeze it, and train the decoder variants on
+\emph{identical} features, so prediction differences are attributable to the decoder
+alone. Both regimes hold the encoder architecture fixed, so the study characterizes
+the decoder and draws no conclusions about the encoder itself.
+
+\paragraph{Frozen-encoder factor decomposition.}
+\method{} removes decoder computation in two ways at once---narrower channels and a
+dropped high-resolution stage. To attribute effects, we decompose them with a $2\times2$
+factorial on the frozen encoder, all within the \method{} decoder family so only the
+two knobs vary: full (highest-resolution stage, wide channels), channel-only (wide
+$\rightarrow$ 48 channels), resolution-only (drop the high-resolution stage), and the
+combined \method{} decoder. Pairwise flips (Full$\rightarrow$channel-only,
+Full$\rightarrow$resolution-only, Full$\rightarrow$combined) isolate which factor
+changes which regions. The frozen encoder is optimized for the full decoder, so
+``efficient still matches on frozen features'' is a \emph{conservative} redundancy
+result.
+
+\paragraph{Null-pair seed control.}
+Because the net flip is tiny, we bound seed noise with a same-architecture null pair:
+two Full models trained with different (predeclared) seeds. The claim is that
+Full-vs-\method{} net flips and their concentration exceed this Full-vs-Full null.
 
 \paragraph{Implementation.}
 We reproduce the \method{} training protocol on a single NVIDIA RTX~5090 (32\,GB,
@@ -102,6 +124,10 @@ the correlated voxels---are the independent units.
   ranking the structures the decoder struggles on.
   \item \textbf{O10, size--difficulty relation.} Spearman $\rho$ between organ volume
   and difficulty, and the partial correlation of $H$ and error given $\log$-volume.
+  \item \textbf{Boundary-resolved flips.} Positive/negative/net flip rate binned by
+  Euclidean distance to the nearest GT boundary---testing whether the decoder
+  \emph{benefit} (not just error) concentrates near boundaries. Complemented by
+  Normalized Surface Dice (NSD) at 1--2 voxel tolerance for a surface-level view.
 \end{itemize}
 
 \smallskip\noindent\textit{(2) Concentration: does a small subset carry most net benefit?}

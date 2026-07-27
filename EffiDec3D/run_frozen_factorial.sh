@@ -40,7 +40,7 @@ train_corner() {   # $1=tag  $2=rf  $3=nchan
     log "corner $1: rf=$2 nchan=$3 (frozen encoder $E0)"
     python main_train_BTCV_TU.py $COMMON $TRAIN \
         --output "$OUT/FZ_$1" --network 3DUXNET_EffiDec3D \
-        --resolution_factor "$2" --n_decoder_channels "$3" \
+        --resolution_factor "$2" --n_decoder_channels "$3" --skip_aggregation concatenation \
         --freeze_encoder --encoder_ckpt "$E0" 2>&1 | tee -a "$LOG"
 }
 

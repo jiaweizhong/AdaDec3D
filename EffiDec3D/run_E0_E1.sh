@@ -54,7 +54,8 @@ run_E0() {
 run_E1() {
     log "E1 starting — 3DUXNET_EffiDec3D (auto-resumes; saves O6 milestones)"
     python main_train_BTCV_TU.py $COMMON $TRAIN_ARGS \
-        --output $OUT/E1 --network 3DUXNET_EffiDec3D \
+        --output $OUT/E1_concat --network 3DUXNET_EffiDec3D \
+        --skip_aggregation concatenation \
         --ds False 2>&1 | tee -a $LOG
     log "E1 done"
 }
@@ -62,7 +63,7 @@ run_E1() {
 # ── Observations: MAC profile + O1–O11 + patch difficulty (needs E0 + E1) ────
 run_obs() {
     E0_CKPT=$(ls $OUT/E0*/3DUXNET/BTCV13/best_metric_model.pth 2>/dev/null | head -1)
-    E1_CKPT=$(ls $OUT/E1*/3DUXNET_EffiDec3D/BTCV13/best_metric_model.pth 2>/dev/null | head -1)
+    E1_CKPT=$(ls $OUT/E1_concat*/3DUXNET_EffiDec3D/BTCV13/best_metric_model.pth 2>/dev/null | head -1)
     if [ -z "$E0_CKPT" ] || [ -z "$E1_CKPT" ]; then
         log "Observations skipped — need both E0 and E1 (E0='$E0_CKPT' E1='$E1_CKPT')"
         return

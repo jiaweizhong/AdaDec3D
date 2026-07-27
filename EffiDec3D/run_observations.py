@@ -94,7 +94,8 @@ def save_obs(tag, metrics):
 
 
 def build_model(network, role, out_classes, device, img_size=(96, 96, 96),
-                feature_size=48, resolution_factor=2, n_decoder_channels=48):
+                feature_size=48, resolution_factor=2, n_decoder_channels=48,
+                skip_aggregation="concatenation"):
     """Build Full ('full') or EffiDec3D ('effi') model for `network`.
 
     Mirrors main_train_BTCV_TU.py instantiation. MedNeXt uses kernel size 3 to
@@ -110,7 +111,7 @@ def build_model(network, role, out_classes, device, img_size=(96, 96, 96),
             m = UXNET_EffiDec3D(in_chans=ic, out_chans=out_classes, depths=[2, 2, 2, 2],
                 feat_size=[48, 96, 192, 384], n_decoder_channels=n_decoder_channels,
                 drop_path_rate=0, layer_scale_init_value=1e-6, spatial_dims=3,
-                skip_aggregation="addition", resolution_factor=resolution_factor)
+                skip_aggregation=skip_aggregation, resolution_factor=resolution_factor)
         else:
             m = UXNET(in_chans=ic, out_chans=out_classes, depths=[2, 2, 2, 2],
                 feat_size=[48, 96, 192, 384], drop_path_rate=0,
@@ -122,7 +123,7 @@ def build_model(network, role, out_classes, device, img_size=(96, 96, 96),
             m = SwinUNETR_EffiDec3D(img_size=img_size, in_channels=ic,
                 out_channels=out_classes, feature_size=feature_size,
                 n_decoder_channels=n_decoder_channels, resolution_factor=resolution_factor,
-                use_checkpoint=False, skip_aggregation="addition", use_v2=use_v2)
+                use_checkpoint=False, skip_aggregation=skip_aggregation, use_v2=use_v2)
         elif use_v2:
             from networks.swin_unetr_effidec3d import SwinUNETR as SwinFull
             m = SwinFull(img_size=img_size, in_channels=ic, out_channels=out_classes,
@@ -758,7 +759,8 @@ def O9_opportunity(val_loader, effi, full, block_size=16, halo=4, primary_budget
     })
 
 
-def O6_difficulty_evolution(val_loader, output, dataset, device, network, role, out_classes):
+def O6_difficulty_evolution(val_loader, output, dataset, device, network, role, out_classes,
+                            skip_aggregation="concatenation"):
     steps = [5000, 10000, 20000, 30000, 45000]
     folder = EFFI_NETWORK[network] if role == "effi" else FULL_NETWORK[network]
     step_ent = {}
@@ -767,7 +769,8 @@ def O6_difficulty_evolution(val_loader, output, dataset, device, network, role, 
         if not paths:
             print(f"[O6] milestone {s:05d} not found; skipping")
             continue
-        m = load_ckpt(build_model(network, role, out_classes, device), paths[-1], device)
+        m = load_ckpt(build_model(network, role, out_classes, device,
+                                  skip_aggregation=skip_aggregation), paths[-1], device)
         ents = []
         with torch.no_grad():
             for batch in val_loader:
@@ -1178,6 +1181,11 @@ def main():
     p.add_argument("--o9_primary_budget", type=int, default=20,
                    choices=[5, 10, 20, 30, 50],
                    help="Predeclared O9 block budget used for the Go/No-Go test")
+    p.add_argument("--skip_aggregation", default="concatenation",
+                   choices=["addition", "concatenation"],
+                   help="EffiDec3D decoder skip aggregation; must match how the effi "
+                        "checkpoint was TRAINED. Default 'concatenation' = the EffiDec3D "
+                        "network default / paper config; use 'addition' for legacy checkpoints.")
     args_ns = p.parse_args()
     OBS_DIR = args_ns.obs_dir
     RESULTS_FILE = os.path.join(OBS_DIR, "results.json")
@@ -1218,7 +1226,8 @@ def main():
     if e0_factorial:
         full = load_ckpt(build_model(network, "effi", out_classes, device, feature_size=fsize,
                                      resolution_factor=(args_ns.e0_rf or 2),
-                                     n_decoder_channels=(args_ns.e0_nchan or 48)), e0[-1], device)
+                                     n_decoder_channels=(args_ns.e0_nchan or 48),
+                                     skip_aggregation=args_ns.skip_aggregation), e0[-1], device)
         print(f"Full (factorial rf={args_ns.e0_rf},nchan={args_ns.e0_nchan}): {e0[-1]}")
     else:
         full = load_ckpt(build_model(network, "full", out_classes, device, feature_size=fsize),
@@ -1233,7 +1242,8 @@ def main():
         if e1:
             effi = load_ckpt(build_model(network, "effi", out_classes, device, feature_size=fsize,
                                          resolution_factor=(args_ns.e1_rf or 2),
-                                         n_decoder_channels=(args_ns.e1_nchan or 48)), e1[-1], device)
+                                         n_decoder_channels=(args_ns.e1_nchan or 48),
+                                         skip_aggregation=args_ns.skip_aggregation), e1[-1], device)
             print(f"Effi (rf={args_ns.e1_rf or 2},nchan={args_ns.e1_nchan or 48}): {e1[-1]}")
         else:
             print(f"[warn] no EffiDec3D checkpoint for {network}; falling back to single-model mode")
@@ -1257,7 +1267,7 @@ def main():
     O3_unc_error_corr(val_loader, analyzed, full=(full if effi is not None else None))
     dice_summary, organ_ent = O4_per_organ(val_loader, analyzed, post_pred, post_lbl)
     O6_difficulty_evolution(val_loader, args_ns.output, args_ns.dataset, device,
-                            network, role, out_classes)
+                            network, role, out_classes, skip_aggregation=args_ns.skip_aggregation)
     O10_organ_size(val_loader, dice_summary, organ_ent)
     O_surface_metrics(val_loader, analyzed, out_classes)   # E4: per-organ NSD
 

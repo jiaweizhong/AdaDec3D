@@ -47,6 +47,10 @@ def main():
     p.add_argument("--slice", type=int, default=None,
                    help="slice index; default = the slice with the most flips")
     p.add_argument("--out", default="/root/obs/figure1_motivation.png")
+    p.add_argument("--skip_aggregation", default="concatenation",
+                   choices=["addition", "concatenation"],
+                   help="EffiDec3D skip aggregation; must match how --e1_ckpt was trained "
+                        "(ignored for MedNeXt, which has no such knob)")
     args = p.parse_args()
     set_determinism(seed=0)
     device = torch.device("cuda:0")
@@ -63,7 +67,8 @@ def main():
 
     full = load_ckpt(build_model(args.network, "full", out_classes, device, feature_size=fsize),
                      args.e0_ckpt, device)
-    effi = load_ckpt(build_model(args.network, "effi", out_classes, device, feature_size=fsize),
+    effi = load_ckpt(build_model(args.network, "effi", out_classes, device, feature_size=fsize,
+                                 skip_aggregation=args.skip_aggregation),
                      args.e1_ckpt, device)
 
     batch = next(b for i, b in enumerate(loader) if i == args.case_idx)

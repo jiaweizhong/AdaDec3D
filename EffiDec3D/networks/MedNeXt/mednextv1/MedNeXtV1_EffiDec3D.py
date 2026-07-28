@@ -383,10 +383,13 @@ class MedNeXt_EffiDec3D(nn.Module):
             dec_x = x_res_1 + x_up_1 
             x = self.iterative_checkpoint(self.dec_block_1, dec_x)
             del x_res_1, x_up_1
-            if self.do_ds or mode =='test':
-                x_ds_1 = checkpoint.checkpoint(self.out_1, x, self.dummy_tensor)
+            # Efficient output head = out_1; the out_0 high-res stage is the removed
+            # decoder computation. Always compute out_1 and return it for BOTH test and
+            # non-deep-supervision training, so the head we deploy is the head we train
+            # (otherwise out_1 gets no gradient and val Dice collapses to ~0).
+            x_ds_1 = checkpoint.checkpoint(self.out_1, x, self.dummy_tensor)
             #Newly added start
-            if mode == 'test':
+            if mode == 'test' or not self.do_ds:
                 #print('returning early')
                 return [x_ds_1]
             x_up_0 = checkpoint.checkpoint(self.up_0, x, self.dummy_tensor)
@@ -436,10 +439,9 @@ class MedNeXt_EffiDec3D(nn.Module):
             dec_x = x_res_1 + x_up_1 
             x = self.dec_block_1(dec_x)
             del x_res_1, x_up_1
-            if self.do_ds or mode =='test':
-                x_ds_1 = self.out_1(x)
+            x_ds_1 = self.out_1(x)
             #newly added start
-            if mode == 'test':
+            if mode == 'test' or not self.do_ds:
                 return [x_ds_1]
             x_up_0 = self.up_0(x)
             dec_x = x_res_0 + x_up_0 

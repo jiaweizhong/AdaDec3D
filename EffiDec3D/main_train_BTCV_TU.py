@@ -144,8 +144,11 @@ if args.n_decoder_channels == 'None':
     args.n_decoder_channels = None
 else:
     args.n_decoder_channels = int(args.n_decoder_channels)
-if args.ds == 'True':
-    args.ds = True
+if isinstance(args.ds, str):
+    # '--ds False' arrives as the string 'False', which is TRUTHY. Parse to a real
+    # bool so deep_supervision is actually disabled for the EffiDec3D pair (otherwise
+    # MedNeXt-Effi builds with DS on -> list output -> validation Dice collapses to ~0).
+    args.ds = (args.ds == 'True')
     
 ## Load Networks
 device = torch.device("cuda:0")

@@ -85,6 +85,39 @@ python verify_env.py
 
 ---
 
+## Part 0b: Errata — bugs fixed in the inherited EffiDec3D code
+
+Full details, before/after diffs, and per-item scope are in
+[EffiDec3D/MODIFICATIONS.md](EffiDec3D/MODIFICATIONS.md). Two of these were **latent
+defects in the inherited code** (not introduced by our additions) that corrupted results
+and must be understood before trusting any MedNeXt-Effi number.
+
+| ID | Where | Defect | Effect | Cells affected |
+|----|-------|--------|--------|----------------|
+| **BF1** | `main_train_BTCV_TU.py` `--ds` parse | `--ds False` arrived as the string `'False'` (truthy), so deep supervision was silently turned **ON** | fed BF2 | MedNeXt-Effi only |
+| **BF2** | `MedNeXtV1_EffiDec3D.py` `forward` | Efficient model **trained** `out_0` (full-res, removed stage) but **deployed** `out_1` (half-res head) → the deployed head got no gradient | train loss ~0.5 but **val Dice ~0.02**; after BF1 fix, `UnboundLocalError` crash | MedNeXt-Effi only |
+
+**Root cause of the pairing:** MedNeXt-Effi is the *only* cell that both takes a
+`deep_supervision` argument (exposed to BF1) **and** has the dual-head train/test split
+(BF2). The two defects stacked only there.
+
+**Scope / honesty for the paper:**
+- **3D UX-Net and SwinUNETR Effi were provably unaffected** — their network classes take
+  no `deep_supervision` argument and have a single, consistent output head. Their reported
+  numbers (UX-Net Effi .770/.775, Swin Effi .779) stand.
+- **All pre-fix MedNeXt-Effi numbers (~0.02 Dice) are invalid** and must not appear in any
+  table or figure; they are replaced by the post-fix run (first-validation Dice ~0.19,
+  climbing toward ~0.80; full MedNeXt is .837).
+- The fix is the intended EffiDec3D behavior: the efficient decoder outputs `out_1` for
+  both training and inference and skips the removed `out_0` stage (this also sped training
+  from ~1.4 to ~2.5 it/s).
+
+**Known non-issues** (not bugs — do not "fix"): `O11.MC Dropout = NaN` (dropout inactive
+for dropout-free backbones; flagged `"warn": "dropout_inactive"`; only Entropy/Confidence
+are used) and the MONAI non-tuple-indexing `UserWarning`s on PyTorch 2.6.
+
+---
+
 ## Part 1: Dataset Setup
 
 ### 1.0 Kaggle API Setup (one-time on AutoDL)
@@ -1081,6 +1114,26 @@ direction holds (subj-r CI-lower `> 0`) and the O1/O2/O10 concentration pattern
 recurs → the decoder-benefit concentration is a property of the EffiDec3D backbone
 family, not an artifact of 3D UX-Net.
 
+**Result — O8 PASS on three matched backbones (BTCV13, 2026-07-28).** The direction
+holds on all three, spanning a real quality range (.79 → .84 full Dice):
+
+| Metric | 3D UX-Net | SwinUNETR | MedNeXt-M-K3 |
+|---|---|---|---|
+| Full → Effi Dice | .7918 → .7700 (−2.18) | .8048 → .7788 (−2.60) | .8374 → .8147 (−2.27) |
+| GMac (× reduction) | 579 → 41 (14.1×) | 308 → 47 (6.5×) | 231 → 107 (2.2×) |
+| O1 boundary/interior err | 3.93× | 3.67× | 4.67× |
+| O3 flip AUROC | .919 | .909 | .931 |
+| O5 subject net-flip (CI>0) | ~.0006 | .00056 | .00085 [.00025, .00153] |
+| O_boundary net-flip peak | 1–2 vox | 1–2 vox | 1–2 vox |
+| O_anatomy size↔net ρ | −.29 | −.14 | −.30 |
+
+The Full−Effi Dice cost is tightly consistent (−2.2 / −2.6 / −2.3%) even though the
+achievable compute reduction varies widely (14.1× vs 2.2×) — MedNeXt is encoder-heavy,
+so its decoder is a smaller share, yet the redundancy finding *still* holds. This is the
+"consistent, **not** universal" architecture-axis evidence. **Caveat:** the MedNeXt-Effi
+cell was only valid after fixing two inherited-code bugs (Part 0b Errata); all pre-fix
+MedNeXt-Effi numbers (~0.02 Dice) are void.
+
 ---
 
 ### O9 — Selective-Allocation Opportunity *(headline result for Paper A)*
@@ -1574,11 +1627,19 @@ Week 4: Observations — preliminary gate (run_observations.py)   ✓ DIRECTION 
 
 Week 5-6: Generalization matrix (run_observations.py --network/--dataset)
   [x] O6: difficulty evolution
-  [ ] Architecture axis — matched pairs: retrain E0/E1 for SwinUNETR (opt. SwinV2/MedNeXt), rerun O1-O11
-  [ ] Dataset axis — freeze 3-4 tasks (BTCV, FeTA, MSD01 BrainTumour, MSD06/08),
+  [x] Architecture axis — matched pairs COMPLETE (3 backbones, BTCV13, 2026-07-28):
+        3D UX-Net (anchor)  E0 .7918 → E1 .7700 (−2.18), 579→41 GMac (14.1×), 40.6→7.5 ms
+        SwinUNETR           E0 .8048 → E1 .7788 (−2.60), 308→47 GMac (6.5×),  37.0→16.2 ms
+        MedNeXt-M-K3        E0 .8374 → E1 .8147 (−2.27), 231→107 GMac (2.2×), 40.9→18.7 ms
+        NB: MedNeXt-Effi required two inherited-code bug fixes (BF1 --ds parse, BF2
+            train/deploy head) before it was valid — see Part 0b Errata + EffiDec3D/MODIFICATIONS.md
+  [ ] Dataset axis — freeze 2-3 more tasks (FeTA, MSD-Task08 HepaticVessel),
       rerun matched UX-Net O1-O11 per dataset; aggregate CI-lower across CT+MRI+lesion
-  [ ] O7: cross-dataset consistency = aggregate over dataset axis (Go: ≥3 datasets)
-  [ ] O8: architecture-family consistency = aggregate over architecture axis
+  [ ] O7: cross-dataset consistency = aggregate over dataset axis (Go: ≥3 datasets)  — STILL PENDING
+  [x] O8: architecture-family consistency PASS (2026-07-28) — direction holds on all 3 backbones:
+        Full−Effi Dice −2.2 / −2.6 / −2.3%;  O1 boundary/interior 3.93 / 3.67 / 4.67×;
+        O3 flip AUROC .919 / .909 / .931;  O5 subject net-flip CI>0 (.0006 / .0006 / .00085);
+        O_boundary net peaks at 1–2 vox (not at the boundary);  O_anatomy size↔net ρ −.29 / −.14 / −.30
   [x] O10: organ size vs difficulty
   [~] O11: entropy and confidence complete; MC dropout invalid/inactive
   [x] Corrected O9 contiguous-region opportunity curve (net/paired/halo) — PASS
@@ -1588,8 +1649,13 @@ Week 5-6: Generalization matrix (run_observations.py --network/--dataset)
   [ ] Patch-level whole-model adaptivity study (extend efficiency beyond decoder's 42%)
 
 Week 7: Paper A draft
-  [~] Paper A manuscript first draft written (wacv-2027/, 7 pp, compiles clean;
-       full O1-O11 on 3D UX-Net/BTCV) — \todo markers remain for the pending
-       SwinUNETR + FeTA/MSD generality cells
+  [~] Paper A manuscript first draft (wacv-2027/, 7 pp, compiles clean).
+       Architecture axis (3D UX-Net + SwinUNETR + MedNeXt-M-K3 on BTCV13) COMPLETE —
+       tab:arch + the O8 Mechanism/consistency paragraph are fillable now (numbers above).
+       Remaining \todo cells: DATASET axis (FeTA + MSD-Task08 HepaticVessel) for O7,
+       and the mechanism runs (frozen-encoder factorial, null-pair seed control).
+  [ ] UX-Net/BTCV concatenation validation (skip_aggregation=concatenation) — running:
+       tests whether part of the −2.2% Full−Effi gap is the addition-vs-concatenation config
+       (expect params 2.955→~3.15 M; Dice .770→~.79). Does NOT change the O8 direction.
   [ ] Target venue: WACV 2027 E&D Track (primary; deadline 2026-08-28) — see Paper-Narrative §9
 ```

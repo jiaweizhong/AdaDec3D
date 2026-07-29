@@ -11,6 +11,8 @@ mean Dice of our runs against the published \method{} value; $\Delta$ is our
 affine metadata, so this is a controlled reimplementation, not an exact
 reproduction.}
 \label{tab:baseline}
+\setlength{\tabcolsep}{4pt}
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{lcccc}
 \toprule
 Dataset & \fullmodel{} & \effimodel{} & pub.\ \effimodel{} & $\Delta$ \\
@@ -19,7 +21,7 @@ BTCV (CT, 13-organ) & .792 & .773 & .793 & $-.020$ \\
 FeTA (MRI) & -- & -- & -- & -- \\
 HepaticVessel (CT) & -- & -- & -- & -- \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \todo{Fill FeTA/HepaticVessel rows as the dataset-axis cells complete.}
 \end{table}
 
@@ -35,6 +37,11 @@ The same pattern holds on the architecture axis (Table~\ref{tab:arch}): on BTCV,
 Swin UNETR reproduces its published full model ($0.805$ vs.\ $0.8013$) and its
 \method{} decoder cuts MACs $6.5\times$ at a $2.6$-point Dice cost---a smaller
 reduction than 3D UX-Net's, matching \method{}'s own per-backbone figures.
+MedNeXt-M-K3, the strongest backbone at $0.837$ full Dice, shows the same $2.3$-point
+cost at a $2.2\times$ MAC reduction; across all three backbones the Dice cost is
+tightly consistent ($-2.2$/$-2.6$/$-2.3\%$) even as the achievable MAC reduction
+ranges from $2.2\times$ to $14.1\times$---consistent across architectures, not
+universal in magnitude.
 Treating these matched models as fixed, the rest of the paper characterizes
 \emph{where} the full decoder's extra computation changes predictions---the question
 \method{}'s aggregate evaluation leaves open.
@@ -43,17 +50,19 @@ Treating these matched models as fixed, the rest of the paper characterizes
 \centering
 \caption{Architecture axis (BTCV): reproduction and efficiency of the matched
 full/\method{} pair per backbone. Dice is Full$\rightarrow$\method{}; reductions are
-Full$/$\method{}. MedNeXt pending.}
+Full$/$\method{}.}
 \label{tab:arch}
+\setlength{\tabcolsep}{4pt}
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{lcccc}
 \toprule
 Backbone & Dice (F$\rightarrow$E) & MAC$\downarrow$ & Param$\downarrow$ & Lat$\downarrow$ \\
 \midrule
 3D UX-Net    & .792$\rightarrow$.773 & $14.1\times$ & $17.9\times$ & $5.4\times$ \\
 Swin UNETR   & .805$\rightarrow$.779 & $6.5\times$  & $5.7\times$  & $2.3\times$ \\
-MedNeXt-M-K3 & -- & -- & -- & -- \\
+MedNeXt-M-K3 & .837$\rightarrow$.815 & $2.2\times$ & $3.0\times$ & $2.2\times$ \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
 
 \subsection{Heterogeneity Metrics}
@@ -72,6 +81,7 @@ decoder's benefit roughly twofold.
 evaluated voxels). Positive/negative flips are the discordant cells of the paired
 comparison~\cite{yan2021pct,mcnemar1947}.}
 \label{tab:flips}
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{lrr}
 \toprule
 Metric & seed 0 & seed 1\\
@@ -79,9 +89,9 @@ Metric & seed 0 & seed 1\\
 Positive flip rate $R_{\mathrm{pos}}$ & .00339 & .00290\\
 Negative flip rate $R_{\mathrm{neg}}$ & .00209 & .00225\\
 Net flip rate $R_{\mathrm{net}}$ & .00130 & .00065\\
-Net flip rate, subject 95\% CI & \todo{re-run} & \todo{re-run}\\
+Net flip rate, subject 95\% CI & -- & $[.00017,.00113]$\\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
 
 \begin{figure}[t]
@@ -94,16 +104,19 @@ uneven across anatomy.}
 
 This small net benefit is far from uniformly distributed.  Error concentrates at
 structure boundaries: mean boundary error is $0.1892$ versus $0.0481$ in the eroded
-interior, a $3.93\times$ ratio \todo{add subject 95\% CI from re-run}.  It is also
+interior, a $3.93\times$ pooled ratio (subject-mean $8.9\times$, $95\%$ CI $[5.8,12.1]$).  It is also
 organ-dependent (Fig.~\ref{fig:organ}), with the adrenal glands, pancreas, and
 veins hardest, and it scales with structure size: the organ-size/difficulty
 Spearman correlation is $\rho=-0.54$, and entropy still explains organ difficulty
 after controlling for log volume (partial $r=0.81$).  Decoder benefit is therefore
 heterogeneous across region, organ, and scale.  Crucially, resolving flips by
 distance to the GT boundary shows the \emph{net flip} rate itself---not just
-error---rises toward the boundary \todo{per-bin net flips + NSD from re-run}, and
-this effect exceeds a same-architecture null pair (Full seed~0 vs.\ seed~1)
-\todo{null-pair floor}, ruling out seed noise.
+error---peaks in the boundary \emph{zone} rather than exactly at the surface: it is
+near zero at $0$--$1$ vox ($-0.0006$), rises to its maximum of $0.034$ at $1$--$2$
+vox, and decays to $0.006$--$0.008$ beyond $4$ vox; surface Dice (NSD) is
+$0.745$/$0.842$ at $\tau{=}1$/$2$~mm.  This concentration should exceed a
+same-architecture null pair (Full seed~0 vs.\ seed~1) \todo{null-pair floor},
+ruling out seed noise.
 
 \subsection{Concentration Metrics}
 \label{sec:concentration}
@@ -145,11 +158,13 @@ every budget $\geq 10\%$; the left panel is a non-deployable voxel oracle.}
 
 Concentration is only actionable if the beneficial regions can be found without the
 ground truth.  We assess this as an error-discrimination problem: predictive entropy
-should separate flip voxels from the rest~\cite{hendrycks2017baseline}.  Per-subject
-AUROC and AUPRC of entropy predicting error, together with confidence calibration
-(ECE)~\cite{guo2017calibration}, are reported with a subject bootstrap
-\todo{fill AUROC/AUPRC/ECE + CI from re-run; the pooled-bin entropy--error
-correlation $r=0.97$ is retained only as a descriptive diagnostic}.
+should separate flip voxels from the rest~\cite{hendrycks2017baseline}.
+Efficient-decoder entropy predicts the \emph{positive-flip} voxel with per-subject
+AUROC $0.919$ ($95\%$ CI $[0.898,0.936]$) and AUPRC $0.312$ ($[0.269,0.356]$);
+predicting the error voxel---a cheaper baseline---gives AUROC $0.892$
+($[0.863,0.914]$) and AUPRC $0.578$ ($[0.545,0.613]$), and entropy is moderately
+calibrated (ECE $0.097$, $[0.074,0.124]$)~\cite{guo2017calibration}.  The pooled-bin
+entropy--error correlation $r=0.97$ is retained only as a descriptive diagnostic.
 
 We then convert this into a deployable, selective-prediction analysis
 \cite{geifman2017selective}.  Non-overlapping $16^3$ blocks are ranked by mean
@@ -164,9 +179,10 @@ positive flips but also $77.5\%$ of the negative ones, so the \emph{net} gain, n
 positive recovery, is the honest headline.
 
 Finally, we compare cheap routing signals against held-out net flips per subject.
-Entropy and confidence are statistically indistinguishable
-\todo{fill subject-level correlations + paired CI from re-run; pooled values are
-$0.655$ and $0.663$}, and Monte-Carlo dropout is invalid for this checkpoint because
+Entropy and confidence track net flips almost identically---subject-level
+correlations $0.646$ ($[0.158,0.994]$) and $0.651$ ($[0.153,0.997]$), a paired
+difference of at most $0.01$ ($[-0.009,-0.002]$)---so they are interchangeable for
+routing, and Monte-Carlo dropout is invalid for this checkpoint because
 the architecture has no active dropout (its stochastic variance is effectively
 zero).  We therefore retain confidence as a required baseline and do not claim
 entropy is uniquely optimal.

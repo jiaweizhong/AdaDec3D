@@ -431,24 +431,28 @@ elif args.network == 'TransBTS':
 
 print('Chosen Network Architecture: {}'.format(args.network))
 
-# Frozen shared-encoder control: load encoder weights from --encoder_ckpt and freeze
-# them so only the decoder is trained. Encoder submodules are name-prefixed uxnet_3d/
-# encoder (3D UX-Net & EffiDec3D) or swinViT/encoder (Swin). Analysis runs in eval
-# mode, so the frozen features are deterministic (DropPath off) despite train-time.
-_ENCODER_PREFIXES = ('uxnet_3d', 'encoder', 'swinViT')
+# Frozen shared-encoder control: load the shared BACKBONE weights from --encoder_ckpt
+# and freeze them so only the decoder path is trained. The true shared encoder is the
+# ConvNeXt backbone (uxnet_3d) / Swin backbone (swinViT). The UnetrBasicBlock skip
+# adapters (encoderN) are decoder-config-dependent -- their channel dims change with
+# n_decoder_channels -- so they CANNOT be shared from a full-decoder checkpoint and
+# train fresh per corner. Analysis runs in eval mode, so features are deterministic.
+_ENCODER_PREFIXES = ('uxnet_3d', 'swinViT')
 if args.freeze_encoder:
     assert args.encoder_ckpt, '--freeze_encoder requires --encoder_ckpt'
     _enc_sd = torch.load(args.encoder_ckpt, map_location='cpu')
     _enc_sd = _enc_sd.get('model_state_dict', _enc_sd) if isinstance(_enc_sd, dict) else _enc_sd
-    _enc_sd = {k: v for k, v in _enc_sd.items() if k.startswith(_ENCODER_PREFIXES)}
-    model.load_state_dict(_enc_sd, strict=False)   # decoder keys intentionally absent
+    _model_sd = model.state_dict()
+    _enc_sd = {k: v for k, v in _enc_sd.items()
+               if k.startswith(_ENCODER_PREFIXES) and k in _model_sd and _model_sd[k].shape == v.shape}
+    model.load_state_dict(_enc_sd, strict=False)   # decoder + adapter keys intentionally absent
     _n_frozen = 0
     for _name, _p in model.named_parameters():
         if _name.startswith(_ENCODER_PREFIXES):
             _p.requires_grad = False
             _n_frozen += 1
-    print(f'[freeze_encoder] loaded {len(_enc_sd)} encoder tensors from {args.encoder_ckpt}; '
-          f'froze {_n_frozen} encoder params; training decoder only')
+    print(f'[freeze_encoder] loaded {len(_enc_sd)} backbone tensors from {args.encoder_ckpt}; '
+          f'froze {_n_frozen} backbone params; training decoder path only')
 
 # Repo networks (UXNET, EffiDec3D variants) take a `mode` kwarg via **kwargs; MONAI
 # nets (SwinUNETR, UNETR, ...) do not. Detect once so the train loop calls correctly.

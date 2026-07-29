@@ -39,10 +39,9 @@ Swin UNETR reproduces its published full model ($0.805$ vs.\ $0.8013$) and its
 \method{} decoder cuts MACs $6.5\times$ at a $2.6$-point Dice cost---a smaller
 reduction than 3D UX-Net's, matching \method{}'s own per-backbone figures.
 MedNeXt-M-K3, the strongest backbone at $0.837$ full Dice, shows a $2.3$-point cost at
-a $2.2\times$ MAC reduction; across the three backbones the Dice cost is small and of
-the same order ($1.5$--$2.6\%$) even as the achievable MAC reduction ranges from
-$2.2\times$ to $11.7\times$---consistent across architectures, not universal in
-magnitude.
+a $2.2\times$ MAC reduction; across the three backbones the Dice cost is small
+($1.0$--$2.3\%$) even as the achievable MAC reduction ranges from $2.2\times$ to
+$11.7\times$---consistent across architectures, not universal in magnitude.
 Treating these matched models as fixed, the rest of the paper characterizes
 \emph{where} the full decoder's extra computation changes predictions---the question
 \method{}'s aggregate evaluation leaves open.
@@ -60,7 +59,7 @@ Full$/$\method{}.}
 Backbone & Dice (F$\rightarrow$E) & MAC$\downarrow$ & Param$\downarrow$ & Lat$\downarrow$ \\
 \midrule
 3D UX-Net    & .792$\rightarrow$.777 & $11.7\times$ & $16.8\times$ & $5.1\times$ \\
-Swin UNETR   & .805$\rightarrow$.779 & $6.5\times$  & $5.7\times$  & $2.3\times$ \\
+Swin UNETR   & .805$\rightarrow$.795 & $5.5\times$  & $5.5\times$  & $2.2\times$ \\
 MedNeXt-M-K3 & .837$\rightarrow$.815 & $2.2\times$ & $3.0\times$ & $2.2\times$ \\
 \bottomrule
 \end{tabular}}
@@ -69,14 +68,17 @@ MedNeXt-M-K3 & .837$\rightarrow$.815 & $2.2\times$ & $3.0\times$ & $2.2\times$ \
 \subsection{Heterogeneity Metrics}
 \label{sec:heterogeneity}
 
-The full decoder's benefit is small and \emph{bidirectional}:
-\fullmodel{} corrects $0.278\%$ of \effimodel{}'s voxels ($R_{\mathrm{pos}}$) while
-degrading $0.232\%$ ($R_{\mathrm{neg}}$), so the net flip rate $R_{\mathrm{net}}$ is
-only $0.047\%$ of voxels---and its subject-level $95\%$ CI, $[-0.026\%, +0.112\%]$,
-\emph{includes zero} (Table~\ref{tab:flips}).  With the parameter-matched
-\effimodel{}, the full decoder's net benefit is thus not even significantly positive:
-reporting positive flips alone would overstate a benefit that, netted against
-regressions, is statistically indistinguishable from none.
+With the parameter-matched \effimodel{}, the full decoder's benefit is small and
+\emph{bidirectional to the point of cancellation}.  On 3D UX-Net, \fullmodel{} corrects
+$0.278\%$ of \effimodel{}'s voxels ($R_{\mathrm{pos}}$) while degrading $0.232\%$
+($R_{\mathrm{neg}}$), so the net flip rate $R_{\mathrm{net}}$ is only $0.047\%$ and its
+subject-level $95\%$ CI $[-0.026\%, +0.112\%]$ \emph{includes zero}
+(Table~\ref{tab:flips}); on Swin UNETR the two rates are equal ($0.201\%$ each) and
+$R_{\mathrm{net}}$ is $-0.001\%$.  Across both matched backbones the full decoder's net
+benefit is thus \emph{statistically indistinguishable from zero}---evidence that its
+high-resolution, wide-channel computation is genuinely redundant, not merely reducible.
+Reporting positive flips alone would overstate a benefit that, netted against its own
+regressions, is essentially none.
 
 \begin{table}[t]
 \centering
@@ -146,15 +148,18 @@ all positive flips.
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.98\columnwidth]{figures/O9_opportunity_corrected.png}
-\caption{Region-level opportunity (seed 1). Contiguous $16^3$ blocks ranked by
-entropy recover far more \emph{net} flip utility than a matched-random selector at
-every budget $\geq 10\%$; the left panel is a non-deployable voxel oracle.}
+\caption{Region-level opportunity (3D UX-Net, concat). Entropy-ranked $16^3$ blocks
+exceed a matched-random selector only in the mean and only at small budgets; under a
+paired bootstrap the advantage is not significant at $\geq 10\%$ (and is negative for
+Swin), because the net benefit itself is $\approx\!0$. Left panel is a non-deployable
+voxel oracle.}
 \label{fig:opportunity}
 \end{figure}
 
-Concentration is only actionable if the beneficial regions can be found without the
-ground truth.  We assess this as an error-discrimination problem: predictive entropy
-should separate flip voxels from the rest~\cite{hendrycks2017baseline}.
+The scarce flips that do occur, though net-neutral, are not random---they can be
+located from the efficient model's own uncertainty.  We assess this as an
+error-discrimination problem: predictive entropy should separate flip voxels from the
+rest~\cite{hendrycks2017baseline}.
 Efficient-decoder entropy predicts the \emph{positive-flip} voxel with per-subject
 AUROC $0.903$ ($95\%$ CI $[0.876,0.926]$) and AUPRC $0.299$ ($[0.259,0.342]$);
 predicting the error voxel---a cheaper baseline---gives AUROC $0.856$
@@ -166,14 +171,15 @@ We then convert this into a deployable, selective-prediction analysis
 \cite{geifman2017selective}.  Non-overlapping $16^3$ blocks are ranked by mean
 entropy and expanded by a $4$-voxel halo; we measure net flip utility recovered
 against a matched-random selector under a paired subject bootstrap
-(Fig.~\ref{fig:opportunity}).  At the predeclared $20\%$ block budget---executing
-$29.1\%$ of the foreground-union volume after halo expansion---entropy-ranked regions
-attain a net utility of $0.161$ versus $0.035$ for random ($\sim\!4.6\times$ in the
-mean), but under a paired subject bootstrap this advantage is significant only at the
-smallest $5\%$ budget (lower bound $0.004$); at every budget $\geq 10\%$ the paired CI
-includes zero.  With the parameter-matched decoder the deployable region-level
-opportunity is thus real in the mean but marginal in significance---consistent with a
-net benefit that is itself barely above zero.
+(Fig.~\ref{fig:opportunity}).  Because the net benefit is itself $\approx\!0$, this
+recovery is correspondingly weak.  On 3D UX-Net, at the predeclared $20\%$ block budget
+entropy-ranked regions attain a net utility of $0.161$ versus $0.035$ for random in the
+mean, but the paired subject bootstrap is significant only at the smallest $5\%$ budget;
+at every budget $\geq 10\%$ its CI includes zero.  On Swin UNETR the paired lower bound
+is negative at \emph{every} budget.  We therefore report a \emph{negative} result at
+the matched configuration: entropy localizes where the scarce flips occur, but there is
+no reliable net benefit to selectively recover, because there is essentially no net
+benefit at all.
 
 Finally, entropy and confidence are interchangeable routing signals (subject
 correlations $0.639$ vs.\ $0.648$, paired difference $\leq 0.02$); Monte-Carlo

@@ -10,15 +10,15 @@ removable, \emph{where} the decoder still matters, or whether those regions can 
 identified at test time. We present a systematic characterization of decoder
 redundancy along three axes---\emph{heterogeneity}, \emph{concentration}, and
 \emph{predictability}---by counting per-voxel prediction \emph{flips} between matched
-full and efficient decoders, with a frozen shared-encoder control that attributes the
-changes to the decoder alone and a channel/resolution factor decomposition that
-separates the two sources of redundancy. We find the full decoder's net benefit is
-small and bidirectional (about $0.1\%$ of voxels), spatially concentrated at organ
-boundaries and small structures, and identifiable from the efficient model's own
-uncertainty---entropy-ranked regions recover its net benefit at roughly five times
-the matched-random rate at a fixed budget. These trends are consistent across three
-architectures and three datasets,
-indicating that decoder redundancy is structured and predictable rather than uniform.
+full and efficient decoders, with a frozen-backbone control and a channel/resolution
+factor decomposition that isolate the decoder path. We find the full decoder's net
+benefit is small and \emph{bidirectional to the point of cancellation}: at the
+parameter-matched configuration the net flip rate is statistically indistinguishable
+from zero across matched backbones (e.g.\ $-0.001\%$ on SwinUNETR). The flips that do
+occur are boundary-localized and predictable from the efficient model's own entropy,
+but they are net-neutral, so entropy-ranked region selection recovers no reliable net
+benefit. These trends are consistent across architectures, indicating that the removed
+decoder computation is genuinely redundant rather than merely reducible.
 Our analysis provides an evaluation protocol and design guidance for more efficient,
 region-adaptive segmentation decoders.
 \end{abstract}

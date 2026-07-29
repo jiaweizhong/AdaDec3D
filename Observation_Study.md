@@ -632,36 +632,37 @@ Save all figures to `/root/obs/`.
 
 **Coverage of the three contributions:** C1 = {O5}; C2 = {O1, O2, O4, O6, O10} (+O5); C3 = {O3, O9, O11} (+O5); generality = {O7, O8}. O5 is the hinge — it defines the flip machinery (C1), shows the effect is small/bidirectional (C2), and shows it rises with entropy (C3).
 
-**Metric priority & de-duplication (paper placement).** Not every O is equally strong;
-several overlap or are weak, so the paper ranks rather than flatly lists them. The later
-flip-resolved metrics (`O_boundary`, `O_anatomy`, `O_surface`, `O_pareto`) largely
-supersede the earlier error/difficulty ones because they measure the *net flip* (decoder
-benefit) directly rather than error.
+**Metric priority & de-duplication (updated for concat / net≈0, 2026-07-29).** The paper
+ranks metrics rather than listing all of them, and three are now **removed from code**
+(functions + calls deleted from `run_observations.py`; not produced by the re-run). The new
+benefit-specific metrics (O3-direction, O_dice_aware, O_errortype) **substitute** the
+now-dead O9-opportunity headline — they are additions in *code* but a *replacement* in the
+paper, so the reported set stays tight.
 
-- **Headline (main figures):** **O5** (net benefit small/bidirectional), **O9** (deployable
-  region opportunity, tight paired CI), **O_boundary** (net flip peaks in the 1–2 vox
-  boundary zone). These carry the three axes.
-- **Main-text supporting:** **O3** (entropy→flip AUROC, the discrimination complement to
-  O9), **O2** (entropy sparsity — the concentration premise), **O_anatomy** (per-organ net
-  benefit + size↔net), **O_surface** (NSD, backs the boundary claim).
-- **Demote to a one-line motivation:** **O1** — "error concentrates at the boundary" is
-  *superseded by O_boundary* ("benefit concentrates there"); keep O1 only as the intro
-  sentence so a reviewer can't object that error ≠ benefit.
-- **Consolidate the organ-level trio:** **O4 + O10 + O_anatomy** all say "smaller/harder
-  organs benefit more" on n=13 organs (noisy). Report **O_anatomy** (net-flip based, on
-  thesis); fold O4/O10 into one supporting sentence or the appendix — do not use three
-  organ figures.
-- **Appendix (weak / off-thesis):** **O6** (entropy falls over training — context, leans
-  Paper-B) and **O11** (routing signals — a near-null result: entropy≈confidence within
-  0.01, MC-dropout invalid at dropout=0). Present O11 only as "confidence is an equally
-  good baseline," not a finding.
-- **Caveat on O5's correlation:** the subject-level `Pearson(H,U)` CI is wide (n=12); lean
-  on **O9's** tight paired CI for the predictability claim and use O5's correlation only as
-  concentration evidence, not as strong predictability on its own.
+- **Headline (main text):** **O5** (voxel net flip ≈0), **O3 direction** (`pos_vs_neg`
+  AUROC — can entropy tell better-from-worse?), **O_dice_aware** (size-normalized per-organ
+  net + per-organ Dice Δ — resolves the net≈0-vs-Dice-gap paradox), **O_boundary** (net
+  flip vs distance-to-boundary; concat peaks at 0–1 vox). These carry the
+  "predictable-in-location, net-neutral-in-sign" thesis.
+- **Main-text supporting:** **O2** (entropy sparsity), **O_errortype** (FN/FP/misclass net
+  — which error type full fixes vs breaks), **O_anatomy** (per-organ net), **O_surface**
+  (NSD), **O3 any/positive AUROC** (location is predictable), **O9 + O_pareto** (oracle-vs-
+  entropy: does a findable opportunity exist — reported as a **negative result** at concat).
+- **One-line intro:** **O1** — "error concentrates at boundary," superseded by O_boundary.
+- **Kept (appendix, cheap):** **O4** (per-organ difficulty; still computed).
+- **DEPRECATED — not computed on the re-run:** **O6** (training-evolution curve; off-thesis
+  and needed milestones), **O10** (organ-size vs difficulty; subsumed by O_anatomy +
+  O_dice_aware), **O11** (routing signals; near-null — entropy≈confidence, MC-dropout invalid
+  at dropout=0). Each collapses to at most one appendix sentence if a reviewer asks.
+- **Not implemented (anti-duplication):** ⑤ oracle benefit map — **already in O9/O_pareto's
+  oracle curve**, so a separate metric would duplicate; ③ signed-boundary geometry —
+  **deferred**, only if O3 `pos_vs_neg` > 0.5 (i.e. direction turns out partly predictable).
+- **Caveat on O5's correlation:** subject-level `Pearson(H,U)` CI is wide (n=12); it is
+  concentration evidence, not strong predictability on its own.
 
-Net effect: ~6 non-overlapping strong metrics in the main text (O_boundary, O_anatomy,
-O2, O5, O3, O9 + O_surface), with O1 as intro and O4/O6/O10/O11 consolidated or in the
-appendix — tighter, and harder to challenge as "several metrics making the same point."
+Net: the re-run yields a tight, non-overlapping set — three benefit-specific additions in,
+O6/O10/O11 out. Headline thesis: *voxel net ≈0 (still Dice-relevant via a thin boundary
+band); flips predictable in location, not in sign.*
 
 ### Common notebook setup
 

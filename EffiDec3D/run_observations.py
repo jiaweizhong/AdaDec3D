@@ -796,229 +796,6 @@ def O9_opportunity(val_loader, effi, full, block_size=16, halo=4, primary_budget
     })
 
 
-def O6_difficulty_evolution(val_loader, output, dataset, device, network, role, out_classes,
-                            skip_aggregation="concatenation", e1_ckpt=None):
-    steps = [5000, 10000, 20000, 30000, 45000]
-    folder = EFFI_NETWORK[network] if role == "effi" else FULL_NETWORK[network]
-    # Pin milestones to the SAME directory as the canonical checkpoint; otherwise the
-    # glob can pick a different-config run (e.g. addition vs concatenation) and the
-    # milestone state_dict shapes won't match the model we build.
-    ckpt_dir = os.path.dirname(e1_ckpt) if (role == "effi" and e1_ckpt) else None
-    step_ent = {}
-    for s in steps:
-        if ckpt_dir:
-            paths = sorted(glob.glob(f"{ckpt_dir}/milestone_{s:05d}.pth"))
-        else:
-            paths = sorted(glob.glob(f"{output}/*/{folder}/{dataset}/milestone_{s:05d}.pth"))
-        if not paths:
-            print(f"[O6] milestone {s:05d} not found; skipping")
-            continue
-        m = load_ckpt(build_model(network, role, out_classes, device,
-                                  skip_aggregation=skip_aggregation), paths[-1], device)
-        ents = []
-        with torch.no_grad():
-            for batch in val_loader:
-                prob = infer(m, batch["image"].cuda()).softmax(1).cpu()
-                ents.append((-(prob * torch.log(prob + 1e-8)).sum(1)).mean().item())
-        step_ent[s] = float(np.mean(ents))
-        print(f"[O6] step {s:5d}: mean_entropy={step_ent[s]:.4f}")
-    if step_ent:
-        plt.figure(figsize=(7, 4))
-        plt.plot(list(step_ent.keys()), list(step_ent.values()), "o-")
-        plt.xlabel("Training iteration"); plt.ylabel("Mean entropy")
-        plt.title("O6: Entropy Evolution During Training")
-        plt.tight_layout(); plt.savefig(f"{OBS_DIR}/O6_entropy_evolution.png", dpi=150); plt.close()
-        save_obs("O6", {"step_mean_entropy": step_ent})
-    else:
-        print("[O6] no milestones found — skipped")
-
-
-def O10_organ_size(val_loader, dice_summary, organ_ent):
-    from scipy.stats import spearmanr
-    sizes_all = {n: [] for n in CLASS_NAMES}
-    for batch in val_loader:
-        lbl = batch["label"].cpu().squeeze()
-        for c, name in enumerate(CLASS_NAMES):
-            mask = (lbl == c + 1)
-            if mask.sum() > 0:
-                sizes_all[name].append(float(mask.float().sum()))
-    sizes, diffs, names = [], [], []
-    for name in CLASS_NAMES:
-        if sizes_all[name] and organ_ent.get(name):
-            sizes.append(float(np.mean(sizes_all[name])))
-            diffs.append(float(np.nanmean(organ_ent[name])))
-            names.append(name)
-    r_size = float(spearmanr(sizes, diffs)[0])
-    # partial correlation: residualize both entropy and dice-error on log(size)
-    log_sizes = np.log(np.array(sizes)); ent_arr = np.array(diffs)
-    r_partial = float("nan")
-    dice_err = np.array([1 - dice_summary.get(n, np.nan) for n in names])
-    valid = ~np.isnan(dice_err)
-    if valid.sum() >= 4:
-        A = np.column_stack([np.ones(int(valid.sum())), log_sizes[valid]])
-        ce, *_ = np.linalg.lstsq(A, ent_arr[valid], rcond=None)
-        cd, *_ = np.linalg.lstsq(A, dice_err[valid], rcond=None)
-        r_partial = float(pearsonr(ent_arr[valid] - A @ ce, dice_err[valid] - A @ cd)[0])
-    print(f"[O10] size~difficulty Spearman={r_size:.3f}  partial-r(ent,err|size)={r_partial:.3f}")
-    save_obs("O10", {"spearman_rho_size_vs_difficulty": r_size,
-                     "partial_r_entropy_given_size": None if np.isnan(r_partial) else r_partial,
-                     "organ_size": {n: round(s, 0) for n, s in zip(names, sizes)}})
-
-
-def O11_routing_signals(val_loader, effi, full, bin_ent=None, bin_net=None):
-    """Compare cheap routing signals against net transitions, per subject.
-
-    Each signal is binned within a subject (quantile bins); the per-subject Pearson
-    r between the signal and net transition is bootstrapped over subjects, matching
-    the subject-level protocol used in O5/O3. A paired entropy-vs-confidence
-    difference CI shows whether either signal is reliably better. MC dropout is
-    included only if the architecture has active stochasticity.
-    """
-    rng = np.random.default_rng(0)
-
-    def subj_corr(sig, net):
-        edges = np.quantile(sig.flatten().numpy(), np.linspace(0, 1, 21))
-        s_sig, s_net = [], []
-        for b in range(20):
-            mask = (sig >= float(edges[b])) & (sig < float(edges[b + 1]))
-            if mask.sum() > 100:
-                s_sig.append(sig[mask].mean().item()); s_net.append(net[mask].mean().item())
-        return float(pearsonr(s_sig, s_net)[0]) if len(s_sig) >= 5 else None
-
-    def boot_ci(vals):
-        vals = np.asarray([v for v in vals if v is not None and not np.isnan(v)], dtype=np.float64)
-        if vals.size == 0:
-            return float("nan"), [float("nan"), float("nan")]
-        b = [np.mean(rng.choice(vals, vals.size, replace=True)) for _ in range(2000)]
-        return float(vals.mean()), [float(np.percentile(b, 2.5)), float(np.percentile(b, 97.5))]
-
-    ent_r, conf_r, pair_diff = [], [], []
-    with torch.no_grad():
-        for batch in val_loader:
-            img = batch["image"].cuda(); lbl = batch["label"].squeeze(1).long().cpu().squeeze()
-            le = infer(effi, img); pe = le.softmax(1).cpu(); pred_e = le.argmax(1).cpu().squeeze()
-            pred_f = infer(full, img).argmax(1).cpu().squeeze()
-            ent = -(pe * torch.log(pe + 1e-8)).sum(1).squeeze()
-            conf = 1 - pe.max(1).values.squeeze()                 # 1-maxprob: high = uncertain
-            net = (((pred_f == lbl) & (pred_e != lbl)).float()
-                   - ((pred_f != lbl) & (pred_e == lbl)).float())
-            re = subj_corr(ent, net); rc = subj_corr(conf, net)
-            if re is not None: ent_r.append(re)
-            if rc is not None: conf_r.append(rc)
-            if re is not None and rc is not None: pair_diff.append(re - rc)
-
-    ent_m, ent_ci = boot_ci(ent_r); conf_m, conf_ci = boot_ci(conf_r)
-    if pair_diff:
-        d = np.asarray(pair_diff, dtype=np.float64)
-        db = [np.mean(rng.choice(d, d.size, replace=True)) for _ in range(2000)]
-        diff_m = float(d.mean()); diff_ci = [float(np.percentile(db, 2.5)), float(np.percentile(db, 97.5))]
-    else:
-        diff_m = float("nan"); diff_ci = [float("nan"), float("nan")]
-
-    res = {
-        "Entropy": {"subject_corr_mean": ent_m, "subject_corr_ci": ent_ci, "latency_ms": 0.0},
-        "Confidence": {"subject_corr_mean": conf_m, "subject_corr_ci": conf_ci, "latency_ms": 0.0},
-        "entropy_minus_confidence_mean": diff_m, "entropy_minus_confidence_ci": diff_ci,
-        "n_subjects": len(pair_diff),
-    }
-    if bin_ent is not None and bin_net is not None and len(bin_ent) > 2:
-        res["Entropy"]["pooled_bin_corr"] = float(pearsonr(bin_ent, bin_net)[0])
-
-    # MC Dropout (T=10): only meaningful if the architecture has active dropout.
-    effi.train(); mc_ok = True; mc_r = []
-    with torch.no_grad():
-        for i, batch in enumerate(val_loader):
-            img = batch["image"].cuda(); lbl = batch["label"].squeeze(1).long().cpu().squeeze()
-            preds = torch.stack([infer(effi, img).softmax(1).cpu() for _ in range(10)])
-            mc_var = preds.var(0).sum(1).squeeze()
-            if i == 0 and mc_var.max().item() < 1e-7:
-                print("[O11] MC Dropout variance ~0 (no active dropout) — skipping MC signal")
-                mc_ok = False; break
-            pred_e = preds.mean(0).argmax(1).cpu().squeeze()
-            pred_f = infer(full, img).argmax(1).cpu().squeeze()
-            net = (((pred_f == lbl) & (pred_e != lbl)).float()
-                   - ((pred_f != lbl) & (pred_e == lbl)).float())
-            r = subj_corr(mc_var, net)
-            if r is not None: mc_r.append(r)
-    effi.eval()
-    if mc_ok:
-        mc_m, mc_ci = boot_ci(mc_r)
-        res["MC Dropout"] = {"subject_corr_mean": mc_m, "subject_corr_ci": mc_ci, "latency_ms": None}
-    else:
-        res["MC Dropout"] = {"subject_corr_mean": float("nan"), "latency_ms": None,
-                             "warn": "dropout_inactive"}
-
-    print(f"\n[O11] {'Signal':12s} {'subj corr':>10}  {'95% CI':>18}")
-    for sig in ("Entropy", "Confidence", "MC Dropout"):
-        v = res[sig]; ci = v.get("subject_corr_ci", [float("nan"), float("nan")])
-        print(f"      {sig:12s} {v['subject_corr_mean']:10.3f}  [{ci[0]:.3f},{ci[1]:.3f}]")
-    print(f"      entropy-confidence diff={diff_m:.3f} CI[{diff_ci[0]:.3f},{diff_ci[1]:.3f}]")
-    save_obs("O11", res)
-
-
-def O_boundary_flips(val_loader, effi, full, bins=(1, 2, 4, 8)):
-    """E3: distance-to-GT-boundary resolved flips. Tests whether the decoder *benefit*
-    (net flip), not merely error, concentrates near boundaries. Bins foreground-union
-    voxels by Euclidean distance to the nearest GT foreground boundary; reports per-bin
-    positive/negative/net flip rates with a subject bootstrap CI on the net rate.
-    """
-    from scipy.ndimage import distance_transform_edt, binary_erosion
-    edges = [0.0] + list(bins) + [float("inf")]
-    nb = len(edges) - 1
-    labels = [f"{int(edges[i])}-{'inf' if np.isinf(edges[i+1]) else int(edges[i+1])}" for i in range(nb)]
-    subj_pos = [[] for _ in range(nb)]; subj_neg = [[] for _ in range(nb)]; subj_net = [[] for _ in range(nb)]
-    with torch.no_grad():
-        for batch in val_loader:
-            img = batch["image"].cuda()
-            lbl = batch["label"].squeeze(1).long().cpu().squeeze()
-            pred_f = infer(full, img).argmax(1).cpu().squeeze()
-            pred_e = infer(effi, img).argmax(1).cpu().squeeze()
-            pos = ((pred_f == lbl) & (pred_e != lbl)).numpy().astype(np.float32)
-            neg = ((pred_f != lbl) & (pred_e == lbl)).numpy().astype(np.float32)
-            fg = (lbl > 0).numpy()
-            if not fg.any():
-                continue
-            boundary = fg & ~binary_erosion(fg, iterations=1)
-            if not boundary.any():
-                continue
-            dist = distance_transform_edt(~boundary)
-            dom = fg | (pred_e.numpy() > 0) | (pred_f.numpy() > 0)
-            for i in range(nb):
-                m = dom & (dist >= edges[i]) & (dist < edges[i + 1])
-                if m.sum() > 0:
-                    subj_pos[i].append(float(pos[m].mean()))
-                    subj_neg[i].append(float(neg[m].mean()))
-                    subj_net[i].append(float(pos[m].mean() - neg[m].mean()))
-    rng = np.random.default_rng(0)
-    pos_m, neg_m, net_m, net_ci = [], [], [], []
-    for i in range(nb):
-        pos_m.append(float(np.mean(subj_pos[i])) if subj_pos[i] else float("nan"))
-        neg_m.append(float(np.mean(subj_neg[i])) if subj_neg[i] else float("nan"))
-        if subj_net[i]:
-            arr = np.asarray(subj_net[i], dtype=np.float64)
-            net_m.append(float(arr.mean()))
-            if arr.size > 1:
-                bs = [np.mean(rng.choice(arr, arr.size, replace=True)) for _ in range(2000)]
-                net_ci.append([float(np.percentile(bs, 2.5)), float(np.percentile(bs, 97.5))])
-            else:
-                net_ci.append([float("nan"), float("nan")])
-        else:
-            net_m.append(float("nan")); net_ci.append([float("nan"), float("nan")])
-    print("[O_boundary] distance-to-boundary net flip rate (near -> far):")
-    for i in range(nb):
-        print(f"      {labels[i]:>6} vox: pos={pos_m[i]:.5f} neg={neg_m[i]:.5f} net={net_m[i]:.5f}")
-    xs = np.arange(nb)
-    plt.figure(figsize=(7, 4))
-    plt.plot(xs, pos_m, "g--o", label="positive"); plt.plot(xs, neg_m, "r--o", label="negative")
-    plt.plot(xs, net_m, "b-o", label="net"); plt.axhline(0, color="k", lw=.7, ls=":")
-    plt.xticks(xs, labels); plt.xlabel("distance to GT boundary (voxels)")
-    plt.ylabel("flip rate"); plt.title("Boundary-resolved flips"); plt.legend()
-    plt.tight_layout(); plt.savefig(f"{OBS_DIR}/O_boundary_flips.png", dpi=150); plt.close()
-    save_obs("O_boundary_flips", {"bins_voxels": labels, "positive_rate": pos_m,
-                                  "negative_rate": neg_m, "net_rate": net_m, "net_ci": net_ci,
-                                  "note": "distance to nearest GT boundary; net=pos-neg per bin"})
-
-
 def O_surface_metrics(val_loader, analyzed, out_classes):
     """E4: per-organ Normalized Surface Dice (NSD) at 1- and 2-voxel tolerance (MONAI).
     A surface-level metric for the 'high-res decoder serves boundaries' claim, rather
@@ -1189,6 +966,93 @@ def O_anatomy(val_loader, effi, full):
                            "net_rate": net_m, "organ_size": size, "size_net_spearman": rho})
 
 
+def O_dice_aware(val_loader, effi, full):
+    """C2 refinement: per-organ SIZE-NORMALIZED net flips + per-organ Dice change
+    (Full - Effi). Explains how a global voxel-level net ~0 coexists with a macro Dice
+    gap --- small organs may still gain when the global net cancels. Net is restricted to
+    each organ's GT voxels and normalized by organ size: R_net,c = (P_c - N_c) / |Y_c|."""
+    names = CLASS_NAMES
+    posn = {n: [] for n in names}; negn = {n: [] for n in names}; netn = {n: [] for n in names}
+    dde = {n: [] for n in names}; ddf = {n: [] for n in names}
+
+    def _dice(a, b):
+        s = int(a.sum()) + int(b.sum())
+        return (2.0 * int((a & b).sum()) / s) if s > 0 else float("nan")
+
+    with torch.no_grad():
+        for batch in val_loader:
+            img = batch["image"].cuda()
+            lbl = batch["label"].squeeze(1).long().cpu().squeeze().numpy().reshape(-1)
+            pe = infer(effi, img).argmax(1).cpu().squeeze().numpy().reshape(-1)
+            pf = infer(full, img).argmax(1).cpu().squeeze().numpy().reshape(-1)
+            for ci, n in enumerate(names, start=1):
+                gt = (lbl == ci); size = int(gt.sum())
+                if size == 0:
+                    continue
+                p = int(((pe != lbl) & (pf == lbl) & gt).sum())    # full recovers organ ci
+                q = int(((pe == lbl) & (pf != lbl) & gt).sum())    # full loses organ ci
+                posn[n].append(p / size); negn[n].append(q / size); netn[n].append((p - q) / size)
+                dde[n].append(_dice(pe == ci, gt)); ddf[n].append(_dice(pf == ci, gt))
+
+    def _mean(d): return {n: (round(float(np.nanmean(v)), 5) if v else float("nan"))
+                          for n, v in d.items()}
+    delta = {n: (round(float(np.nanmean(ddf[n]) - np.nanmean(dde[n])), 4) if dde[n]
+                 else float("nan")) for n in names}
+    net_by_organ = _mean(netn)
+    save_obs("O_dice_aware", {
+        "size_normalized_net_per_organ": net_by_organ,
+        "positive_rate_per_organ": _mean(posn),
+        "negative_rate_per_organ": _mean(negn),
+        "dice_delta_full_minus_effi_per_organ": delta,
+        "note": "net restricted to each organ's GT voxels, normalized by organ size; "
+                "delta = Full per-organ Dice - Effi per-organ Dice",
+    })
+    print(f"[O_dice_aware] per-organ Dice delta (Full-Effi): {delta}")
+    return net_by_organ, delta
+
+
+def O_errortype(val_loader, effi, full):
+    """C2 refinement: classify each flip by (efficient pred, full pred, GT) transition.
+    Positive flips (full fixes) -> FN/FP/misclass correction; negative flips (full breaks)
+    -> their introduced counterparts. Reveals whether the full decoder systematically
+    helps some error types (e.g. recovering missed foreground) and hurts others (e.g.
+    introducing false positives)."""
+    cats = ["fn_correction", "fp_correction", "misclass_correction",
+            "fn_introduced", "fp_introduced", "misclass_introduced"]
+    tot = {c: 0 for c in cats}; subj = {c: [] for c in cats}
+    with torch.no_grad():
+        for batch in val_loader:
+            img = batch["image"].cuda()
+            lbl = batch["label"].squeeze(1).long().cpu().squeeze().numpy().reshape(-1)
+            pe = infer(effi, img).argmax(1).cpu().squeeze().numpy().reshape(-1)
+            pf = infer(full, img).argmax(1).cpu().squeeze().numpy().reshape(-1)
+            pos = (pe != lbl) & (pf == lbl)     # full fixes effi
+            neg = (pe == lbl) & (pf != lbl)     # full breaks effi
+            c = {
+                "fn_correction":       int((pos & (pe == 0) & (lbl > 0)).sum()),
+                "fp_correction":       int((pos & (pe > 0) & (lbl == 0)).sum()),
+                "misclass_correction": int((pos & (pe > 0) & (lbl > 0)).sum()),
+                "fn_introduced":       int((neg & (pf == 0) & (lbl > 0)).sum()),
+                "fp_introduced":       int((neg & (pf > 0) & (lbl == 0)).sum()),
+                "misclass_introduced": int((neg & (pf > 0) & (lbl > 0)).sum()),
+            }
+            nfg = int((lbl > 0).sum()) or 1
+            for k in cats:
+                tot[k] += c[k]; subj[k].append(c[k] / nfg)
+    net = {"fn": tot["fn_correction"] - tot["fn_introduced"],
+           "fp": tot["fp_correction"] - tot["fp_introduced"],
+           "misclass": tot["misclass_correction"] - tot["misclass_introduced"]}
+    save_obs("O_errortype", {
+        "counts": tot,
+        "rate_per_fg_voxel": {k: round(float(np.mean(subj[k])), 6) for k in cats},
+        "net_by_type": net,
+        "note": "positive=full fixes effi; negative=full breaks effi; "
+                "net_by_type>0 means full helps that error type on balance",
+    })
+    print(f"[O_errortype] net by type (full helps if >0): {net}")
+    return tot, net
+
+
 def main():
     global OBS_DIR, RESULTS_FILE, CLASS_NAMES
     p = argparse.ArgumentParser()
@@ -1309,18 +1173,16 @@ def main():
     O1_error_distribution(val_loader, analyzed)
     O2_entropy_distribution(val_loader, analyzed)
     O3_unc_error_corr(val_loader, analyzed, full=(full if effi is not None else None))
-    dice_summary, organ_ent = O4_per_organ(val_loader, analyzed, post_pred, post_lbl)
-    O6_difficulty_evolution(val_loader, args_ns.output, args_ns.dataset, device,
-                            network, role, out_classes, skip_aggregation=args_ns.skip_aggregation,
-                            e1_ckpt=(e1[-1] if e1 else None))
-    O10_organ_size(val_loader, dice_summary, organ_ent)
+    O4_per_organ(val_loader, analyzed, post_pred, post_lbl)   # appendix: per-organ difficulty
     O_surface_metrics(val_loader, analyzed, out_classes)   # E4: per-organ NSD
 
     # Matched-only observations (need the full-vs-EffiDec3D transition pair).
     if effi is not None:
-        bin_ent, bin_net = O5_decoder_gain(val_loader, effi, full)
+        O5_decoder_gain(val_loader, effi, full)
         O_boundary_flips(val_loader, effi, full)           # E3: boundary-resolved flips
         O_anatomy(val_loader, effi, full)                  # Fig 3: per-organ benefit + size
+        O_dice_aware(val_loader, effi, full)               # C2: size-normalized net + Dice delta
+        O_errortype(val_loader, effi, full)                # C2: per-error-type net (fix vs break)
         O9_opportunity(val_loader, effi, full, block_size=args_ns.o9_block_size,
                        halo=args_ns.o9_halo, primary_budget=args_ns.o9_primary_budget,
                        foreground=args_ns.o9_foreground,
@@ -1328,9 +1190,8 @@ def main():
                                    "full_checkpoint": e0[-1], "effi_checkpoint": e1[-1]})
         O_pareto(val_loader, effi, full, block_size=args_ns.o9_block_size,
                  halo=args_ns.o9_halo)                     # Fig 2: multi-signal Pareto
-        O11_routing_signals(val_loader, effi, full, bin_ent, bin_net)
     else:
-        print("[O5/O9/O11] skipped — ecological control has no EffiDec3D pair")
+        print("[O5/O9] skipped — ecological control has no EffiDec3D pair")
     print(f"\nDone. Figures + results.json in {OBS_DIR}")
 
 

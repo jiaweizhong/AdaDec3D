@@ -165,7 +165,21 @@ def build_model(network, role, out_classes, device, img_size=(96, 96, 96),
 def load_ckpt(model, path, device):
     state = torch.load(path, map_location=device)
     state = state.get("model_state_dict", state) if isinstance(state, dict) else state
-    model.load_state_dict(state)
+    # A full model trained WITH deep supervision (e.g. MedNeXt-M, --ds True) carries
+    # auxiliary heads (out_1..out_4) that the inference model (deep_supervision=False)
+    # does not have. These are training-only; keep only keys the model expects, then
+    # require every remaining key to be present so genuine mismatches still surface.
+    model_keys = set(model.state_dict().keys())
+    filtered = {k: v for k, v in state.items() if k in model_keys}
+    dropped = [k for k in state if k not in model_keys]
+    missing, _ = model.load_state_dict(filtered, strict=False)
+    if missing:
+        raise RuntimeError(
+            f"Checkpoint {path} is missing required weights for "
+            f"{type(model).__name__}: {list(missing)[:8]}")
+    if dropped:
+        print(f"[load_ckpt] dropped {len(dropped)} training-only keys "
+              f"(e.g. deep-supervision heads): {dropped[:4]}")
     model.eval()
     return model
 

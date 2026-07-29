@@ -75,10 +75,13 @@ $0.278\%$ of \effimodel{}'s voxels ($R_{\mathrm{pos}}$) while degrading $0.232\%
 subject-level $95\%$ CI $[-0.026\%, +0.112\%]$ \emph{includes zero}
 (Table~\ref{tab:flips}); on Swin UNETR the two rates are equal ($0.201\%$ each) and
 $R_{\mathrm{net}}$ is $-0.001\%$.  Across both matched backbones the full decoder's net
-benefit is thus \emph{statistically indistinguishable from zero}---evidence that its
-high-resolution, wide-channel computation is genuinely redundant, not merely reducible.
-Reporting positive flips alone would overstate a benefit that, netted against its own
-regressions, is essentially none.
+benefit is thus \emph{statistically indistinguishable from zero at the voxel level}.
+Crucially, this net neutrality coexists with the $1$--$2$ point Dice gap of
+Table~\ref{tab:arch}: the flips, though nearly balanced in count, concentrate at organ
+boundaries that Dice weights heavily, so the full decoder still moves macro metrics
+through a thin boundary band even as its net contribution to voxel correctness vanishes.
+Reporting positive flips alone would overstate a voxel-level benefit that, netted against
+its own regressions, is essentially none.
 
 \begin{table}[t]
 \centering
@@ -202,3 +205,28 @@ frozen encoder was optimized for the full decoder, a near-match by the efficient
 decoder on those features would be a \emph{conservative} statement of redundancy.  We
 present this regime as validation of the decoder attribution rather than as the
 primary result.
+
+\section{Discussion: Implications for Efficient Decoder Design}
+\label{sec:discussion}
+
+Our characterization has three implications for how efficient 3D decoders are built and
+evaluated. \textbf{First, aggregate Dice and FLOPs are insufficient summaries.} They
+hide that the full decoder's advantage over a parameter-matched efficient decoder is, at
+the voxel level, a near-perfect cancellation of improvements and regressions
+($R_{\mathrm{net}}\!\approx\!0$): a decoder can differ by $\sim\!1$--$2$ Dice points while
+providing no net voxel-level benefit. Reporting positive, negative, and net flips exposes
+this and should accompany Dice/FLOPs whenever a decoder is simplified.
+\textbf{Second, the redundancy is spatially structured, not diffuse.} The flips that
+remain concentrate within one to two voxels of organ boundaries and on small structures,
+and are predictable from the efficient model's own entropy (AUROC $\approx\!0.9$); efficient
+decoders can thus be designed and audited around a small, identifiable boundary band rather
+than the whole volume. \textbf{Third, the redundancy is a property of the decoder, not a
+single backbone.} Across 3D UX-Net, SwinUNETR, and MedNeXt the same pattern holds---small
+Dice cost, boundary-localized predictable flips, and a voxel-level net benefit
+statistically indistinguishable from zero---indicating that the decoder stages removed by
+\method{} contribute almost nothing to \emph{net voxel correctness}, even though, via that
+same boundary band, they still account for a $1$--$2$ point macro-Dice gap. \method{}'s
+aggressive compression is thus empirically well justified, and the removed capacity is
+better described as net-neutral than as strictly unused. Future efficient decoders should
+explicitly measure \emph{where} computation changes predictions rather than assume a
+uniform accuracy cost.

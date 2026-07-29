@@ -14,11 +14,14 @@ full and efficient decoders, with a frozen-backbone control and a channel/resolu
 factor decomposition that isolate the decoder path. We find the full decoder's net
 benefit is small and \emph{bidirectional to the point of cancellation}: at the
 parameter-matched configuration the net flip rate is statistically indistinguishable
-from zero across matched backbones (e.g.\ $-0.001\%$ on SwinUNETR). The flips that do
-occur are boundary-localized and predictable from the efficient model's own entropy,
-but they are net-neutral, so entropy-ranked region selection recovers no reliable net
-benefit. These trends are consistent across architectures, indicating that the removed
-decoder computation is genuinely redundant rather than merely reducible.
+from zero across matched backbones (e.g.\ $-0.001\%$ on SwinUNETR)---yet this voxel-level
+neutrality coexists with a $1$--$2$ point Dice gap, because the balanced flips concentrate
+at the Dice-weighted organ boundaries. Uncertainty reliably predicts \emph{where} the full
+decoder changes a prediction (AUROC $\approx\!0.9$) but not \emph{whether} the change
+improves it: predicting instability is easier than predicting improvement. These trends are
+consistent across architectures, indicating that the removed decoder capacity contributes
+almost nothing to net voxel correctness while still influencing macro metrics through a
+thin boundary band.
 Our analysis provides an evaluation protocol and design guidance for more efficient,
 region-adaptive segmentation decoders.
 \end{abstract}

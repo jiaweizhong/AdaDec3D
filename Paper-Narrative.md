@@ -42,7 +42,7 @@ Paper B 必须进一步证明两件 Paper A 没有证明的事：
 |---|---:|---:|
 | decoder 收益是否空间异质 | ✓ | 作为前提引用 |
 | 收益是否可预测 | ✓ | 作为 router 依据 |
-| oracle selective allocation 是否存在 | ✓ | — |
+| deployable selective allocation 是否存在 | **否**——net≈0,region opportunity negative(如实报告) | — |
 | 可训练的 adaptive decoder | — | ✓ |
 | 实际 executed MACs / latency 节省 | — | ✓ |
 | accuracy–efficiency Pareto improvement | — | ✓ |
@@ -116,11 +116,15 @@ Paper A 不声称第五层 **realizable efficiency**；这一层属于 AdaDec3D 
 
 定位是**补全 EffiDec3D 未回答的问题**，而不是批评聚合指标：
 
-> **EffiDec3D shows decoder computation is *removable* (empirical ablation); we
-> explain *why* it is removable and *where* decoder computation still helps.**
+> **EffiDec3D shows decoder computation is *removable* (empirical ablation); we show
+> *why* — with the parameter-matched decoder the full decoder's net benefit is
+> statistically indistinguishable from zero (the removed computation is genuinely
+> redundant), and the residual flips are boundary-localized and predictable but
+> net-neutral.**
 
-EffiDec3D 通过 ablation 证明"删了 Dice 不掉"，但没有解释为什么可删、哪些区域仍依赖
-decoder。本文用 flip 分析回答这一机制问题。可在 Introduction 直接引用 EffiDec3D：
+EffiDec3D 通过 ablation 证明"删了 Dice 不掉"，但没有解释为什么可删。本文用 flip 分析
+证明:参数对齐后 full decoder 的**净收益 ≈ 0**——不是"哪里还有用",而是"净收益整体
+消失",这是比 ablation 更强的冗余证据。可在 Introduction 直接引用 EffiDec3D：
 *"Prior work such as EffiDec3D demonstrates that large portions of decoder computation
 can be removed with little loss in Dice; however, these choices are justified by
 empirical ablation, leaving open where decoder computation actually contributes."*
@@ -138,14 +142,18 @@ empirical ablation, leaving open where decoder computation actually contributes.
    不再只比较整幅图像的 Dice/FLOPs，而是逐 voxel 计数 positive、negative 和 net
    flips，并做 subject-level bootstrap，避免把任何 disagreement 当作改善。
 
-2. **C2 — decoder 收益小、双向且空间集中**
-   聚合 net 收益很小（约 0.1% voxels）且被 negative flips 大量抵消，但高度
-   非均匀：集中在器官边界（boundary error 3.93× interior）与小器官（size–difficulty
-   $\rho=-0.54$；控制 log size 后 entropy 仍解释 difficulty，partial $r=0.81$）。
+2. **C2 — voxel 级净收益 ≈ 0、边界集中,但仍对 Dice 有关**
+   参数对齐(concat)后 $R_{\mathrm{pos}}\approx R_{\mathrm{neg}}$,net 收益在 **voxel
+   层面**与零无法区分(UX-Net +0.047%,CI 跨 0;Swin −0.001%)。**但它与 ~1.45 点的
+   Dice 差共存**:抵消后的 flip 集中在 Dice 加权的器官边界与小器官,所以 decoder 仍通过
+   一条薄边界带影响 macro 指标。**不要夸成"所有指标零收益"或"真冗余"**——准确说法是
+   *voxel correctness 上净中性,但对 Dice 并非无关*。
 
-3. **C3 — 该收益在测试时可预测**
-   用 efficient 模型自身的 entropy 排序 contiguous 3D regions，在预声明预算下 net
-   收益约为 matched random 的五倍，paired subject-bootstrap 下界 > 0。
+3. **C3 — entropy 能预测"哪里会变",不能预测"变好还是变坏"**
+   efficient 模型自身 entropy 能很好判别 flip 体素(O3 AUROC ~0.91),但因净收益 ≈0,
+   **无法可靠识别正净收益区域**(UX-Net 仅 5% 预算显著、Swin 全预算 CI<0)。全文最该被
+   记住的 insight:**predicting instability is easier than predicting improvement** ——
+   一个干净的 negative result。
 
 Generalizability（跨 seed / backbone / dataset）**不单列为第四条贡献**，而是贯穿
 C1–C3 的稳健性检验（O7/O8）。不要把“首次”“90% FLOPs”“只需 5% voxels”等措辞写进贡献，除非实验和文献检索都能支持。
@@ -306,7 +314,7 @@ per-stage effective rank / probing / CKA 等不同工具）。
 
 图注必须强调 error map、uncertainty map 和 flip map 是三个不同概念。
 
-### Figure 2 — 全文核心 Pareto 图
+### Figure 2 — Region-selection curve（concat 后为 **negative result**）
 
 横轴：
 
@@ -324,7 +332,10 @@ per-stage effective rank / probing / CKA 等不同工具）。
 - boundary proxy；
 - random allocation（均值和 95% CI）。
 
-这是最能支撑标题和 central thesis 的图。
+**注意(concat 更新):** 参数对齐配置下这条曲线是 **negative result**——entropy-selected
+regions 不能可靠优于 random(Swin 全预算 paired CI<0,UX 仅 5% 预算显著)。它不再是"全文核心
+图";核心叙事是"Full≈Effi、voxel 净翻转≈0、flip 边界化且可预测但净中性"。此图作为
+negative-result 证据保留(而非机会证据)。
 
 ### Figure 3 — Anatomical analysis
 
@@ -653,7 +664,7 @@ SCI/SCIE 通常指期刊，不是会议。常规期刊全年滚动投稿，因�
 
 ## 12. Paper A 摘要骨架
 
-> Efficient decoders such as EffiDec3D remove large portions of decoder computation with little loss in Dice, but justify this by empirical ablation, leaving open why the computation is removable and where decoder computation still helps. We answer this with a prediction-flip analysis of matched full and efficient decoders, separating positive, negative, and net flips, and isolate the effect with a frozen shared encoder that varies only the decoder. Across [datasets], [backbones], and [seeds], we find the full decoder's net benefit is [result 1], with [X]% of candidate regions accounting for [Y]% of net flips, concentrated at [result 2], and identifiable at test time by [signal] above random, boundary, and confidence controls on held-out subjects [result 3]. A channel/resolution factor decomposition attributes the removable computation to [result 4]. These findings explain what EffiDec3D's ablation left unexplained and provide an evaluation protocol for region-adaptive decoders.
+> Efficient decoders such as EffiDec3D remove large portions of decoder computation with little loss in Dice, but justify this by empirical ablation, leaving open why the computation is removable. We answer this with a prediction-flip analysis of matched full and efficient decoders, separating positive, negative, and net flips, and isolate the effect with a frozen backbone that varies only the decoder path. With the parameter-matched efficient decoder, the full decoder's net flip rate is statistically indistinguishable from zero across backbones (e.g. −0.001% on SwinUNETR): positive and negative flips cancel, so the removed computation is genuinely redundant rather than merely reducible. The residual flips are boundary-localized and predictable from the efficient model's own entropy (AUROC ~0.91) but net-neutral, so entropy-ranked region selection recovers no reliable net benefit. These findings explain what EffiDec3D's ablation left unexplained and provide an evaluation protocol for region-adaptive decoders.
 
 在实验完成前保留方括号，不提前填写预期数值。
 
@@ -663,7 +674,7 @@ SCI/SCIE 通常指期刊，不是会议。常规期刊全年滚动投稿，因�
 
 Paper B 的开场不需要重复 Paper A 的全部观察，只需：
 
-> Our previous analysis showed that the prediction improvements from additional 3D decoder computation are spatially concentrated and predictable. Based on this finding, we introduce AdaDec3D, a region-adaptive decoder that routes additional capacity only to regions predicted to improve.
+> Our previous analysis showed that, at a parameter-matched configuration, the extra 3D decoder computation produces only boundary-localized, predictable, but net-neutral prediction changes: uncertainty predicts *where* predictions change, not *whether* they improve. AdaDec3D therefore starts from this constraint rather than assuming a directly recoverable regional benefit.
 
 Paper B 的标题可以保留：
 

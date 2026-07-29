@@ -308,7 +308,8 @@ def O3_unc_error_corr(val_loader, effi, full=None):
     rng = np.random.default_rng(0)
     x_ent, y_err = [], []                                  # pooled-bin (descriptive)
     subj_auroc, subj_auprc, subj_ece, subj_prev = [], [], [], []
-    subj_fauroc, subj_fauprc, subj_fprev = [], [], []      # flip-prediction (primary)
+    subj_fauroc, subj_fauprc, subj_fprev = [], [], []      # positive-flip prediction
+    subj_nauroc, subj_aauroc, subj_pvn = [], [], []        # neg-flip, any-flip, pos-vs-neg
     predict_flip = full is not None and full is not effi
     with torch.no_grad():
         for batch in val_loader:
@@ -342,14 +343,25 @@ def O3_unc_error_corr(val_loader, effi, full=None):
                 subj_auprc.append(_auprc(e, yb))
                 subj_prev.append(float(yb.mean()))
             subj_ece.append(_ece(cb, (~yb).astype(np.float64)))
-            if predict_flip:                               # entropy -> positive flip
+            if predict_flip:                               # entropy -> flip discrimination
                 pred_f = infer(full, img).argmax(1).cpu().squeeze()
-                posflip = ((pred_f == lbl) & (pred != lbl)).numpy().reshape(-1)
-                yf = posflip[idx].astype(bool)
+                posflip = ((pred_f == lbl) & (pred != lbl)).numpy().reshape(-1)[idx]
+                negflip = ((pred_f != lbl) & (pred == lbl)).numpy().reshape(-1)[idx]
+                anyflip = posflip | negflip
+                yf = posflip.astype(bool)                  # (a) positive flip: full fixes effi
                 if yf.sum() > 0 and (~yf).sum() > 0:
                     subj_fauroc.append(_auroc(e, yf))
                     subj_fauprc.append(_auprc(e, yf))
                     subj_fprev.append(float(yf.mean()))
+                yn = negflip.astype(bool)                  # (b) negative flip: full breaks effi
+                if yn.sum() > 0 and (~yn).sum() > 0:
+                    subj_nauroc.append(_auroc(e, yn))
+                ya = anyflip.astype(bool)                  # (c) any flip: the prediction changes
+                if ya.sum() > 0 and (~ya).sum() > 0:
+                    subj_aauroc.append(_auroc(e, ya))
+                # (d) KEY: within flip voxels, can entropy tell better-from-worse?
+                if ya.sum() > 10 and yf[ya].sum() > 0 and (~yf[ya]).sum() > 0:
+                    subj_pvn.append(_auroc(e[ya], yf[ya]))
     r_p = float(pearsonr(x_ent, y_err)[0]); r_s = float(spearmanr(x_ent, y_err)[0])
 
     def _boot_ci(vals):
@@ -366,6 +378,9 @@ def O3_unc_error_corr(val_loader, effi, full=None):
     fauroc_m, fauroc_ci = _boot_ci(subj_fauroc)     # flip-prediction (primary)
     fauprc_m, fauprc_ci = _boot_ci(subj_fauprc)
     fprev_m = float(np.mean(subj_fprev)) if subj_fprev else float("nan")
+    nauroc_m, nauroc_ci = _boot_ci(subj_nauroc)     # negative-flip prediction
+    aauroc_m, aauroc_ci = _boot_ci(subj_aauroc)     # any-flip prediction
+    pvn_m, pvn_ci = _boot_ci(subj_pvn)              # KEY: pos-vs-neg discrimination
     err_go = bool(not np.isnan(auroc_ci[0]) and auroc_ci[0] > 0.5)
     flip_go = bool(not np.isnan(fauroc_ci[0]) and fauroc_ci[0] > 0.5)
     go = flip_go if predict_flip else err_go        # headline gate = flip when available
@@ -374,6 +389,9 @@ def O3_unc_error_corr(val_loader, effi, full=None):
         print(f"     FLIP  AUROC={fauroc_m:.3f} CI[{fauroc_ci[0]:.3f},{fauroc_ci[1]:.3f}]  "
               f"AUPRC={fauprc_m:.3f} (pos-flip prev={fprev_m:.4f})  "
               f"{'GO' if flip_go else 'NO-GO'} (AUROC CI-lower > 0.5)")
+        print(f"     any-flip AUROC={aauroc_m:.3f}  neg-flip AUROC={nauroc_m:.3f}  "
+              f"POS-vs-NEG AUROC={pvn_m:.3f} CI[{pvn_ci[0]:.3f},{pvn_ci[1]:.3f}]  "
+              f"(~0.5 => entropy cannot separate improvement from degradation)")
     print(f"     error AUROC={auroc_m:.3f} CI[{auroc_ci[0]:.3f},{auroc_ci[1]:.3f}]  "
           f"AUPRC={auprc_m:.3f} (err prev={prev_m:.3f})  ECE={ece_m:.3f}  (baseline)")
     plt.figure(figsize=(6, 5)); plt.scatter(x_ent, y_err, alpha=0.7)
@@ -386,6 +404,11 @@ def O3_unc_error_corr(val_loader, effi, full=None):
         "flip_auprc_mean": fauprc_m, "flip_auprc_ci": fauprc_ci,
         "positive_flip_prevalence_mean": fprev_m, "flip_go": flip_go,
         "n_subjects_flip": len(subj_fauroc),
+        # flip discrimination: any / negative / and KEY positive-vs-negative
+        "any_flip_auroc_mean": aauroc_m, "any_flip_auroc_ci": aauroc_ci,
+        "neg_flip_auroc_mean": nauroc_m, "neg_flip_auroc_ci": nauroc_ci,
+        "pos_vs_neg_auroc_mean": pvn_m, "pos_vs_neg_auroc_ci": pvn_ci,
+        "n_subjects_pvn": len(subj_pvn),
         # baseline: entropy predicts the efficient model's own error
         "subject_auroc_mean": auroc_m, "subject_auroc_ci": auroc_ci,
         "subject_auprc_mean": auprc_m, "subject_auprc_ci": auprc_ci,

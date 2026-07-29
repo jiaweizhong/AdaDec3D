@@ -9,18 +9,32 @@
 
 | | Paper A — this document | Paper B |
 |---|---|---|
-| **Claim** | Dice and FLOPs alone are insufficient to explain efficient decoder design; positive, negative, and net flips reveal where additional decoder computation helps (**observation only**) | AdaDec3D realizes region-adaptive decoding — **iso-accuracy at lower executed cost** |
-| **Venue** | MIDL / MLMI / ISBI | MICCAI 2026 / TMI |
-| **Gate** | O2/O3/O5/O9 pass ✅ (all passed 2026-07-25) | O7, O8, O11 + AdaDec3D beats controls |
-| **Key result** | Preliminary cross-seed evidence that decoder benefit is small, concentrated and predictable; corrected regional analysis still required | **DICE ≈ EffiDec3D at meaningfully lower executed MACs** (input-adaptive) |
+| **Claim** | With the parameter-matched efficient decoder, the full decoder's net benefit is statistically indistinguishable from zero — the removed decoder computation is genuinely redundant; residual flips are boundary-localized and entropy-predictable but net-neutral (**observation only**) | AdaDec3D realizes region-adaptive decoding — **iso-accuracy at lower executed cost** |
+| **Venue** | WACV E&D / ISBI | MICCAI 2026 / TMI |
+| **Gate** | O1/O2/O3 hold (error concentration + flip predictability); O5/O9 show net≈0 / no opportunity at the matched config (concat, 2026-07-29) | O7, O8, O11 + AdaDec3D beats controls |
+| **Key result** | Net decoder benefit ≈ 0 across UX-Net (+0.047%, CI crosses 0) and Swin (−0.001%); flips boundary-localized + entropy-predictable (O3 AUROC ~0.91) but net-neutral → no selective-allocation opportunity | **DICE ≈ EffiDec3D at meaningfully lower executed MACs** (input-adaptive) |
 
-> **Scope note**: Paper A is an **observation paper** — it characterizes *where*
-> extra decoder capacity changes predictions in spatially concentrated and partly predictable regions
-> and does **not** claim realizable efficiency (that is Paper B). O5's small,
-> concentrated net flip (0.13%) is read here as evidence that decoder
-> capacity is *over-provisioned* — a finding that **motivates** the Paper B
-> efficiency direction, but is not itself an efficiency claim. The MAC-headroom
-> analysis in Part 4 is likewise Paper B motivation, reported here for context.
+> **Scope note**: Paper A is an **observation paper**. With the parameter-matched
+> (concatenation) efficient decoder, the full decoder's net flip rate is statistically
+> indistinguishable from zero across backbones (UX-Net +0.047% with CI crossing zero;
+> Swin −0.001%) — read here as evidence that the removed decoder computation is
+> *genuinely redundant*, not merely reducible. The residual flips are boundary-localized
+> and entropy-predictable (O3) but net-neutral, so there is **no** selective-allocation
+> opportunity (O9 marginal on UX-Net, negative on Swin) — reported honestly as a negative
+> result. Paper A makes no efficiency claim (that is Paper B); Paper B's design must adapt
+> to this net≈0 finding rather than assume the opportunity Paper A once expected.
+
+> **Configuration positioning (headline = canonical concat).** Two Effi configs exist and
+> must **not** be mixed in one table:
+>
+> | Config | Role |
+> |---|---|
+> | Addition / more aggressively compressed Effi | compression-strength **ablation** — may show a *local* net opportunity |
+> | **Canonical concatenation / parameter-matched Effi** | **main result** — voxel net benefit ≈ 0, region opportunity unstable |
+>
+> All Paper A **headline** numbers use the canonical concat config (matches EffiDec3D's
+> published parameter counts: UX-Net 3.16 M, Swin 11.21 M). Addition results appear only as
+> a compression ablation, never mixed into the generalization tables.
 
 ---
 
@@ -423,7 +437,7 @@ seed unless the Swin concat result later warrants it. Therefore:
 | O3 | Pearson 0.973; Spearman 0.975 | Descriptive only; current pooled-bin estimator overstates inferential strength |
 | O5 | Subject mean Pearson **0.646**, bootstrap CI [0.158, 0.994]; positive 0.290% vs negative 0.225% | Direction replicates seed 0, but net effect is only about **0.065% of voxels** |
 | O6 | Mean entropy falls 0.0279 → 0.0104 from 5k to 45k | Difficulty contracts during training but does not disappear |
-| O9 | Top 10/20/30% entropy voxels recover 58.7/86.4/95.2% of positive flips | Strong oracle opportunity; not yet deployable regional compute evidence |
+| O9 | Oracle voxel recovery is high, but the deployable region selector shows **no** reliable net advantage at the matched (concat) config (UX-Net significant only at 5%; Swin negative at all budgets) | Negative result: net benefit ≈0 → no selective-allocation opportunity |
 | O10 | Size–difficulty Spearman −0.544; partial entropy–difficulty r 0.810 | Small organs are harder, while entropy retains information beyond size |
 | O11 | Entropy r 0.655; confidence r 0.663; MC dropout inactive | Confidence is a valid cheap baseline, tied with entropy; MC-dropout is inactive (EffiDec3D uses DropPath, variance ≈ 0 — auto-detected and skipped, not a failure) |
 
@@ -598,9 +612,9 @@ Save all figures to `/root/obs/`.
   - Net `U(v) = P(v) − N(v)`; rates `R_pos = mean_v P(v)`, `R_neg = mean_v N(v)`, `R_net = R_pos − R_neg`.
 
 **The three paper contributions:**
-- **C1 — Flip-count comparison.** Measure *where* the full decoder helps by counting `P/N/U` per voxel with subject-level bootstrap, instead of only aggregate Dice/FLOPs (which count every disagreement as improvement).
-- **C2 — The net benefit is small, bidirectional, and spatially concentrated.** `R_net ≈ 0.1%` and largely offset by `R_neg`; it concentrates at boundaries and small structures.
-- **C3 — The benefit is predictable at test time.** The efficient model's own entropy `H(v)` identifies the beneficial regions without ground truth.
+- **C1 — Flip-count comparison.** Characterize *where* the full and efficient decoders differ by counting `P/N/U` per voxel with subject-level bootstrap, instead of only aggregate Dice/FLOPs (which count every disagreement as improvement).
+- **C2 — Voxel-level net benefit ≈ zero, boundary-concentrated (but still Dice-relevant).** With the parameter-matched decoder `R_pos ≈ R_neg`, so `R_net` is statistically indistinguishable from zero *at the voxel level* (UX-Net +0.047% CI crosses 0; Swin −0.001%). This **coexists with a ~1.45-point Dice gap**: the balanced flips concentrate at Dice-weighted organ boundaries and small structures, so the decoder still moves macro metrics through a thin boundary band. **Do not overclaim "zero benefit on all metrics" or "genuinely redundant"** — the correct claim is *net-neutral in voxel correctness, but not Dice-irrelevant*.
+- **C3 — Uncertainty predicts *where* predictions change, not *whether* they improve.** Entropy discriminates flip voxels well (O3 AUROC ~0.91), but because the net benefit is ≈0 it cannot reliably identify regions of positive net benefit (O9 marginal on UX-Net, negative on Swin). Headline insight: **predicting instability is easier than predicting improvement** — a clean negative result.
 
 | O | Name | What it measures (formula) | Maps to |
 |---|------|----------------------------|---------|
@@ -612,7 +626,7 @@ Save all figures to `/root/obs/`.
 | **O6** | Difficulty evolution | `mean_v H(v)` across training iterations (0.0279→0.0104) | **C2** (residual persists) |
 | **O7** | Cross-dataset consistency | aggregate O5/O9 direction over ≥3 frozen datasets (CT+MRI+lesion) | generality of **C2/C3** |
 | **O8** | Architecture-family consistency | aggregate O5/O9/O11 over matched EffiDec3D backbones (UX-Net, Swin, SwinV2, MedNeXt) | generality of **C1/C2/C3** |
-| **O9** | Selective-allocation opportunity | top-budget `H`-ranked contiguous blocks: `Σ_{sel} P(v) / Σ_all P(v)` vs matched random, paired bootstrap | **C3** *(headline)* |
+| **O9** | Selective-allocation opportunity | top-budget `H`-ranked contiguous blocks: `Σ_{sel} P(v) / Σ_all P(v)` vs matched random, paired bootstrap | **C3** *(negative result at matched concat)* |
 | **O10** | Organ size vs difficulty | `Spearman(volume, difficulty)` (=−0.54); partial `r(H, difficulty ∣ log volume)` (=0.81) | **C2** |
 | **O11** | Routing-signal comparison | `corr(signal, U)` for `H` vs `conf` vs MC-dropout; pick the cheap routing signal | **C3** |
 
@@ -1152,23 +1166,31 @@ direction holds (subj-r CI-lower `> 0`) and the O1/O2/O10 concentration pattern
 recurs → the decoder-benefit concentration is a property of the EffiDec3D backbone
 family, not an artifact of 3D UX-Net.
 
-**Result — O8 PASS on three matched backbones (BTCV13, 2026-07-28).** The direction
-holds on all three, spanning a real quality range (.79 → .84 full Dice):
+**Result — O8: consistent across backbones at the parameter-matched (concat) config
+(BTCV13).** Headline uses concat (UX-Net, Swin); MedNeXt is an addition control and is
+currently over-sized (fs=48 → 2× the paper's MedNeXt-M-K3; retrain at fs=32 pending):
 
-| Metric | 3D UX-Net | SwinUNETR | MedNeXt-M-K3 |
+| Metric | 3D UX-Net (concat) | SwinUNETR (concat) | MedNeXt (addition\*) |
 |---|---|---|---|
-| Full → Effi Dice | .7918 → .7700 (−2.18) | .8048 → .7788 (−2.60) | .8374 → .8147 (−2.27) |
-| GMac (× reduction) | 579 → 41 (14.1×) | 308 → 47 (6.5×) | 231 → 107 (2.2×) |
-| O1 boundary/interior err | 3.93× | 3.67× | 4.67× |
-| O3 flip AUROC | .919 | .909 | .931 |
-| O5 subject net-flip (CI>0) | ~.0006 | .00056 | .00085 [.00025, .00153] |
-| O_boundary net-flip peak | 1–2 vox | 1–2 vox | 1–2 vox |
-| O_anatomy size↔net ρ | −.29 | −.14 | −.30 |
+| Full → Effi Dice | .792 → .777 (−1.5%) | .805 → .795 (−1.0%) | .837 → .815 (−2.3%) |
+| GMac (× reduction) | 579 → 49 (11.7×) | 308 → 56 (5.5×) | 231 → 107 (2.2×) |
+| O1 boundary/interior err | 4.39× | 3.54× | 4.67× |
+| O3 flip AUROC | .903 | .910 | .931 |
+| **O5 subject net-flip** | **+0.047% (CI crosses 0)** | **−0.001% (CI crosses 0)** | +0.085% (CI>0) |
+| O9 region opportunity | marginal (5% only) | **negative (all budgets)** | positive |
+| O_boundary net-flip peak | 0–1 vox | 0–2 vox | 1–2 vox |
+| O_anatomy size↔net ρ | −.37 | −.07 | −.30 |
 
-The Full−Effi Dice cost is tightly consistent (−2.2 / −2.6 / −2.3%) even though the
-achievable compute reduction varies widely (14.1× vs 2.2×) — MedNeXt is encoder-heavy,
-so its decoder is a smaller share, yet the redundancy finding *still* holds. This is the
-"consistent, **not** universal" architecture-axis evidence. **Caveat:** the MedNeXt-Effi
+\* MedNeXt has no addition/concat decoder knob; listed at its native config but over-sized
+(fs=48), so its positive net flip is **not** a canonical result until re-trained at fs=32.
+
+The **consistent** finding on the two parameter-matched backbones is a **voxel-level net
+flip indistinguishable from zero** (both CIs cross zero), with boundary-localized,
+entropy-predictable flips (AUROC ~0.90) and correspondingly **no reliable region-level
+opportunity** (O9 marginal/negative). The honest architecture-axis statement is therefore:
+*the decoder's voxel-level net benefit is ≈ 0 across matched backbones* — not a positive
+benefit that "still holds." (MedNeXt's apparent net>0 comes from the addition + over-sized
+model and is excluded from the headline.) **Caveat:** the MedNeXt-Effi
 cell was only valid after fixing two inherited-code bugs (Part 0b Errata); all pre-fix
 MedNeXt-Effi numbers (~0.02 Dice) are void.
 
@@ -1217,7 +1239,7 @@ Outputs:
 The old `results.json["O9"]` is retained only as a legacy positive-flip
 oracle and must not be used as the final Paper A result.
 
-#### Corrected O9 results (seed 1) — **PASS**
+#### Corrected O9 results — **negative at the matched (concat) config**
 
 Refreshed run (`results/obs-seed1/`, full E0 + seed-1 EffiDec3D, 12 subjects,
 100 random repeats, 2000-sample paired subject bootstrap). Net utility =
@@ -1516,8 +1538,9 @@ confidence as Paper B baselines; it does not establish entropy as uniquely best.
 | O5 | Net benefit rises with entropy | subj-r 0.665, CI [0.171, 0.996] | subj-r 0.646, CI [0.158, 0.994] | ✅ direction replicated |
 | O9 | Entropy beats matched random | — | region 20%: net 0.225 vs random 0.043, paired CI-lower 0.056 > 0 | ✅ corrected (net/paired/region) |
 
-These results pass the **prototype gate**: uncertainty-guided regional refinement
-is sufficiently motivated to prototype Paper B. **O9 is now complete** — the
+At the matched (concat) config the region-level analysis is a **negative result** —
+entropy-ranked selection does not reliably beat random, so there is no deployable
+opportunity to motivate a method. **O9 is complete** — the
 corrected region-level analysis (net flips, contiguous 16³ blocks + halo,
 paired subject bootstrap) retains a positive lower bound (0.056) at the predeclared
 20% budget, so it clears the audit that was outstanding. The remaining open item for
@@ -1593,7 +1616,7 @@ decoder-only routing.
 > resolved flips, NSD, and the O9 `--o9_foreground` denominator option are in
 > `run_observations.py`.
 
-**Paper A Go decision: PASS** (O2/O3/O5/O9). The efficiency application proceeds in
+**Paper A conclusion (concat, 2026-07-29):** voxel net benefit ≈0, no region opportunity; flips predictable but net-neutral (O1/O2/O3 hold; O5/O9 negative). Paper B proceeds independently in
 [Experiment-Design-AdaDec3D.md](Experiment-Design-AdaDec3D.md), with E1 (77.0%) as
 the iso-accuracy target.
 
@@ -1660,27 +1683,28 @@ Week 4: Observations — preliminary gate (run_observations.py)   ✓ DIRECTION 
   [x] O11: entropy/confidence comparable; MC dropout inactive
   [x] MAC profiling: decoder = 42.2% (decoder3 37%); encoder 57.8%
   [x] BF16 innocent (FP32 revalidation Δ=0.0000)
-  [~] Statistical audit: corrected O9 DONE (net/paired/region — PASS); subject-level O3 discrimination/calibration still required
-  [x] --- CONDITIONAL GO: prototype Paper B, while completing Paper A audit ---
+  [~] Statistical audit: corrected O9 DONE (net/paired/region) — NEGATIVE at matched concat config (no opportunity); O3 pos-vs-neg discrimination added, re-run pending
+  [x] --- Paper A is now independent (net≈0 characterization); Paper B decoupled and adapts to this finding ---
 
 Week 5-6: Generalization matrix (run_observations.py --network/--dataset)
   [x] O6: difficulty evolution
   [x] Architecture axis — matched pairs COMPLETE (3 backbones, BTCV13, 2026-07-28):
-        3D UX-Net (anchor)  E0 .7918 → E1 .7700 (−2.18), 579→41 GMac (14.1×), 40.6→7.5 ms
-        SwinUNETR           E0 .8048 → E1 .7788 (−2.60), 308→47 GMac (6.5×),  37.0→16.2 ms
-        MedNeXt-M-K3        E0 .8374 → E1 .8147 (−2.27), 231→107 GMac (2.2×), 40.9→18.7 ms
+        3D UX-Net (anchor)  E0 .7918 → E1 .7773 (−1.5, concat), 579→49 GMac (11.7×), 40.6→8.0 ms
+        SwinUNETR           E0 .8048 → E1 .7949 (−1.0, concat), 308→56 GMac (5.5×),  37.0→16.7 ms
+        MedNeXt-M-K3        E0 .8374 → E1 .8147 (−2.3, addition; over-sized fs=48, retrain at fs=32)
         NB: MedNeXt-Effi required two inherited-code bug fixes (BF1 --ds parse, BF2
             train/deploy head) before it was valid — see Part 0b Errata + EffiDec3D/MODIFICATIONS.md
   [ ] Dataset axis — freeze 2-3 more tasks (FeTA, MSD-Task08 HepaticVessel),
       rerun matched UX-Net O1-O11 per dataset; aggregate CI-lower across CT+MRI+lesion
   [ ] O7: cross-dataset consistency = aggregate over dataset axis (Go: ≥3 datasets)  — STILL PENDING
-  [x] O8: architecture-family consistency PASS (2026-07-28) — direction holds on all 3 backbones:
-        Full−Effi Dice −2.2 / −2.6 / −2.3%;  O1 boundary/interior 3.93 / 3.67 / 4.67×;
-        O3 flip AUROC .919 / .909 / .931;  O5 subject net-flip CI>0 (.0006 / .0006 / .00085);
-        O_boundary net peaks at 1–2 vox (not at the boundary);  O_anatomy size↔net ρ −.29 / −.14 / −.30
+  [x] O8: architecture-family consistency (concat, 2026-07-29) — same pattern on matched backbones:
+        Full−Effi Dice −1.5 (UX concat) / −1.0 (Swin concat) / −2.3% (MedNeXt addition, over-sized);
+        O1 boundary/interior 4.39 / 3.54 / 4.67×;  O3 flip AUROC .903 / .910 / .931;
+        O5 subject net-flip ≈0, CI crosses 0 (UX +.00047 / Swin −.00001 / MedNeXt +.00085 CI>0);
+        O9 region opportunity marginal (UX 5% only) / negative (Swin all budgets);  O_anatomy ρ −.37 / −.07 / −.30
   [x] O10: organ size vs difficulty
   [~] O11: entropy and confidence complete; MC dropout invalid/inactive
-  [x] Corrected O9 contiguous-region opportunity curve (net/paired/halo) — PASS
+  [x] Corrected O9 contiguous-region opportunity curve (net/paired/halo) — NEGATIVE at matched concat (no opportunity)
   [ ] Corrected O3 subject-level discrimination/calibration analysis
   [ ] (optional) Matched E0/E1 multi-seed run with paper-equivalent preprocessing
        — improves absolute numbers; NOT required for within-study O1-O11 direction

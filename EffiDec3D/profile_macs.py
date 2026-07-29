@@ -12,6 +12,7 @@ Total is cross-checked against ptflops.
 Usage (from /root/AdaDec3D/EffiDec3D):
   python profile_macs.py
 """
+import argparse
 import torch
 import torch.nn as nn
 from ptflops import get_model_complexity_info
@@ -40,12 +41,18 @@ def module_macs(m, out):
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--skip_aggregation", default="concatenation",
+                    choices=["addition", "concatenation"],
+                    help="must match the canonical EffiDec3D config (now concatenation)")
+    args = ap.parse_args()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = UXNET_EffiDec3D(
         in_chans=1, out_chans=14, depths=[2, 2, 2, 2],
         feat_size=[48, 96, 192, 384], n_decoder_channels=48,
         drop_path_rate=0, layer_scale_init_value=1e-6, spatial_dims=3,
-        skip_aggregation="addition", resolution_factor=2).to(device).eval()
+        skip_aggregation=args.skip_aggregation, resolution_factor=2).to(device).eval()
+    print(f"[config] skip_aggregation={args.skip_aggregation}")
 
     top_macs = {name: 0 for name, _ in model.named_children()}
     handles = []

@@ -306,8 +306,8 @@ python main_train_BTCV_TU.py \
 **Verify E1 prints at startup**:
 
 ```
-Computational complexity:   41.06 GMac
-Number of parameters:       2.955 M
+Computational complexity:   49.49 GMac
+Number of parameters:       3.156 M
 ```
 
 **E1 target BTCV13 mean DICE**: 79.0–79.5% (paper EffiDec3D 79.25%; the full 3DUX-Net E0 target is 79.74%)
@@ -336,33 +336,39 @@ AdaDec3D targets. (R.Kidney HD95 = 20.35 is a single-case spatial outlier.)
 
 ### E1 measured baseline (EffiDec3D)
 
-E1 (3DUXNET_EffiDec3D, `--ds False`, seed 0, 45 000 iter): **Mean DICE 0.7700**
-(paper EffiDec3D **79.25%**, −2.25), Mean HD95 14.41, **41.06 GMac / 2.955 M
-params**, train 5.36 h, infer **7.5 ms/vol**, peak infer mem **0.24 GB**.
+E1 (3DUXNET_EffiDec3D, **concatenation**, `--ds False`, seed 0, 45 000 iter):
+**Mean DICE 0.7773** (paper EffiDec3D **79.25%**, −1.5), Mean HD95 11.82,
+**49.49 GMac / 3.156 M params**, train 5.43 h, infer **8.0 ms/vol**, peak infer mem
+**0.24 GB**. Params now **match the paper's 3.15 M** — concatenation is EffiDec3D's
+default skip aggregation; our earlier `addition` variant (2.955 M / 41.06 GMac,
+Mean DICE 0.7700) is retained only as a skip-aggregation ablation.
 
-Efficiency vs E0: **14.1× MACs**, 5.4× latency, 7.7× memory — matches the paper.
-Per-organ (our E1 | paper EffiDec3D):
+Efficiency vs E0: **11.7× MACs**, 5.1× latency, 7.7× memory.
+Per-organ (our E1 concat | paper EffiDec3D):
 
 | Organ | E1 | paper | | Organ | E1 | paper |
 |---|---|---|---|---|---|---|
-| Spleen | .865 | .904 | | IVC | .814 | .859 |
-| R.Kidney | .841 | .848 | | Veins | .650 | .680 |
-| L.Kidney | .872 | .871 | | Pancreas | .665 | .702 |
-| Gallbladder | .746 | .753 | | R.Adrenal | .615 | .655 |
-| Esophagus | .753 | .743 | | L.Adrenal | .607 | .647 |
-| Liver | .954 | .944 | | **Mean** | **.770** | **.793** |
-| Stomach | .756 | .788 | | | | |
-| Aorta | .872 | .910 | | | | |
+| Spleen | .886 | .904 | | IVC | .842 | .859 |
+| R.Kidney | .835 | .848 | | Veins | .675 | .680 |
+| L.Kidney | .849 | .871 | | Pancreas | .681 | .702 |
+| Gallbladder | .738 | .753 | | R.Adrenal | .605 | .655 |
+| Esophagus | .741 | .743 | | L.Adrenal | .609 | .647 |
+| Liver | .949 | .944 | | **Mean** | **.777** | **.793** |
+| Stomach | .791 | .788 | | | | |
+| Aorta | .903 | .910 | | | | |
 
-**Reproduction notes** (why E1 lands 2.25 below the paper):
+**Reproduction notes** (why E1 lands ~1.5 below the paper):
+- **Skip-aggregation resolved the parameter mismatch (2026-07-28).** EffiDec3D's
+  default is `concatenation` (3.15 M params); our earlier `addition` variant was
+  2.955 M. Retraining with concatenation matches the paper's parameter count and
+  lifts Dice 0.770→**0.777**. The config is now faithful — but note the smaller
+  Full$-$Effi gap weakens the net-flip signal (O5/O9 below); we report it as-is.
 - Code is faithful to upstream EffiDec3D (encoder identical; backbone only differs
   by `**kwargs`; hyperparameters match the README command exactly; seed 0 = upstream default).
 - **BF16 is innocent**: re-validating the same weights in FP32 vs BF16 gives
   Δ = 0.0000 (`revalidate_fp32.py`). Precision is not the cause.
-- Remaining gap is most likely the **data source** (we use the TransUNet Synapse
-  Kaggle split with identity affine; the paper uses `btcv_trns`). Seed 1 improves
-  the result, but does not close the reproduction gap (see below), so random-seed
-  variance alone is not a sufficient explanation.
+- The **remaining ~1.5-point gap** is most likely the **data source** (we use the
+  TransUNet Synapse Kaggle split with identity affine; the paper uses `btcv_trns`).
 - **Skip-`Spacingd` control — rejected (negative result, 2026-07-26).** To test
   whether the identity-affine metadata made resampling harmful, we retrained E1
   with `--skip_spatial_resampling`. It is **decisively worse** (best Mean DICE
@@ -386,16 +392,17 @@ The second E1 training run is stored in
 `results/E1_metrics_btcv13_seed1.csv`; its observations and figures are in
 `results/obs-seed1/`.
 
-| Run | Mean DICE | Mean HD95 | Train time | Inference | Difference from paper E1 |
+| Run | Mean DICE | Mean HD95 | Train time | Inference | Diff from paper E1 |
 |---|---:|---:|---:|---:|---:|
-| E1 seed 0 | 0.7700 | 14.41 | 5.36 h | 7.5 ms | −2.25 DICE points |
-| E1 seed 1 | **0.7755** | **10.17** | 5.27 h | 7.6 ms | −1.70 DICE points |
+| **E1 concat, seed 0 (canonical)** | **0.7773** | 11.82 | 5.43 h | 8.0 ms | −1.5 |
+| E1 addition, seed 0 (ablation) | 0.7700 | 14.41 | 5.36 h | 7.5 ms | −2.25 |
+| E1 addition, seed 1 (ablation) | 0.7755 | 10.17 | 5.27 h | 7.6 ms | −1.70 |
 | Paper E1 | 0.7925 | 10.12 | — | — | — |
 
-Seed 1 nearly reproduces the reported mean HD95 and improves DICE by 0.55 points,
-but the two-seed mean DICE is only **0.7728**. The E0–E1 DICE gap is 2.18 points
-for seed 0 and 1.63 points for seed 1, both larger than the paper's 0.49-point
-gap. Therefore:
+Concatenation (canonical) matches the paper's parameter count and lands **1.5 points**
+below its Dice, versus **2.25** for the addition ablation; the E0$-$E1 gap narrows to
+**1.45 points** (0.792→0.777). We report a **single concat seed as-is** — no second
+seed unless the Swin concat result later warrants it. Therefore:
 
 - The implementation is adequate for a **controlled internal observation study**:
   E0 and E1 share the same data, split, transforms and evaluation protocol.
@@ -610,6 +617,37 @@ Save all figures to `/root/obs/`.
 | **O11** | Routing-signal comparison | `corr(signal, U)` for `H` vs `conf` vs MC-dropout; pick the cheap routing signal | **C3** |
 
 **Coverage of the three contributions:** C1 = {O5}; C2 = {O1, O2, O4, O6, O10} (+O5); C3 = {O3, O9, O11} (+O5); generality = {O7, O8}. O5 is the hinge — it defines the flip machinery (C1), shows the effect is small/bidirectional (C2), and shows it rises with entropy (C3).
+
+**Metric priority & de-duplication (paper placement).** Not every O is equally strong;
+several overlap or are weak, so the paper ranks rather than flatly lists them. The later
+flip-resolved metrics (`O_boundary`, `O_anatomy`, `O_surface`, `O_pareto`) largely
+supersede the earlier error/difficulty ones because they measure the *net flip* (decoder
+benefit) directly rather than error.
+
+- **Headline (main figures):** **O5** (net benefit small/bidirectional), **O9** (deployable
+  region opportunity, tight paired CI), **O_boundary** (net flip peaks in the 1–2 vox
+  boundary zone). These carry the three axes.
+- **Main-text supporting:** **O3** (entropy→flip AUROC, the discrimination complement to
+  O9), **O2** (entropy sparsity — the concentration premise), **O_anatomy** (per-organ net
+  benefit + size↔net), **O_surface** (NSD, backs the boundary claim).
+- **Demote to a one-line motivation:** **O1** — "error concentrates at the boundary" is
+  *superseded by O_boundary* ("benefit concentrates there"); keep O1 only as the intro
+  sentence so a reviewer can't object that error ≠ benefit.
+- **Consolidate the organ-level trio:** **O4 + O10 + O_anatomy** all say "smaller/harder
+  organs benefit more" on n=13 organs (noisy). Report **O_anatomy** (net-flip based, on
+  thesis); fold O4/O10 into one supporting sentence or the appendix — do not use three
+  organ figures.
+- **Appendix (weak / off-thesis):** **O6** (entropy falls over training — context, leans
+  Paper-B) and **O11** (routing signals — a near-null result: entropy≈confidence within
+  0.01, MC-dropout invalid at dropout=0). Present O11 only as "confidence is an equally
+  good baseline," not a finding.
+- **Caveat on O5's correlation:** the subject-level `Pearson(H,U)` CI is wide (n=12); lean
+  on **O9's** tight paired CI for the predictability claim and use O5's correlation only as
+  concentration evidence, not as strong predictability on its own.
+
+Net effect: ~6 non-overlapping strong metrics in the main text (O_boundary, O_anatomy,
+O2, O5, O3, O9 + O_surface), with O1 as intro and O4/O6/O10/O11 consolidated or in the
+appendix — tighter, and harder to challenge as "several metrics making the same point."
 
 ### Common notebook setup
 

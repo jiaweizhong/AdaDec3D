@@ -2,7 +2,7 @@
 The decoder is an essential module for fusing multi-scale features and restoring spatial
 detail in U-Net architectures for 3D medical image segmentation. Recent designs, especially attention-based 
 decoders, sharply increase its cost, and efficient methods such as EffiDec3D respond by shrinking high-resolution 
-decoder stages---removing $>90\%$ of its parameters and
+decoder stages---removing $>85\%$ of its parameters and
 FLOPs across 3D UX-Net, MedNeXt-M-K3 and SwinUNETR with little loss in Dice.
 This success, however, rests on the empirical assumption that decoder computation is
 static and globally redundant; it does not explain \emph{why} the computation is

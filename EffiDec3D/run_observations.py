@@ -774,12 +774,19 @@ def O9_opportunity(val_loader, effi, full, block_size=16, halo=4, primary_budget
 
 
 def O6_difficulty_evolution(val_loader, output, dataset, device, network, role, out_classes,
-                            skip_aggregation="concatenation"):
+                            skip_aggregation="concatenation", e1_ckpt=None):
     steps = [5000, 10000, 20000, 30000, 45000]
     folder = EFFI_NETWORK[network] if role == "effi" else FULL_NETWORK[network]
+    # Pin milestones to the SAME directory as the canonical checkpoint; otherwise the
+    # glob can pick a different-config run (e.g. addition vs concatenation) and the
+    # milestone state_dict shapes won't match the model we build.
+    ckpt_dir = os.path.dirname(e1_ckpt) if (role == "effi" and e1_ckpt) else None
     step_ent = {}
     for s in steps:
-        paths = sorted(glob.glob(f"{output}/*/{folder}/{dataset}/milestone_{s:05d}.pth"))
+        if ckpt_dir:
+            paths = sorted(glob.glob(f"{ckpt_dir}/milestone_{s:05d}.pth"))
+        else:
+            paths = sorted(glob.glob(f"{output}/*/{folder}/{dataset}/milestone_{s:05d}.pth"))
         if not paths:
             print(f"[O6] milestone {s:05d} not found; skipping")
             continue
@@ -1281,7 +1288,8 @@ def main():
     O3_unc_error_corr(val_loader, analyzed, full=(full if effi is not None else None))
     dice_summary, organ_ent = O4_per_organ(val_loader, analyzed, post_pred, post_lbl)
     O6_difficulty_evolution(val_loader, args_ns.output, args_ns.dataset, device,
-                            network, role, out_classes, skip_aggregation=args_ns.skip_aggregation)
+                            network, role, out_classes, skip_aggregation=args_ns.skip_aggregation,
+                            e1_ckpt=(e1[-1] if e1 else None))
     O10_organ_size(val_loader, dice_summary, organ_ent)
     O_surface_metrics(val_loader, analyzed, out_classes)   # E4: per-organ NSD
 

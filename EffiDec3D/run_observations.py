@@ -53,7 +53,9 @@ BTCV13_NAMES = ["Spleen", "R.Kidney", "L.Kidney", "Gallbladder", "Esophagus",
                 "Liver", "Stomach", "Aorta", "IVC", "Veins",
                 "Pancreas", "R.Adrenal", "L.Adrenal"]
 FETA_NAMES = ["ECF", "GM", "WM", "Ventricles", "Cerebellum", "DeepGM", "Brainstem"]
-DATASET_NAMES = {"BTCV13": BTCV13_NAMES, "feta": FETA_NAMES}
+HEPATIC_NAMES = ["Vessel", "Tumour"]   # MSD Task08: 2 foreground classes (out_classes=3)
+DATASET_NAMES = {"BTCV13": BTCV13_NAMES, "feta": FETA_NAMES,
+                 "Task08_HepaticVessel": HEPATIC_NAMES}
 
 # Module global; main() sets it from the dataset. O1/O4/O10 reference CLASS_NAMES,
 # so per-organ observations stay generic across datasets (else class_1..N).

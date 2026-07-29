@@ -64,8 +64,12 @@ run_obs() {
     fi
     log "Observations: EffiDec3D MAC profile (encoder vs decoder)"
     python profile_macs.py 2>&1 | tee -a $LOG
-    log "Observations: O1–O11 gate (run_observations.py)"
-    python run_observations.py --root $ROOT --output $OUT 2>&1 | tee -a $LOG
+    log "Observations: O1–O11 gate (run_observations.py) — concat E1"
+    python run_observations.py --root $ROOT --output $OUT \
+        --network 3DUXNET --dataset BTCV13 \
+        --e0_ckpt "$E0_CKPT" --e1_ckpt "$E1_CKPT" \
+        --skip_aggregation concatenation \
+        --obs_dir /root/obs 2>&1 | tee -a $LOG
     log "Observations: patch difficulty (encoder-adaptivity headroom)"
     python patch_difficulty.py --root $ROOT --with-model 2>&1 | tee -a $LOG
     log "Observations done — figures + results.json in /root/obs"

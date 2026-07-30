@@ -224,16 +224,19 @@ O1–O11 是**探索阶段**，正文只报告以下六个；其余降级到 app
   的 subject 均值与自助 CI。回答"是统一改善，还是修正与破坏并存"——$R_{\text{net}}\approx0$
   而 $R_{\text{pos}},R_{\text{neg}}>0$ 即双向抵消，是 Dice 差看不出的。
 - **H2｜boundary- + anatomy-resolved net**（代码 `H2_boundary`〔新实现，此前被调用却未定义〕、
-  `O_anatomy`、`O_dice_aware`、`O_surface`、`O_errortype`）：按到边界距离分桶的 $R_{\text{net}}(D_k)$、
-  per-organ $R_{\text{net},c}$ + per-organ Dice Δ + NSD。回答收益**在哪里**——是否集中在一到两个
-  voxel 的边界薄带与小器官，解释 net≈0 何以与 Dice 差共存。并需超过 Full-vs-Full null-pair 地板。
+  `O_anatomy`〔union(GT,Full,Effi) 前景 + `dice_delta_full_minus_effi`〕、`O_surface`〔可选 NSD〕）：
+  按到边界距离分桶的 $R_{\text{net}}(D_k)$（bins `{0-1,1-2,2-4,>4}`）、per-organ $R_{\text{net},c}$
+  + per-organ Dice Δ。回答收益**在哪里**——是否集中在一到两个 voxel 的边界薄带与小器官，解释 net≈0 何以与
+  Dice 差共存。并需超过 Full-vs-Full null-pair 地板。（已删除的 `O_dice_aware`/`O_errortype` 属冗余：
+  Dice Δ 已并入 `O_anatomy`，error-type net 不在六个核心指标内。）
 
 #### Concentration — 有益计算是否空间集中？
 
 - **C1/C2｜oracle net-benefit coverage + top-k / K80**（代码 `O_pareto['oracle']` +
   `O_pareto['concentration']`）：把 volume 切成 $16^3$ block，按真实净收益 $B(r)=\sum_{v\in r}U(v)$
-  排序画累计覆盖曲线；报告 top-10/20% 覆盖与达 80% 所需预算 $K_{80}$。**务必与绝对净收益一起报**——
-  曲线陡但总量≈0 是"小的绝对机会"，不可当成大收益。
+  排序，覆盖 $C_{\text{oracle}}(k)=\sum_{r\in\text{topK}}B(r)/\sum_r\max(B(r),0)$（分母用正净收益质量，
+  不是所有 positive flips）；报告 top-10/20% 覆盖、达 80% 所需预算 $K_{80}$，以及 `abs_net`（有符号总净收益）。
+  **务必与 `abs_net` 一起报**——曲线陡但总量≈0 是"小的绝对机会"，不可当成大收益。
 
 #### Predictability — 测试时信号能否在无 GT 下定位这些区域？
 

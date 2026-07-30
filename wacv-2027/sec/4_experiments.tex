@@ -121,12 +121,14 @@ it depend on location and structure?}
   that a Dice gap alone cannot reveal.
   \item \textbf{H2, boundary- and anatomy-resolved net flips.} $R_{\mathrm{net}}(D_k)$
   over voxels binned by Euclidean distance $d(v)$ to the nearest GT boundary
-  ($D_k\!\in\!\{0\text{--}1,1\text{--}2,2\text{--}4,4\text{--}8,{>}8\}$), and per-organ
-  $R_{\mathrm{net},c}$ alongside the per-organ Dice change
-  $\Delta\mathrm{Dice}_c=\mathrm{Dice}_{\mathrm{F},c}-\mathrm{Dice}_{\mathrm{E},c}$ and
-  NSD at 1--2 voxel tolerance. \emph{Meaning:} \emph{where} the effect lives---whether
-  the net benefit concentrates in a thin boundary band and in particular structures,
-  explaining how a near-zero global net coexists with a macro Dice gap.
+  ($D_k\!\in\!\{0\text{--}1,1\text{--}2,2\text{--}4,{>}4\}$), and, on the
+  $\mathrm{union}(\mathrm{GT},\mathrm{Full},\mathrm{Effi})$ foreground of each organ $c$
+  (so false positives are not dropped), $R_{\mathrm{net},c}$ alongside the per-organ Dice
+  change $\Delta\mathrm{Dice}_c=\mathrm{Dice}_{\mathrm{F},c}-\mathrm{Dice}_{\mathrm{E},c}$
+  (NSD at 1--2 voxel tolerance as an optional boundary-quality column). \emph{Meaning:}
+  \emph{where} the effect lives---whether the net benefit concentrates in a thin boundary
+  band and in particular structures, explaining how a near-zero global net coexists with a
+  macro Dice gap.
 \end{itemize}
 
 \smallskip\noindent\textit{(2) Concentration: is the beneficial computation spatially
@@ -134,10 +136,12 @@ concentrated?}
 \begin{itemize}\setlength\itemsep{1pt}
   \item \textbf{C1, oracle net-benefit coverage.} Partition each volume into contiguous
   $16^3$ blocks, score block $r$ by its true net benefit $B(r)=\sum_{v\in r}U(v)$, rank
-  by $B(r)$, and plot cumulative recovered net benefit against the fraction of blocks
-  selected. \emph{Meaning:} the ceiling---whether, \emph{with oracle knowledge}, a small
-  region subset carries the net benefit. We report the absolute net beside the coverage
-  so a steep curve over a near-zero total is not mistaken for a large opportunity.
+  by $B(r)$, and plot the cumulative recovered fraction
+  $C_{\mathrm{oracle}}(k)=\sum_{r\in\text{top-}k}B(r)\,/\,\sum_r\max(B(r),0)$ against the
+  block budget $k$ (normalizing by the positive net mass, not all positive flips).
+  \emph{Meaning:} the ceiling---whether, \emph{with oracle knowledge}, a small region
+  subset carries the net benefit. We report the absolute net $\sum_r B(r)$ beside the
+  coverage so a steep curve over a near-zero total is not mistaken for a large opportunity.
   \item \textbf{C2, top-$k$ coverage.} The oracle coverage at 10\% and 20\% of blocks
   and the smallest budget $K_{80}$ reaching 80\% of the net benefit. \emph{Meaning:} a
   compact summary of \emph{how} concentrated the opportunity is.

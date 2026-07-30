@@ -107,8 +107,9 @@ Net flip rate, subject 95\% CI & $[-.00026,.00112]$\\
 \centering
 \includegraphics[width=0.96\columnwidth]{figures/O_anatomy.png}
 \caption{H2, per-organ net flip for the matched pair (seed 1): positive, negative, and
-net rates within each organ's GT voxels, and net flip vs.\ organ size. The decoder's
-net benefit is uneven across anatomy and rises as structures shrink.}
+net rates on each organ's $\mathrm{union}(\mathrm{GT},\mathrm{Full},\mathrm{Effi})$
+foreground, and net flip vs.\ organ size. The decoder's net benefit is uneven across
+anatomy and rises as structures shrink.}
 \label{fig:organ}
 \end{figure}
 
@@ -118,9 +119,11 @@ boundary shows the benefit is sharply boundary-localized: it peaks at the surfac
 ($0.085$ at $0$--$1$ vox) and falls to near zero or slightly negative beyond one voxel
 \todo{refresh H2 boundary profile from re-run}, so the balanced flips of
 Table~\ref{tab:flips} live almost entirely in a one-voxel shell---the same band Dice
-weights heavily.  Per organ, the net benefit rises as structures shrink (adrenals,
-pancreas, veins; organ-size/net-flip $\rho=-0.37$, Fig.~\ref{fig:organ}), and
-surface Dice (NSD) is $0.741$/$0.845$ at $\tau{=}1$/$2$~mm.  This boundary and
+weights heavily.  Per organ (on the union foreground), the net benefit rises as
+structures shrink (adrenals, pancreas, veins; organ-size/net-flip $\rho=-0.37$,
+Fig.~\ref{fig:organ}), with the per-organ Dice change $\Delta\mathrm{Dice}_c$ tracking
+the same small structures; surface Dice (NSD) is $0.741$/$0.845$ at $\tau{=}1$/$2$~mm.
+This boundary and
 small-structure concentration should exceed a same-architecture null pair (Full seed~0
 vs.\ seed~1) \todo{null-pair floor}, ruling out seed noise.  (The error-based boundary
 ratio---\effimodel{} error $4.39\times$ the interior rate---is a consistent but weaker

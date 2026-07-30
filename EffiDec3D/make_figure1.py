@@ -108,21 +108,62 @@ def main():
         ax.imshow(np.ma.masked_where(seg == 0, seg), alpha=0.6, **seg_kw)
         ax.set_title(title); ax.axis("off")
 
-    fig, axs = plt.subplots(2, 3, figsize=(12, 8))
-    axs[0, 0].imshow(im2, cmap="gray"); axs[0, 0].set_title("(a) image"); axs[0, 0].axis("off")
-    seg_panel(axs[0, 1], gt2, "(b) ground truth")
-    seg_panel(axs[0, 2], pe2, "(c) EffiDec3D prediction")
-    seg_panel(axs[1, 0], pf2, "(d) full-decoder prediction")
-    # flip map: green = positive flip (full fixes), red = negative flip (full breaks)
-    axs[1, 1].imshow(im2, cmap="gray")
+    # flip-map RGBA (green = positive flip / full fixes, red = negative flip / full breaks)
     flip_rgb = np.zeros((*im2.shape, 4))
     flip_rgb[pos2] = [0.1, 0.8, 0.1, 0.9]
     flip_rgb[neg2] = [0.9, 0.1, 0.1, 0.9]
-    axs[1, 1].imshow(flip_rgb)
-    axs[1, 1].set_title("(e) flip map: green=+, red=$-$"); axs[1, 1].axis("off")
-    im_ent = axs[1, 2].imshow(ent2, cmap="magma")
-    axs[1, 2].set_title("(f) efficient-model entropy"); axs[1, 2].axis("off")
-    fig.colorbar(im_ent, ax=axs[1, 2], fraction=0.046, pad=0.04)
+
+    # Locate one positive and one negative zoom region (largest connected flip cluster).
+    from scipy.ndimage import label as _cc_label, center_of_mass
+    half = 16                                        # zoom half-window (voxels)
+
+    def _pick(mask):
+        lab, n = _cc_label(mask)
+        if n == 0:
+            return None
+        sizes = np.bincount(lab.ravel()); sizes[0] = 0
+        cy, cx = center_of_mass(lab == int(sizes.argmax()))
+        y0 = int(np.clip(cy - half, 0, im2.shape[0] - 2 * half))
+        x0 = int(np.clip(cx - half, 0, im2.shape[1] - 2 * half))
+        return y0, x0
+    zoom_pos, zoom_neg = _pick(pos2), _pick(neg2)
+
+    def _zoom(ax, box, label, color):
+        if box is None:
+            ax.text(0.5, 0.5, f"no {label}\non this slice", ha="center", va="center",
+                    fontsize=9); ax.axis("off"); return
+        y0, x0 = box; sl = (slice(y0, y0 + 2 * half), slice(x0, x0 + 2 * half))
+        ax.imshow(im2[sl], cmap="gray")
+        ax.imshow(flip_rgb[sl])
+        ax.contour(ent2[sl], levels=[np.percentile(ent2, 90)], colors="cyan", linewidths=0.8)
+        ax.set_title(label, color=color, fontsize=10)
+        ax.set_xticks([]); ax.set_yticks([])
+        for s in ax.spines.values():
+            s.set_edgecolor(color); s.set_linewidth(2)
+
+    fig = plt.figure(figsize=(12, 11))
+    gs = fig.add_gridspec(3, 6, height_ratios=[1, 1, 1.05])
+    ax_a = fig.add_subplot(gs[0, 0:2]); ax_b = fig.add_subplot(gs[0, 2:4]); ax_c = fig.add_subplot(gs[0, 4:6])
+    ax_d = fig.add_subplot(gs[1, 0:2]); ax_e = fig.add_subplot(gs[1, 2:4]); ax_f = fig.add_subplot(gs[1, 4:6])
+    ax_a.imshow(im2, cmap="gray"); ax_a.set_title("(a) image"); ax_a.axis("off")
+    seg_panel(ax_b, gt2, "(b) ground truth")
+    seg_panel(ax_c, pe2, "(c) EffiDec3D prediction")
+    seg_panel(ax_d, pf2, "(d) full-decoder prediction")
+    ax_e.imshow(im2, cmap="gray"); ax_e.imshow(flip_rgb)
+    ax_e.set_title("(e) flip map: green=+, red=$-$"); ax_e.axis("off")
+    # mark the two zoom windows on the flip map
+    from matplotlib.patches import Rectangle
+    for box, col in [(zoom_pos, "lime"), (zoom_neg, "red")]:
+        if box is not None:
+            y0, x0 = box
+            ax_e.add_patch(Rectangle((x0, y0), 2 * half, 2 * half, fill=False,
+                                     edgecolor=col, lw=1.5))
+    im_ent = ax_f.imshow(ent2, cmap="magma")
+    ax_f.set_title("(f) efficient-model entropy"); ax_f.axis("off")
+    fig.colorbar(im_ent, ax=ax_f, fraction=0.046, pad=0.04)
+    ax_g = fig.add_subplot(gs[2, 0:3]); ax_h = fig.add_subplot(gs[2, 3:6])
+    _zoom(ax_g, zoom_pos, "(g) high entropy + positive flip", "green")
+    _zoom(ax_h, zoom_neg, "(h) high entropy + negative flip", "firebrick")
 
     fig.suptitle(f"{args.network} / {args.dataset}  case {args.case_idx}  "
                  f"axis {args.axis} slice {k}  (error ≠ uncertainty ≠ flip)")

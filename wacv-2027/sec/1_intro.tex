@@ -22,6 +22,22 @@ allocate decoder computation \emph{adaptively}, spending it only where it helps.
 Dice and FLOPs cannot distinguish these cases, because a metric that averages over
 millions of voxels hides both the spatial structure of the change and its direction.
 
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.98\textwidth]{figures/figure1_motivation.png}
+\caption{\textbf{Decoder-induced prediction changes are spatially localized but
+bidirectional.} For one input volume (a) with ground truth (b), the efficient (c) and
+full (d) decoders differ primarily near anatomical boundaries. The flip map (e) shows the
+full decoder \emph{corrects} some efficient-model errors (green, positive flips) while
+simultaneously \emph{introducing} new errors (red, negative flips); both overlap the
+efficient model's high-entropy regions (f). The zoomed positive (g) and negative (h)
+examples share the same high uncertainty, illustrating our central distinction: predicting
+\emph{where} a prediction will change is easier than predicting \emph{whether} the change
+is beneficial. This figure is a qualitative teaser; the quantitative evidence is in
+Sec.~\ref{sec:results}.}
+\label{fig:motivation}
+\end{figure*}
+
 We therefore complement the ablation evidence with a systematic characterization of
 decoder redundancy. Rather than asking whether the decoder can be removed, we ask
 \emph{how} its contribution is distributed, organizing the study along three axes:

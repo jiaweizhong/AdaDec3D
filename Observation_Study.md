@@ -637,33 +637,40 @@ Save all figures to `/root/obs/`.
 
 **Converged reporting framework (6 metrics, Heterogeneity → Concentration → Predictability, 2026-07-30).**
 The exploratory O1–O11 above are the *investigation*; the paper reports exactly **six**
-named metrics. `run_observations.py` now emits them by default and gates the deprecated
-diagnostics behind `--appendix`. Mapping (paper name → code):
+named metrics plus **one qualitative motivation figure** (Figure 1, not a metric).
+`run_observations.py` emits the six by default and gates the deprecated diagnostics behind
+`--appendix`. Mapping (paper name → code):
 
 | Axis | Metric | Physical meaning | Code (`save_obs` tag) |
 |---|---|---|---|
+| — (teaser) | **Figure 1** motivation | one slice: image/GT/Effi/Full/pos-neg flip map/entropy + 2 zooms → shows pos & neg flips coexist at high-entropy boundaries; concept only, proves nothing | `make_figure1.py` → `figure1_motivation.png` |
 | Heterogeneity | **H1** global P/N/net + subject CI | is the effect uniform or a bidirectional cancellation? | `O5` (`subject_{pos,neg,net}_rate_*`) |
-| Heterogeneity | **H2** boundary- + anatomy-resolved net (+ per-organ Dice Δ, NSD) | *where* the net benefit lives (thin boundary band, small organs) | `H2_boundary` (**newly implemented — was called but undefined**), `O_anatomy`, `O_dice_aware`, `O_surface`, `O_errortype` |
-| Concentration | **C1/C2** oracle net-benefit coverage + top-k / K80 | does the net benefit concentrate in few regions, and how strongly? | `O_pareto['oracle']` + `O_pareto['concentration']` |
+| Heterogeneity | **H2** boundary- + anatomy-resolved net (union fg) + per-organ Dice Δ | *where* the net benefit lives (thin boundary band, small organs) | `H2_boundary` (**newly implemented — was called but undefined**), `O_anatomy` (union fg + `dice_delta_full_minus_effi`), `O_surface` (optional NSD) |
+| Concentration | **C1/C2** oracle coverage `Σtop B(r)/Σmax(B(r),0)` + top-k / K80 (+ `abs_net`) | does the net benefit concentrate in few regions, and how strongly? | `O_pareto['oracle']` + `O_pareto['concentration']` |
 | Predictability | **P1** any / positive / **direction** AUROC | *where* preds change, *where* corrected, *whether* improved (direction ≈0.5 ⇒ instability predictable, improvement not) | `O3` (`any_flip_/flip_/pos_vs_neg_auroc`) |
 | Predictability | **P2** signal vs oracle vs random, paired gap CI | is the concentrated opportunity *recoverable* at test time? | `O_pareto` signals + `O_pareto['selection_gap_at_20pct']` |
 
 - **Headline:** H1 (net≈0), P1 direction (`pos_vs_neg`≈0.5), H2 boundary (peaks 0–1 vox),
-  C1 (steep coverage over a ≈0 absolute total — reported *with* the absolute net so shape
+  C1 (steep coverage over a ≈0 `abs_net` total — reported *with* the absolute net so shape
   isn't over-read). Thesis: *net-neutral in voxel correctness, Dice-relevant via a thin
   boundary band; flips predictable in location, not in sign.*
+- **Deleted from code (surplus, 2026-07-30):** **O_dice_aware** (its per-organ Dice Δ folded
+  into `O_anatomy`; size-normalized net was a duplicate of H2-B), **O_errortype** (FN/FP/misclass
+  net — not one of the six), and O5's entropy-binning / `Pearson(H,U)` correlation (H1 keeps only
+  the flip *rates*). Earlier deletions: **O6/O10/O11**.
 - **Appendix only (`--appendix`):** **O1** (boundary error ratio — error-side view of H2),
   **O2** (entropy sparsity), **O4** (per-organ difficulty), **O9** (halo/executed-volume
   opportunity variant — superseded by C1/P2 in `O_pareto`).
-- **Deleted from code:** **O6** (training evolution), **O10** (size vs difficulty — subsumed
-  by H2 anatomy), **O11** (routing-signal correlation; MC-dropout invalid at dropout=0).
-- **Dropped from the main narrative:** O5's subject `Pearson(H,U)` correlation (a duplicate,
-  wide-CI correlation) — the flip *rates* from O5 are H1; the correlation is no longer featured.
+- **Spec-alignment fixes (2026-07-30):** H2-B now uses `union(GT,Full,Effi)` per organ (not
+  GT-only, so FPs count); H2-A boundary bins are `{0-1,1-2,2-4,>4}`; C1 normalizes by the
+  positive net mass `Σ max(B(r),0)` (not all positive flips) and reports `abs_net` beside it.
 - **Anti-duplication:** the old ⑤ oracle-benefit-map is exactly C1; ③ signed-boundary geometry
   stays deferred unless P1 direction AUROC > 0.5.
 
-`aggregate_generality.py` (Fig 4) now plots the two converged headline numbers per L-shape
-cell: H1 net rate (`O5.subject_net_rate_*`) and P1 direction AUROC (`O3.pos_vs_neg_*`).
+Four main figures/tables: **Fig 1** motivation, **Fig 2** heterogeneity (H1 bar + H2 boundary/anatomy),
+**Fig 3** concentration (C1 oracle coverage), **Fig 4** + `tab:pred` predictability (P1 table + P2 curve).
+`aggregate_generality.py` plots the two converged headline numbers per L-shape cell:
+H1 net rate (`O5.subject_net_rate_*`) and P1 direction AUROC (`O3.pos_vs_neg_*`).
 
 ### Common notebook setup
 
@@ -1636,11 +1643,12 @@ The six converged metrics (H1/H2/C1/C2/P1/P2) and figures come from one script,
 
 ### Figures (Paper A) → producing output
 
-| Paper figure | Content | run_observations output |
+| Paper figure | Content | producing output |
 |---|---|---|
-| Fig 1 (Heterogeneity, H2) | per-organ net flip + size (`O_anatomy`) | `O_anatomy.png` |
-| Fig 2 (Concentration/Predictability, C1+P2) | oracle net-benefit coverage vs deployable signals vs random (`O_pareto`) | `O_pareto.png` |
-| supp. (H2) | boundary-resolved net flip (`H2_boundary`) | `H2_boundary.png` |
+| Fig 1 (motivation, teaser) | one slice: image/GT/Effi/Full/pos-neg flip map/entropy + 2 zoom boxes | `make_figure1.py` → `figure1_motivation.png` |
+| Fig 2 (Heterogeneity, H1+H2) | global P/N/net bar (`H1_global_flips`), boundary-resolved net (`H2_boundary`), per-organ net+size (`O_anatomy`) | `H1_global_flips.png`, `H2_boundary.png`, `O_anatomy.png` |
+| Fig 3 (Concentration, C1) | oracle net-benefit coverage curve + top-k/K80 | `O_pareto.png` (oracle curve) |
+| Fig 4 (Predictability, P1+P2) | `tab:pred` AUROC + oracle/signal/random region curves | `tab:pred` + `O_pareto.png` |
 | supp. (P1) | entropy–error scatter (`O3`) | `O3_unc_error.png` |
 
 Appendix figures only under `--appendix`: `O1_organ_error.png`, `O2_entropy.png`,

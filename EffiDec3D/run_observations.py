@@ -453,71 +453,49 @@ def O4_per_organ(val_loader, effi, post_pred, post_lbl):
 
 
 def O5_decoder_gain(val_loader, effi, full):
-    subj_r_pearson, subj_r_spearman = [], []
-    subj_pos_rate, subj_neg_rate = [], []   # per-subject volume transition rates
-    g_ent, g_pos, g_neg, g_net = [], [], [], []
+    """H1: global positive / negative / net flip rates with a subject bootstrap CI.
+
+    For each subject R_pos = mean_v P(v), R_neg = mean_v N(v), R_net = R_pos - R_neg over
+    the whole volume; we bootstrap the twelve subject-level R_net values (not the
+    correlated voxels). Answers whether the full decoder improves predictions uniformly or
+    simultaneously corrects and degrades them: R_net ~ 0 with R_pos, R_neg > 0 is a
+    bidirectional cancellation that a Dice gap alone cannot reveal."""
+    subj_pos_rate, subj_neg_rate = [], []
     with torch.no_grad():
         for batch in val_loader:
             img = batch["image"].cuda()
             lbl = batch["label"].squeeze(1).long().cpu().squeeze()
             pred_full = infer(full, img).argmax(1).cpu().squeeze()
-            logits_e = infer(effi, img)
-            pred_effi = logits_e.argmax(1).cpu().squeeze()
-            prob_e = logits_e.softmax(1).cpu()
-            ent = -(prob_e * torch.log(prob_e + 1e-8)).sum(1).squeeze()
+            pred_effi = infer(effi, img).argmax(1).cpu().squeeze()
             pos = ((pred_full == lbl) & (pred_effi != lbl)).float()
             neg = ((pred_full != lbl) & (pred_effi == lbl)).float()
-            net = pos - neg
             subj_pos_rate.append(float(pos.mean())); subj_neg_rate.append(float(neg.mean()))
-            # np.quantile: torch.quantile errors on tensors > 2^24 elements
-            edges = np.quantile(ent.flatten().numpy(), np.linspace(0, 1, 21))
-            s_ent, s_net = [], []
-            for b in range(20):
-                q_lo, q_hi = float(edges[b]), float(edges[b + 1])
-                mask = (ent >= q_lo) & (ent < q_hi)
-                if mask.sum() > 100:
-                    s_ent.append(ent[mask].mean().item()); s_net.append(net[mask].mean().item())
-                    g_ent.append(s_ent[-1]); g_net.append(net[mask].mean().item())
-                    g_pos.append(pos[mask].mean().item()); g_neg.append(neg[mask].mean().item())
-            if len(s_ent) >= 5:
-                subj_r_pearson.append(pearsonr(s_ent, s_net)[0])
-                subj_r_spearman.append(spearmanr(s_ent, s_net)[0])
-    if len(subj_r_pearson) == 0:
-        print("[O5] no subject produced >=5 valid entropy bins; skipping"); return
-    r_mean = float(np.mean(subj_r_pearson)); r_std = float(np.std(subj_r_pearson))
-    rng = np.random.default_rng(0)
-    boot = [np.mean(rng.choice(subj_r_pearson, len(subj_r_pearson), replace=True)) for _ in range(2000)]
-    ci_lo, ci_hi = np.percentile(boot, [2.5, 97.5])
-    mean_pos, mean_neg = float(np.mean(g_pos)), float(np.mean(g_neg))
-    # Subject-level volume transition rates (rigorous; the bin-averaged rates above
-    # are kept for backward compatibility).
+    if not subj_pos_rate:
+        print("[H1] no subjects; skipping"); return
+    mean_pos, mean_neg = float(np.mean(subj_pos_rate)), float(np.mean(subj_neg_rate))
     net_rate = np.array(subj_pos_rate) - np.array(subj_neg_rate)
+    rng = np.random.default_rng(0)
     nr_boot = [np.mean(rng.choice(net_rate, len(net_rate), replace=True)) for _ in range(2000)]
     nr_ci = [float(np.percentile(nr_boot, 2.5)), float(np.percentile(nr_boot, 97.5))]
-    print(f"[O5] subj Pearson r={r_mean:.3f}+/-{r_std:.3f}  95%CI[{ci_lo:.3f},{ci_hi:.3f}]")
-    print(f"     subj net rate={float(net_rate.mean()):.5f}  95%CI[{nr_ci[0]:.5f},{nr_ci[1]:.5f}]")
-    print(f"     mean pos_rate={mean_pos:.5f}  neg_rate={mean_neg:.5f}  "
-          f"{'GO' if (ci_lo>0 and mean_pos>mean_neg) else 'NO-GO'}")
-    idx = np.argsort(g_ent)
-    xe = np.array(g_ent)[idx]
-    plt.figure(figsize=(8, 5))
-    plt.plot(xe, np.array(g_pos)[idx], "g--o", ms=3, alpha=.6, label="Positive rate")
-    plt.plot(xe, np.array(g_neg)[idx], "r--o", ms=3, alpha=.6, label="Negative rate")
-    plt.plot(xe, np.array(g_net)[idx], "b-o", ms=4,
-             label=f"Net gain (subj-r={r_mean:.2f}[{ci_lo:.2f},{ci_hi:.2f}])")
-    plt.axhline(0, color="k", lw=.8, ls=":")
-    plt.xlabel("Mean entropy (bin)"); plt.ylabel("Rate"); plt.title("O5: Decoder Gain vs Uncertainty")
-    plt.legend(); plt.tight_layout(); plt.savefig(f"{OBS_DIR}/O5_decoder_gain.png", dpi=150); plt.close()
-    bin_net = np.array(g_net)[idx].tolist()
-    save_obs("O5", {"subj_pearson_r_mean": r_mean, "subj_pearson_r_ci": [float(ci_lo), float(ci_hi)],
-                    "mean_positive_rate": mean_pos, "mean_negative_rate": mean_neg,
-                    "subject_pos_rate_mean": float(np.mean(subj_pos_rate)),
-                    "subject_neg_rate_mean": float(np.mean(subj_neg_rate)),
+    net_neutral = bool(nr_ci[0] <= 0 <= nr_ci[1])
+    print(f"[H1] R_pos={mean_pos:.5f}  R_neg={mean_neg:.5f}  "
+          f"R_net={float(net_rate.mean()):.5f}  95%CI[{nr_ci[0]:.5f},{nr_ci[1]:.5f}]  "
+          f"{'net-neutral (CI crosses 0)' if net_neutral else 'directional'}")
+    plt.figure(figsize=(5, 4))
+    plt.bar([0, 1, 2], [mean_pos, mean_neg, float(net_rate.mean())],
+            color=["seagreen", "firebrick", "steelblue"], alpha=.8)
+    plt.errorbar([2], [float(net_rate.mean())],
+                 yerr=[[float(net_rate.mean()) - nr_ci[0]], [nr_ci[1] - float(net_rate.mean())]],
+                 fmt="none", ecolor="k", capsize=5)
+    plt.axhline(0, color="k", lw=.6, ls=":")
+    plt.xticks([0, 1, 2], ["$R_{pos}$", "$R_{neg}$", "$R_{net}$"])
+    plt.ylabel("flip rate"); plt.title("H1: global decoder flip rates")
+    plt.tight_layout(); plt.savefig(f"{OBS_DIR}/H1_global_flips.png", dpi=150); plt.close()
+    save_obs("O5", {"mean_positive_rate": mean_pos, "mean_negative_rate": mean_neg,
+                    "subject_pos_rate_mean": mean_pos, "subject_neg_rate_mean": mean_neg,
                     "subject_net_rate_mean": float(net_rate.mean()),
                     "subject_net_rate_ci": nr_ci,
-                    "bin_ent": xe.tolist(), "bin_net": bin_net,
-                    "go": bool(ci_lo > 0 and mean_pos > mean_neg)})
-    return xe.tolist(), bin_net
+                    "net_neutral": net_neutral})
 
 
 def O9_opportunity(val_loader, effi, full, block_size=16, halo=4, primary_budget=20,
@@ -850,8 +828,8 @@ def O_boundary_flips(val_loader, effi, full):
     Rates are computed on the union(GT, Full, Effi) foreground so false positives are
     not dropped."""
     from scipy.ndimage import distance_transform_edt, binary_erosion
-    edges = [0, 1, 2, 4, 8, np.inf]
-    labels = ["0-1", "1-2", "2-4", "4-8", ">8"]
+    edges = [0, 1, 2, 4, np.inf]                 # boundary / near / transition / interior
+    labels = ["0-1", "1-2", "2-4", ">4"]
     nb = len(labels)
     s_pos = [[] for _ in range(nb)]
     s_neg = [[] for _ in range(nb)]
@@ -920,11 +898,13 @@ def O_pareto(val_loader, effi, full, block_size=16, halo=4):
     ``block_size`` blocks by several signals and plot the net-flip utility recovered
     vs. selection budget --- true-flip ORACLE (upper bound), entropy, confidence,
     a boundary proxy, and matched random (with 95% CI). Utility per block is the net
-    flip within the block, normalized by all positive flips in the subject."""
+    flip within the block, normalized by the subject's positive net mass
+    sum_r max(B(r),0) so coverage is a fraction of the recoverable net benefit (C1)."""
     from scipy.ndimage import distance_transform_edt, binary_erosion
     budgets = np.array([5, 10, 20, 30, 50]); n_random = 100; n_boot = 2000
     signals = ["oracle", "entropy", "confidence", "boundary"]
     rec = {s: [] for s in signals + ["random"]}
+    abs_net, abs_pos_mass = [], []          # per-subject total net and positive-net mass (voxels)
     srng = np.random.default_rng(0); brng = np.random.default_rng(1)
     with torch.no_grad():
         for batch in val_loader:
@@ -939,8 +919,7 @@ def O_pareto(val_loader, effi, full, block_size=16, halo=4):
             neg = ((pred_f != lbl) & (pred_e == lbl)).astype(np.float32)
             net = pos - neg
             body = (lbl > 0) | (pred_f > 0) | (pred_e > 0)
-            tp = float(pos[body].sum())
-            if tp == 0:
+            if not body.any():
                 continue
             fg = lbl > 0
             bnd = fg & ~binary_erosion(fg, iterations=1) if fg.any() else fg
@@ -952,17 +931,22 @@ def O_pareto(val_loader, effi, full, block_size=16, halo=4):
                      for z in range(0, shp[0], block_size)
                      for y in range(0, shp[1], block_size)
                      for x in range(0, shp[2], block_size)]
-            util, s_ent, s_conf, s_bnd = [], [], [], []
+            util_raw, s_ent, s_conf, s_bnd = [], [], [], []
             for c in cores:
                 bm = body[c]
                 if bm.any():
-                    util.append(float(net[c][bm].sum() / tp))
+                    util_raw.append(float(net[c][bm].sum()))      # raw block net benefit B(r)
                     s_ent.append(float(ent[c][bm].mean()))
                     s_conf.append(float(conf[c][bm].mean()))
                     s_bnd.append(float(-dist[c][bm].mean()))      # nearer boundary = higher
                 else:
-                    util.append(0.0); s_ent.append(-np.inf); s_conf.append(-np.inf); s_bnd.append(-np.inf)
-            util = np.array(util)
+                    util_raw.append(0.0); s_ent.append(-np.inf); s_conf.append(-np.inf); s_bnd.append(-np.inf)
+            util_raw = np.array(util_raw)
+            pos_mass = float(util_raw[util_raw > 0].sum())        # C1 denom: sum_r max(B(r),0)
+            if pos_mass == 0:
+                continue
+            util = util_raw / pos_mass                            # fraction of positive net mass
+            abs_net.append(float(util_raw.sum())); abs_pos_mass.append(pos_mass)
             score = {"entropy": np.array(s_ent), "confidence": np.array(s_conf),
                      "boundary": np.array(s_bnd), "oracle": util}
             nb = len(cores)
@@ -1001,8 +985,8 @@ def O_pareto(val_loader, effi, full, block_size=16, halo=4):
     plt.savefig(f"{OBS_DIR}/O_pareto.png", dpi=150); plt.close()
 
     # ---- C1/C2: oracle concentration (how concentrated is the useful net benefit) ----
-    # out["oracle"]["net_recovered_mean"][k] is the fraction of the subject's positive-flip
-    # -normalized net benefit captured by the top-k% oracle blocks -> C_oracle(k).
+    # out["oracle"]["net_recovered_mean"][k] = C_oracle(k), the fraction of the subject's
+    # positive net mass sum_r max(B(r),0) captured by the top-k% oracle blocks.
     orc = np.asarray(out["oracle"]["net_recovered_mean"], dtype=np.float64)
 
     def _cov(bud):
@@ -1013,10 +997,13 @@ def O_pareto(val_loader, effi, full, block_size=16, halo=4):
         "oracle_coverage_at_10pct": _cov(10),
         "oracle_coverage_at_20pct": _cov(20),
         "budget_for_80pct_net_pct": k80,
-        "note": "C1/C2: fraction of the subject positive-flip-normalized net benefit "
-                "recovered by the top-k% oracle blocks; K80 = smallest block budget "
-                "reaching 0.8. Read together with H1 absolute net (near zero) so the "
-                "coverage shape is not mistaken for a large absolute opportunity.",
+        "abs_net_voxels_mean": float(np.mean(abs_net)),        # signed total net (voxels)
+        "abs_pos_mass_voxels_mean": float(np.mean(abs_pos_mass)),  # positive net mass (voxels)
+        "note": "C1/C2: coverage = fraction of the subject's positive net mass "
+                "sum_r max(B(r),0) recovered by the top-k% oracle blocks; K80 = smallest "
+                "block budget reaching 0.8. abs_net is the signed total net benefit in "
+                "voxels: report it WITH the coverage so a steep curve over a ~0 absolute "
+                "total is not mistaken for a large opportunity.",
     }
     # ---- P2: paired (signal - random) net recovery at the primary 20% budget ----
     pidx = int(np.where(budgets == 20)[0][0])
@@ -1043,12 +1030,24 @@ def O_pareto(val_loader, effi, full, block_size=16, halo=4):
 
 
 def O_anatomy(val_loader, effi, full):
-    """Fig 3: per-organ decoder benefit (net flip within each organ's GT voxels) and
-    the organ-size vs. net-flip relationship --- the benefit-based counterparts of the
-    error-based O1/O4/O10."""
+    """H2-B: per-organ decoder benefit on the union(GT, Full, Effi) foreground.
+
+    For organ c let Omega_c = {v : y(v)=c OR y_full(v)=c OR y_effi(v)=c} (union, so false
+    positives are not dropped). Reports the subject-mean positive/negative/net flip rate
+        R_pos,c = mean_{v in Omega_c} P(v),  R_neg,c = mean_{v in Omega_c} N(v),
+        R_net,c = R_pos,c - R_neg,c,
+    the per-organ Dice change dDice_c = Dice_full,c - Dice_effi,c (on GT), organ size, and
+    the size-vs-net-flip Spearman rho. Answers whether the decoder's value is
+    anatomy-dependent, and how a global net ~0 (H1) coexists with a macro Dice gap."""
     from scipy.stats import spearmanr
     o_pos = {n: [] for n in CLASS_NAMES}; o_neg = {n: [] for n in CLASS_NAMES}
     o_size = {n: [] for n in CLASS_NAMES}
+    dde = {n: [] for n in CLASS_NAMES}; ddf = {n: [] for n in CLASS_NAMES}
+
+    def _dice(a, b):
+        s = int(a.sum()) + int(b.sum())
+        return (2.0 * int((a & b).sum()) / s) if s > 0 else float("nan")
+
     with torch.no_grad():
         for batch in val_loader:
             img = batch["image"].cuda()
@@ -1058,18 +1057,24 @@ def O_anatomy(val_loader, effi, full):
             pos = (pred_f == lbl) & (pred_e != lbl)
             neg = (pred_f != lbl) & (pred_e == lbl)
             for c, name in enumerate(CLASS_NAMES, start=1):
-                m = (lbl == c)
-                if m.sum() > 0:
-                    o_pos[name].append(float(pos[m].mean()))
-                    o_neg[name].append(float(neg[m].mean()))
-                    o_size[name].append(float(m.sum()))
+                gt = (lbl == c)
+                dom = gt | (pred_f == c) | (pred_e == c)     # union foreground for organ c
+                if dom.sum() > 0:
+                    o_pos[name].append(float(pos[dom].mean()))
+                    o_neg[name].append(float(neg[dom].mean()))
+                if gt.sum() > 0:
+                    o_size[name].append(float(gt.sum()))
+                    dde[name].append(_dice(pred_e == c, gt))
+                    ddf[name].append(_dice(pred_f == c, gt))
     names = [n for n in CLASS_NAMES if o_pos[n]]
     pos_m = [float(np.mean(o_pos[n])) for n in names]
     neg_m = [float(np.mean(o_neg[n])) for n in names]
     net_m = [p - q for p, q in zip(pos_m, neg_m)]
-    size = [float(np.mean(o_size[n])) for n in names]
+    size = [float(np.mean(o_size[n])) if o_size[n] else float("nan") for n in names]
+    ddice = [float(np.nanmean(ddf[n]) - np.nanmean(dde[n])) if dde[n] else float("nan")
+             for n in names]
     rho = float(spearmanr(size, net_m)[0]) if len(names) > 2 else float("nan")
-    print(f"[O_anatomy] per-organ net flip; size~net Spearman={rho:.3f}")
+    print(f"[H2-anatomy] per-organ net flip (union fg) + dDice; size~net Spearman={rho:.3f}")
     fig, axs = plt.subplots(1, 2, figsize=(12, 4))
     xs = np.arange(len(names))
     axs[0].bar(xs - 0.2, pos_m, 0.4, color="seagreen", alpha=.7, label="positive")
@@ -1077,7 +1082,8 @@ def O_anatomy(val_loader, effi, full):
     axs[0].plot(xs, net_m, "b-o", ms=3, label="net")
     axs[0].axhline(0, color="k", lw=.6, ls=":")
     axs[0].set_xticks(xs); axs[0].set_xticklabels(names, rotation=45, ha="right")
-    axs[0].set_ylabel("flip rate"); axs[0].set_title("(a) Per-organ decoder benefit"); axs[0].legend()
+    axs[0].set_ylabel("flip rate (union fg)")
+    axs[0].set_title("(a) Per-organ decoder benefit"); axs[0].legend()
     axs[1].scatter(size, net_m, color="steelblue")
     for i, n in enumerate(names):
         axs[1].annotate(n, (size[i], net_m[i]), fontsize=7)
@@ -1085,95 +1091,11 @@ def O_anatomy(val_loader, effi, full):
     axs[1].set_xlabel("organ size (voxels, log)"); axs[1].set_ylabel("net flip rate")
     axs[1].set_title(f"(b) Size vs.\\ benefit (Spearman ${rho:.2f}$)")
     fig.tight_layout(); fig.savefig(f"{OBS_DIR}/O_anatomy.png", dpi=150); plt.close(fig)
-    save_obs("O_anatomy", {"organ": names, "positive_rate": pos_m, "negative_rate": neg_m,
-                           "net_rate": net_m, "organ_size": size, "size_net_spearman": rho})
-
-
-def O_dice_aware(val_loader, effi, full):
-    """C2 refinement: per-organ SIZE-NORMALIZED net flips + per-organ Dice change
-    (Full - Effi). Explains how a global voxel-level net ~0 coexists with a macro Dice
-    gap --- small organs may still gain when the global net cancels. Net is restricted to
-    each organ's GT voxels and normalized by organ size: R_net,c = (P_c - N_c) / |Y_c|."""
-    names = CLASS_NAMES
-    posn = {n: [] for n in names}; negn = {n: [] for n in names}; netn = {n: [] for n in names}
-    dde = {n: [] for n in names}; ddf = {n: [] for n in names}
-
-    def _dice(a, b):
-        s = int(a.sum()) + int(b.sum())
-        return (2.0 * int((a & b).sum()) / s) if s > 0 else float("nan")
-
-    with torch.no_grad():
-        for batch in val_loader:
-            img = batch["image"].cuda()
-            lbl = batch["label"].squeeze(1).long().cpu().squeeze().numpy().reshape(-1)
-            pe = infer(effi, img).argmax(1).cpu().squeeze().numpy().reshape(-1)
-            pf = infer(full, img).argmax(1).cpu().squeeze().numpy().reshape(-1)
-            for ci, n in enumerate(names, start=1):
-                gt = (lbl == ci); size = int(gt.sum())
-                if size == 0:
-                    continue
-                p = int(((pe != lbl) & (pf == lbl) & gt).sum())    # full recovers organ ci
-                q = int(((pe == lbl) & (pf != lbl) & gt).sum())    # full loses organ ci
-                posn[n].append(p / size); negn[n].append(q / size); netn[n].append((p - q) / size)
-                dde[n].append(_dice(pe == ci, gt)); ddf[n].append(_dice(pf == ci, gt))
-
-    def _mean(d): return {n: (round(float(np.nanmean(v)), 5) if v else float("nan"))
-                          for n, v in d.items()}
-    delta = {n: (round(float(np.nanmean(ddf[n]) - np.nanmean(dde[n])), 4) if dde[n]
-                 else float("nan")) for n in names}
-    net_by_organ = _mean(netn)
-    save_obs("O_dice_aware", {
-        "size_normalized_net_per_organ": net_by_organ,
-        "positive_rate_per_organ": _mean(posn),
-        "negative_rate_per_organ": _mean(negn),
-        "dice_delta_full_minus_effi_per_organ": delta,
-        "note": "net restricted to each organ's GT voxels, normalized by organ size; "
-                "delta = Full per-organ Dice - Effi per-organ Dice",
+    save_obs("O_anatomy", {
+        "organ": names, "positive_rate": pos_m, "negative_rate": neg_m, "net_rate": net_m,
+        "organ_size": size, "dice_delta_full_minus_effi": ddice, "size_net_spearman": rho,
+        "foreground": "union(GT,Full,Effi) per organ",
     })
-    print(f"[O_dice_aware] per-organ Dice delta (Full-Effi): {delta}")
-    return net_by_organ, delta
-
-
-def O_errortype(val_loader, effi, full):
-    """C2 refinement: classify each flip by (efficient pred, full pred, GT) transition.
-    Positive flips (full fixes) -> FN/FP/misclass correction; negative flips (full breaks)
-    -> their introduced counterparts. Reveals whether the full decoder systematically
-    helps some error types (e.g. recovering missed foreground) and hurts others (e.g.
-    introducing false positives)."""
-    cats = ["fn_correction", "fp_correction", "misclass_correction",
-            "fn_introduced", "fp_introduced", "misclass_introduced"]
-    tot = {c: 0 for c in cats}; subj = {c: [] for c in cats}
-    with torch.no_grad():
-        for batch in val_loader:
-            img = batch["image"].cuda()
-            lbl = batch["label"].squeeze(1).long().cpu().squeeze().numpy().reshape(-1)
-            pe = infer(effi, img).argmax(1).cpu().squeeze().numpy().reshape(-1)
-            pf = infer(full, img).argmax(1).cpu().squeeze().numpy().reshape(-1)
-            pos = (pe != lbl) & (pf == lbl)     # full fixes effi
-            neg = (pe == lbl) & (pf != lbl)     # full breaks effi
-            c = {
-                "fn_correction":       int((pos & (pe == 0) & (lbl > 0)).sum()),
-                "fp_correction":       int((pos & (pe > 0) & (lbl == 0)).sum()),
-                "misclass_correction": int((pos & (pe > 0) & (lbl > 0)).sum()),
-                "fn_introduced":       int((neg & (pf == 0) & (lbl > 0)).sum()),
-                "fp_introduced":       int((neg & (pf > 0) & (lbl == 0)).sum()),
-                "misclass_introduced": int((neg & (pf > 0) & (lbl > 0)).sum()),
-            }
-            nfg = int((lbl > 0).sum()) or 1
-            for k in cats:
-                tot[k] += c[k]; subj[k].append(c[k] / nfg)
-    net = {"fn": tot["fn_correction"] - tot["fn_introduced"],
-           "fp": tot["fp_correction"] - tot["fp_introduced"],
-           "misclass": tot["misclass_correction"] - tot["misclass_introduced"]}
-    save_obs("O_errortype", {
-        "counts": tot,
-        "rate_per_fg_voxel": {k: round(float(np.mean(subj[k])), 6) for k in cats},
-        "net_by_type": net,
-        "note": "positive=full fixes effi; negative=full breaks effi; "
-                "net_by_type>0 means full helps that error type on balance",
-    })
-    print(f"[O_errortype] net by type (full helps if >0): {net}")
-    return tot, net
 
 
 def main():
@@ -1303,10 +1225,9 @@ def main():
     save_obs("framework_map", {
         "H1_global_flips": "O5 (subject-mean positive/negative/net flip + bootstrap CI)",
         "H2_boundary": "H2_boundary (distance-to-boundary net flip)",
-        "H2_anatomy": "O_anatomy (per-organ net flip + size)",
-        "H2_organ_support": "O_dice_aware (size-normalized net + per-organ Dice delta), "
-                            "O_surface (per-organ NSD), O_errortype (net by error type)",
-        "C1_C2_concentration": "O_pareto['oracle'] curve + O_pareto['concentration'] top-k/K80",
+        "H2_anatomy": "O_anatomy (per-organ union-fg net flip + per-organ Dice delta + size)",
+        "H2_support": "O_surface (per-organ NSD, optional boundary-quality column)",
+        "C1_C2_concentration": "O_pareto['oracle'] curve + O_pareto['concentration'] top-k/K80/abs_net",
         "P1_predictability": "O3 (any / positive / direction=pos-vs-neg AUROC)",
         "P2_selection": "O_pareto signals vs oracle vs random + "
                         "O_pareto['selection_gap_at_20pct'] paired diff CI",
@@ -1321,9 +1242,7 @@ def main():
     if effi is not None:
         O5_decoder_gain(val_loader, effi, full)            # H1: global P/N/net + subject CI
         O_boundary_flips(val_loader, effi, full)           # H2-A: boundary-resolved net
-        O_anatomy(val_loader, effi, full)                  # H2-B: per-organ net + size
-        O_dice_aware(val_loader, effi, full)               # H2 support: size-norm net + Dice delta
-        O_errortype(val_loader, effi, full)                # H2 support: net by error type
+        O_anatomy(val_loader, effi, full)                  # H2-B: per-organ union-fg net + Dice delta
         O_pareto(val_loader, effi, full, block_size=args_ns.o9_block_size,
                  halo=args_ns.o9_halo)                     # C1+C2 (oracle) + P2 (signal vs random)
     else:

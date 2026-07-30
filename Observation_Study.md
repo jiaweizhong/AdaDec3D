@@ -1625,6 +1625,25 @@ decoder-only routing.
 > resolved flips, NSD, and the O9 `--o9_foreground` denominator option are in
 > `run_observations.py`.
 
+**Frozen-encoder factorial results (UX-Net, BTCV, concat, 2026-07-30).** Four corners
+trained on the frozen full-UX encoder ([results/factorial_btcv13.csv](results/factorial_btcv13.csv)):
+
+| Decoder | (r_f, C) | MACs (G) | Param (M) | Dice | ΔDice vs full |
+|---|---|---|---|---|---|
+| Full | (1, 384) | 657.8 | 46.7 | .804 | — |
+| Channel-only | (1, 48) | 388.2 | 2.2 | .798 | −0.6 |
+| Resolution-only | (2, 384) | 319.1 | 46.3 | .780 | −2.5 |
+| Combined (Effi) | (2, 48) | 49.5 | 1.8 | .784 | −2.1 |
+
+Reading (→ paper `tab:factorial` + `sec:mechanism`):
+- **Sanity gate ✅** — full corner on the frozen encoder (.804) ≥ end-to-end full-UX (.792), so the frozen features don't bottleneck the decoder; attribution is valid.
+- **Channel width = more removable** — 384→48 costs only −0.6 Dice while dropping 95% of decoder params (46.7→2.2M).
+- **High-res stage = the compute + most of the (small) cost** — dropping it costs −2.5 Dice and is where the MACs go (657.8→319.1 at full C; 388.2→49.5 combined); params barely move → near-pure compute/accuracy knob.
+- **Factors ~independent** — combined (.784) tracks resolution-only; channel cut nearly free on top.
+- **Pending**: the per-factor *flip* localization (does dropping resolution push flips nearer the boundary?) needs the pairwise analysis **re-run on the converged code** (the run that produced these Dice was killed/old-code for the flip part).
+
+**E0/E1 baseline cross-check (2026-07-30).** UX-Net & Swin `tab:baseline`/`tab:arch` numbers verified against the CSV (UX concat 11.7×/16.8×/5.1×/7.7×; Swin concat 5.5×/5.5×/2.2×). Fixed one stale prose figure (Swin said "6.5× / 2.6 pt" = the *addition* config; corrected to concat 5.5× / 1.0 pt). **MedNeXt row is provisional** — the CSV is the oversized f_s=48 model (full 39.3M vs standard 17.6M, 2.24×); refresh `tab:arch` MedNeXt after the f_s=32 retrain.
+
 **Paper A conclusion (concat, 2026-07-29):** voxel net benefit ≈0, no recoverable region opportunity; flips predictable in location but net-neutral in direction (H2/P1 hold; H1/C1/P2 negative). Paper B proceeds independently in
 [Experiment-Design-AdaDec3D.md](Experiment-Design-AdaDec3D.md), with E1 (77.0%) as
 the iso-accuracy target.

@@ -36,10 +36,12 @@ published reductions: \effimodel{} uses $11.7\times$ fewer MACs, $16.8\times$ fe
 parameters, $\sim\!5\times$ lower latency, and $\sim\!7.7\times$ lower peak memory.
 The same pattern holds on the architecture axis (Table~\ref{tab:arch}): on BTCV,
 Swin UNETR reproduces its published full model ($0.805$ vs.\ $0.8013$) and its
-\method{} decoder cuts MACs $6.5\times$ at a $2.6$-point Dice cost---a smaller
-reduction than 3D UX-Net's, matching \method{}'s own per-backbone figures.
-MedNeXt-M-K3, the strongest backbone at $0.837$ full Dice, shows a $2.3$-point cost at
-a $2.2\times$ MAC reduction; across the three backbones the Dice cost is small
+\method{} decoder (concatenation skip) cuts MACs $5.5\times$ at a $1.0$-point Dice
+cost---a smaller reduction than 3D UX-Net's, matching \method{}'s own per-backbone
+figures. MedNeXt-M-K3, the strongest backbone at $0.837$ full Dice, shows a
+$2.3$-point cost at a $2.2\times$ MAC reduction\todo{MedNeXt is currently the
+oversized $f_s{=}48$ config ($39.3$\,M vs.\ the standard $17.6$\,M); refresh this row
+after the $f_s{=}32$ retrain}; across the three backbones the Dice cost is small
 ($1.0$--$2.3\%$) even as the achievable MAC reduction ranges from $2.2\times$ to
 $11.7\times$---consistent across architectures, not universal in magnitude.
 Treating these matched models as fixed, the rest of the paper characterizes
@@ -208,17 +210,50 @@ difference $\leq0.02$), so we do not claim entropy is uniquely optimal.
 
 The comparisons above use end-to-end models, which share the encoder architecture but
 not its weights. As a further, causally cleaner check, we \emph{freeze} one trained
-encoder and train the $2\times2$ decoder factorial on identical features, then compare
-Full$\rightarrow$channel-only, Full$\rightarrow$resolution-only, and
-Full$\rightarrow$combined \method{}
-\todo{report per-factor flip rates and boundary profiles from the frozen-encoder run;
-hypothesis to test: dropping the high-resolution stage yields flips concentrated
-nearer the boundary, while channel reduction is spatially diffuse and smaller, which
-would explain why both are removable with little aggregate Dice change}.  Because the
-frozen encoder was optimized for the full decoder, a near-match by the efficient
-decoder on those features would be a \emph{conservative} statement of redundancy.  We
-present this regime as validation of the decoder attribution rather than as the
-primary result.
+3D UX-Net encoder and train a $2\times2$ decoder factorial on identical features,
+varying only the two knobs \method{} changes at once---channel width ($C{=}384$
+vs.\ $48$) and the high-resolution stage (resolution factor $r_f{=}1$ vs.\ $2$)---so any
+difference is attributable to the decoder alone (Table~\ref{tab:factorial}).
+
+\begin{table}[t]
+\centering
+\caption{Frozen-encoder $2\times2$ decoder factorial (3D UX-Net, BTCV, concatenation
+skip). The encoder is the trained full-UX encoder, frozen; only the decoder is trained.
+Channel width and the high-resolution stage are varied independently.}
+\label{tab:factorial}
+\setlength{\tabcolsep}{4pt}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{llcccc}
+\toprule
+Decoder & $(r_f, C)$ & MACs & Param & Dice & $\Delta$Dice \\
+ & & (G) & (M) & & vs.\ full \\
+\midrule
+Full             & $(1, 384)$ & $657.8$ & $46.7$ & $.804$ & --- \\
+Channel-only     & $(1, 48)$  & $388.2$ & $2.2$  & $.798$ & $-0.6$ \\
+Resolution-only  & $(2, 384)$ & $319.1$ & $46.3$ & $.780$ & $-2.5$ \\
+Combined (\method{}) & $(2, 48)$ & $49.5$ & $1.8$ & $.784$ & $-2.1$ \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+Three readings follow. \textbf{(i)~The frozen-encoder attribution is valid:} the
+full-decoder corner on the frozen encoder reaches $0.804$ Dice, matching (slightly
+exceeding) the end-to-end full-UX model ($0.792$), so the frozen features do not
+bottleneck the decoder. \textbf{(ii)~Channel width is the more removable factor:}
+cutting $384\!\rightarrow\!48$ channels costs only $0.6$ Dice while removing
+$95\%$ of decoder parameters ($46.7\!\rightarrow\!2.2$\,M). \textbf{(iii)~The
+high-resolution stage carries the compute and most of the (small) accuracy cost:}
+dropping it costs $2.5$ Dice and is where the MAC savings live
+($657.8\!\rightarrow\!319.1$\,G at full width; $388.2\!\rightarrow\!49.5$\,G combined),
+while leaving parameters almost unchanged---a near-pure compute/accuracy knob. The two
+factors are largely independent: the combined \method{} decoder ($0.784$) tracks
+resolution-only, with the channel cut nearly free on top. Because the frozen encoder was
+optimized for the full decoder, the efficient decoder's near-match on those features is a
+\emph{conservative} statement of redundancy. The corresponding per-factor \emph{flip}
+localization---testing whether dropping the high-resolution stage concentrates flips
+nearer the boundary than channel reduction does---is \todo{report from the pairwise
+frozen-encoder flip analysis re-run}. We present this regime as validation of the decoder
+attribution rather than as the primary result.
 
 \section{Discussion: Implications for Efficient Decoder Design}
 \label{sec:discussion}

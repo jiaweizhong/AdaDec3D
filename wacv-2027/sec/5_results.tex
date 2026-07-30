@@ -105,89 +105,100 @@ Net flip rate, subject 95\% CI & $[-.00026,.00112]$\\
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.96\columnwidth]{figures/O1_organ_error.png}
-\caption{Per-organ error rate for \effimodel{} (seed 1). Difficulty is strongly
-uneven across anatomy.}
+\includegraphics[width=0.96\columnwidth]{figures/O_anatomy.png}
+\caption{H2, per-organ net flip for the matched pair (seed 1): positive, negative, and
+net rates within each organ's GT voxels, and net flip vs.\ organ size. The decoder's
+net benefit is uneven across anatomy and rises as structures shrink.}
 \label{fig:organ}
 \end{figure}
 
-This small net benefit is far from uniformly distributed.  As a first cut,
-\effimodel{} error concentrates at structure boundaries ($4.39\times$ the
-eroded-interior rate) and on small, hard organs---the adrenals, pancreas, and
-veins---with net benefit rising as structure size falls (organ-size/net-flip
-$\rho=-0.37$; Fig.~\ref{fig:organ}).  Resolving the \emph{net flip} rate by distance
-to the GT boundary shows the decoder's benefit is sharply boundary-localized: it
-peaks at the surface ($0.085$ at $0$--$1$ vox) and is near zero or slightly negative
-beyond $1$ vox; surface Dice (NSD) is $0.741$/$0.845$ at $\tau{=}1$/$2$~mm.  This
-concentration should exceed a same-architecture null pair (Full seed~0 vs.\ seed~1)
-\todo{null-pair floor}, ruling out seed noise.
+This near-zero global net is \emph{not} a uniform absence of effect but a spatially
+structured cancellation (H2).  Resolving $R_{\mathrm{net}}$ by distance to the GT
+boundary shows the benefit is sharply boundary-localized: it peaks at the surface
+($0.085$ at $0$--$1$ vox) and falls to near zero or slightly negative beyond one voxel
+\todo{refresh H2 boundary profile from re-run}, so the balanced flips of
+Table~\ref{tab:flips} live almost entirely in a one-voxel shell---the same band Dice
+weights heavily.  Per organ, the net benefit rises as structures shrink (adrenals,
+pancreas, veins; organ-size/net-flip $\rho=-0.37$, Fig.~\ref{fig:organ}), and
+surface Dice (NSD) is $0.741$/$0.845$ at $\tau{=}1$/$2$~mm.  This boundary and
+small-structure concentration should exceed a same-architecture null pair (Full seed~0
+vs.\ seed~1) \todo{null-pair floor}, ruling out seed noise.  (The error-based boundary
+ratio---\effimodel{} error $4.39\times$ the interior rate---is a consistent but weaker
+error-side view, reported in the appendix.)
 
 \subsection{Concentration Metrics}
 \label{sec:concentration}
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.90\columnwidth]{figures/O2_entropy.png}\\[-1mm]
-\textbf{(a) Voxel entropy (log-count).}\\[1mm]
-\includegraphics[width=0.96\columnwidth]{figures/O5_decoder_gain.png}\\[-1mm]
-\textbf{(b) Net flips vs.\ entropy.}
-\caption{Concentration of difficulty and net flips (seed 1). Uncertainty is
-spatially sparse (a), and net flips rise with it (b).}
+\includegraphics[width=0.98\columnwidth]{figures/O_pareto.png}
+\caption{C1/P2: net benefit recovered vs.\ the fraction of $16^3$ blocks selected. The
+true-net \emph{oracle} (black; C1) upper-bounds concentration, while deployable signals
+(entropy, confidence, boundary) and a matched-random selector (P2) show whether that
+opportunity is recoverable at test time. Shaded bands are subject $95\%$ CIs.}
 \label{fig:concentration}
 \end{figure}
 
-A small, high-uncertainty subset carries most of the net benefit.  Predictive
-entropy is spatially sparse: the median voxel entropy is near zero and only $1.26\%$
-of voxels exceed $0.5$ (Fig.~\ref{fig:concentration}a).  What net flips there are
-concentrate in this tail---the subject-level Pearson correlation between binned
-entropy and net flips is $r=0.639$ (95\% CI $[0.198, 0.987]$), bounded above zero
-(Fig.~\ref{fig:concentration}b).  A voxel-level oracle makes the concentration
-explicit: ranking foreground voxels by entropy, the top $20\%$ contain $83.1\%$ of
-all positive flips.
+We next ask whether that small net benefit is at least spatially concentrated (C1).
+Ranking contiguous $16^3$ blocks by their true net benefit $B(r)=\sum_{v\in r}U(v)$,
+the top $10\%$/$20\%$ of blocks recover \todo{$C_{10}$/$C_{20}$\%} of the volume's net
+benefit, and $K_{80}=\,$\todo{}\% of blocks are needed to reach $80\%$
+(Fig.~\ref{fig:concentration}, oracle curve).  The coverage curve is steep, so the net
+benefit \emph{is} concentrated---but it is concentrated over a total that is itself
+$\approx\!0$ (Table~\ref{tab:flips}), a small absolute opportunity rather than a large
+one.  We report coverage and absolute net together precisely so the curve's shape is
+not read as a large payoff.  For reference, a voxel-level oracle over entropy captures
+$83.1\%$ of the \emph{positive} flips in its top $20\%$; but positive-flip coverage
+ignores the near-equal negative flips that cancel them, which is why the net-benefit
+oracle above is the honest concentration measure.
 
 \subsection{Predictability Metrics}
 \label{sec:predictability}
 
-\begin{figure}[t]
+\begin{table}[t]
 \centering
-\includegraphics[width=0.98\columnwidth]{figures/O9_opportunity_corrected.png}
-\caption{Region-level opportunity (3D UX-Net, concat). Entropy-ranked $16^3$ blocks
-exceed a matched-random selector only in the mean and only at small budgets; under a
-paired bootstrap the advantage is not significant at $\geq 10\%$ (and is negative for
-Swin), because the net benefit itself is $\approx\!0$. Left panel is a non-deployable
-voxel oracle.}
-\label{fig:opportunity}
-\end{figure}
+\caption{P1: subject-level AUROC of efficient-model entropy for three progressively
+harder flip-prediction targets. Entropy locates \emph{where} predictions change but
+carries almost no information about \emph{whether} they improve (direction
+$\approx0.5$).}
+\label{tab:pred}
+\resizebox{0.9\columnwidth}{!}{%
+\begin{tabular}{lcc}
+\toprule
+Target & AUROC & 95\% CI \\
+\midrule
+Any flip ($P\vee N$)      & \todo{} & \todo{} \\
+Positive flip ($P$)       & .903 & $[.876,.926]$ \\
+Direction ($P$ vs.\ $N$)  & \todo{$\approx.5$} & \todo{} \\
+\bottomrule
+\end{tabular}}
+\end{table}
 
-The scarce flips that do occur, though net-neutral, are not random---they can be
-located from the efficient model's own uncertainty.  We assess this as an
-error-discrimination problem: predictive entropy should separate flip voxels from the
-rest~\cite{hendrycks2017baseline}.
-Efficient-decoder entropy predicts the \emph{positive-flip} voxel with per-subject
-AUROC $0.903$ ($95\%$ CI $[0.876,0.926]$) and AUPRC $0.299$ ($[0.259,0.342]$);
-predicting the error voxel---a cheaper baseline---gives AUROC $0.856$
-($[0.789,0.897]$) and AUPRC $0.530$ ($[0.499,0.559]$), and entropy is moderately
-calibrated (ECE $0.088$, $[0.065,0.115]$)~\cite{guo2017calibration}.  The pooled-bin
-entropy--error correlation $r=0.97$ is retained only as a descriptive diagnostic.
+The scarce flips, though net-neutral, are not random---but only their \emph{location},
+not their \emph{direction}, is predictable from the efficient model's own uncertainty
+(P1, Table~\ref{tab:pred}).  Entropy separates any correctness-changing flip from stable
+voxels (AUROC \todo{}) and predicts the \emph{positive}-flip voxel with per-subject AUROC
+$0.903$ ($95\%$ CI $[0.876,0.926]$)~\cite{hendrycks2017baseline}.  Restricted to the flip
+voxels themselves, however, entropy cannot tell an improvement from a regression: the
+positive-vs-negative (direction) AUROC is \todo{$\approx0.5$}, so knowing that a
+prediction will change conveys almost nothing about whether it gets better.  Predicting
+\emph{instability} is easy; predicting \emph{improvement} is not---the central obstacle
+to turning this redundancy into a benefit-aware efficient decoder.  (Entropy is
+moderately calibrated, ECE $0.088$, $[0.065,0.115]$~\cite{guo2017calibration}; the
+pooled-bin entropy--error correlation $r=0.97$ is a descriptive diagnostic only.)
 
-We then convert this into a deployable, selective-prediction analysis
-\cite{geifman2017selective}.  Non-overlapping $16^3$ blocks are ranked by mean
-entropy and expanded by a $4$-voxel halo; we measure net flip utility recovered
-against a matched-random selector under a paired subject bootstrap
-(Fig.~\ref{fig:opportunity}).  Because the net benefit is itself $\approx\!0$, this
-recovery is correspondingly weak.  On 3D UX-Net, at the predeclared $20\%$ block budget
-entropy-ranked regions attain a net utility of $0.161$ versus $0.035$ for random in the
-mean, but the paired subject bootstrap is significant only at the smallest $5\%$ budget;
-at every budget $\geq 10\%$ its CI includes zero.  On Swin UNETR the paired lower bound
-is negative at \emph{every} budget.  We therefore report a \emph{negative} result at
-the matched configuration: entropy localizes where the scarce flips occur, but there is
-no reliable net benefit to selectively recover, because there is essentially no net
-benefit at all.
-
-Finally, entropy and confidence are interchangeable routing signals (subject
-correlations $0.639$ vs.\ $0.648$, paired difference $\leq 0.02$); Monte-Carlo
-dropout is inapplicable at this checkpoint's zero dropout, so we treat confidence as
-an equally valid baseline and do not claim entropy is uniquely optimal.
+This unpredictable direction directly bounds deployable region selection (P2).  Using
+the same $16^3$ blocks as C1 but ranking by a ground-truth-free
+signal~\cite{geifman2017selective}, we compare the net benefit recovered against the
+oracle and a matched-random selector under a paired subject bootstrap
+(Fig.~\ref{fig:concentration}).  Because the net benefit is $\approx\!0$ and its
+direction is unpredictable, recovery is weak: at the predeclared $20\%$ block budget the
+entropy$-$random gap is \todo{$g\pm$CI} with a $95\%$ CI that includes zero
+\todo{confirm from re-run}, and on Swin UNETR the paired lower bound is negative at every
+budget.  We therefore report a \emph{negative} result at the matched configuration:
+entropy localizes where the scarce flips occur, but there is no reliable net benefit to
+selectively recover.  Entropy and confidence are interchangeable as signals (paired
+difference $\leq0.02$), so we do not claim entropy is uniquely optimal.
 
 \subsection{Mechanism: Which Factor Is Removable}
 \label{sec:mechanism}

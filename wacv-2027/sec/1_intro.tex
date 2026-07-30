@@ -1,202 +1,67 @@
 \section{Introduction}
 \label{sec:intro}
 
-Please follow the steps outlined below when submitting your manuscript to the IEEE Computer Society Press.
-This style guide now has several important modifications (for example, you are no longer warned against the use of sticky tape to attach your artwork to the paper), so all authors should read this new version.
+Encoder--decoder U-Nets are the dominant architecture for 3D medical image
+segmentation, where the decoder fuses multi-scale encoder features and restores the
+spatial detail needed for accurate organ boundaries. As backbones have grown---from
+convolutional~\cite{lee20233duxnet,roy2023mednext} to
+Transformer~\cite{hatamizadeh2022unetr,tang2022swinunetr,he2023swinunetrv2}
+designs---the decoder has become a large share of the compute and memory budget,
+particularly its high-resolution stages that operate at or near input resolution.
+Efficient-decoder methods respond by shrinking these stages: \method{}, a recent
+example, removes more than $85\%$ of the decoder's parameters and FLOPs across 3D
+UX-Net, MedNeXt-M-K3, and Swin UNETR while losing little Dice~\cite{rahman2025effidec3d}.
 
-%-------------------------------------------------------------------------
-\subsection{Language}
+Such results demonstrate that decoder computation is \emph{removable}: one can delete it
+and watch aggregate accuracy hold. They do not, however, explain \emph{why} it is
+removable, \emph{where} in the volume the full decoder still changes predictions, or
+whether those regions can be identified at test time. This gap matters for the field's
+next step. If the removed capacity were uniformly useless, efficient decoders could stop
+at a fixed reduction; if instead its benefit were concentrated and predictable, one could
+allocate decoder computation \emph{adaptively}, spending it only where it helps. Aggregate
+Dice and FLOPs cannot distinguish these cases, because a metric that averages over
+millions of voxels hides both the spatial structure of the change and its direction.
 
-All manuscripts must be in English.
+We therefore complement the ablation evidence with a systematic characterization of
+decoder redundancy. Rather than asking whether the decoder can be removed, we ask
+\emph{how} its contribution is distributed, organizing the study along three axes:
+\textbf{heterogeneity} (is the full decoder's effect uniform, or does it depend on
+location and anatomy?), \textbf{concentration} (is the beneficial computation confined to
+a small subset of regions?), and \textbf{predictability} (can a test-time signal find
+those regions without the ground truth?). Our unit of analysis is the per-voxel
+\emph{prediction flip} between a matched full and efficient decoder---the standard tool
+for comparing two classifiers on paired data~\cite{yan2021pct,cormier2016churn,mcnemar1947}
+---which separates cases where the full decoder \emph{corrects} the efficient one
+(positive flips) from those where it \emph{degrades} it (negative flips). We evaluate two
+regimes: an end-to-end matched pair, and a frozen shared-encoder control that isolates the
+decoder path. Generality is tested with an L-shaped protocol spanning three architectures
+(3D UX-Net, Swin UNETR, MedNeXt-M-K3) and three datasets
+(BTCV~\cite{antonelli2022msd}, FeTA~\cite{payette2021feta}, and MSD HepaticVessel).
 
-\subsection{Dual submission}
+Our characterization yields a nuanced picture that the aggregate numbers obscure. At the
+parameter-matched configuration the full decoder's net benefit is
+\emph{bidirectional to the point of cancellation}: it corrects and degrades comparable
+numbers of voxels, so the net flip rate is statistically indistinguishable from zero
+(e.g.\ $-0.001\%$ on Swin UNETR). Yet this voxel-level neutrality coexists with a
+$1$--$2$ point Dice gap, because the near-balanced flips concentrate in a thin band within
+one to two voxels of organ boundaries---exactly where Dice is most sensitive. Finally,
+the efficient model's own uncertainty predicts \emph{where} a prediction will change
+(AUROC $\approx\!0.9$) but not \emph{whether} the change is an improvement (direction
+AUROC $\approx\!0.5$): predicting instability is easy, predicting improvement is not. This
+last result is the central obstacle to turning decoder redundancy into a deployable,
+benefit-aware efficient decoder, and it holds consistently across the three architectures.
 
-Please refer to the author guidelines on the \confName\ \confYear\ web page for a
-discussion of the policy on dual submissions.
-
-\subsection{Paper length}
-Papers, excluding the references section, must be no longer than eight pages in length.
-The references section will not be included in the page count, and there is no limit on the length of the references section.
-For example, a paper of eight pages with two pages of references would have a total length of 10 pages.
-{\bf There will be no extra page charges for \confName\ \confYear.}
-
-Overlength papers will simply not be reviewed.
-This includes papers where the margins and formatting are deemed to have been significantly altered from those laid down by this style guide.
-Note that this \LaTeX\ guide already sets figure captions and references in a smaller font.
-The reason such papers will not be reviewed is that there is no provision for supervised revisions of manuscripts.
-The reviewing process cannot determine the suitability of the paper for presentation in eight pages if it is reviewed in eleven.
-
-%-------------------------------------------------------------------------
-\subsection{The ruler}
-The \LaTeX\ style defines a printed ruler which should be present in the version submitted for review.
-The ruler is provided in order that reviewers may comment on particular lines in the paper without circumlocution.
-If you are preparing a document using a non-\LaTeX\ document preparation system, please arrange for an equivalent ruler to appear on the final output pages.
-The presence or absence of the ruler should not change the appearance of any other content on the page.
-The camera-ready copy should not contain a ruler.
-(\LaTeX\ users may use options of \texttt{wacv.sty} to switch between different versions.)
-
-Reviewers:
-note that the ruler measurements do not align well with lines in the paper --- this turns out to be very difficult to do well when the paper contains many figures and equations, and, when done, looks ugly.
-Just use fractional references (\eg, this line is $087.5$), although in most cases one would expect that the approximate location will be adequate.
-
-
-\subsection{Paper ID}
-Make sure that the Paper ID from the submission system is visible in the version submitted for review (replacing the ``*****'' you see in this document).
-If you are using the \LaTeX\ template, \textbf{make sure to update paper ID in the appropriate place in the tex file}.
-
-
-\subsection{Mathematics}
-
-Please number all of your sections and displayed equations as in these examples:
-\begin{equation}
-  E = m\cdot c^2
-  \label{eq:important}
-\end{equation}
-and
-\begin{equation}
-  v = a\cdot t.
-  \label{eq:also-important}
-\end{equation}
-It is important for readers to be able to refer to any particular equation.
-Just because you did not refer to it in the text does not mean some future reader might not need to refer to it.
-It is cumbersome to have to use circumlocutions like ``the equation second from the top of page 3 column 1''.
-(Note that the ruler will not be present in the final copy, so is not an alternative to equation numbers).
-All authors will benefit from reading Mermin's description of how to write mathematics:
-\url{http://www.pamitc.org/documents/mermin.pdf}.
-
-\subsection{Blind review}
-
-Many authors misunderstand the concept of anonymizing for blind review.
-Blind review does not mean that one must remove citations to one's own work---in fact it is often impossible to review a paper unless the previous citations are known and available.
-
-Blind review means that you do not use the words ``my'' or ``our'' when citing previous work.
-That is all.
-(But see below for tech reports.)
-
-Saying ``this builds on the work of Lucy Smith [1]'' does not say that you are Lucy Smith;
-it says that you are building on her work.
-If you are Smith and Jones, do not say ``as we show in [7]'', say ``as Smith and Jones show in [7]'' and at the end of the paper, include reference 7 as you would any other cited work.
-
-An example of a bad paper just asking to be rejected:
-\begin{quote}
-\begin{center}
-    An analysis of the frobnicatable foo filter.
-\end{center}
-
-   In this paper we present a performance analysis of our previous paper [1], and show it to be inferior to all previously known methods.
-   Why the previous paper was accepted without this analysis is beyond me.
-
-   [1] Removed for blind review
-\end{quote}
-
-
-An example of an acceptable paper:
-\begin{quote}
-\begin{center}
-     An analysis of the frobnicatable foo filter.
-\end{center}
-
-   In this paper we present a performance analysis of the  paper of Smith \etal [1], and show it to be inferior to all previously known methods.
-   Why the previous paper was accepted without this analysis is beyond me.
-
-   [1] Smith, L and Jones, C. ``The frobnicatable foo filter, a fundamental contribution to human knowledge''. Nature 381(12), 1-213.
-\end{quote}
-
-If you are making a submission to another conference at the same time, which covers similar or overlapping material, you may need to refer to that submission in order to explain the differences, just as you would if you had previously published related work.
-In such cases, include the anonymized parallel submission~\cite{Authors14} as supplemental material and cite it as
-\begin{quote}
-[1] Authors. ``The frobnicatable foo filter'', F\&G 2014 Submission ID 324, Supplied as supplemental material {\tt fg324.pdf}.
-\end{quote}
-
-Finally, you may feel you need to tell the reader that more details can be found elsewhere, and refer them to a technical report.
-For conference submissions, the paper must stand on its own, and not {\em require} the reviewer to go to a tech report for further details.
-Thus, you may say in the body of the paper ``further details may be found in~\cite{Authors14b}''.
-Then submit the tech report as supplemental material.
-Again, you may not assume the reviewers will read this material.
-
-Sometimes your paper is about a problem which you tested using a tool that is widely known to be restricted to a single institution.
-For example, let's say it's 1969, you have solved a key problem on the Apollo lander, and you believe that the 1970 audience would like to hear about your
-solution.
-The work is a development of your celebrated 1968 paper entitled ``Zero-g frobnication: How being the only people in the world with access to the Apollo lander source code makes us a wow at parties'', by Zeus \etal.
-
-You can handle this paper like any other.
-Do not write ``We show how to improve our previous work [Anonymous, 1968].
-This time we tested the algorithm on a lunar lander [name of lander removed for blind review]''.
-That would be silly, and would immediately identify the authors.
-Instead write the following:
-\begin{quotation}
-\noindent
-   We describe a system for zero-g frobnication.
-   This system is new because it handles the following cases:
-   A, B.  Previous systems [Zeus et al. 1968] did not  handle case B properly.
-   Ours handles it by including a foo term in the bar integral.
-
-   ...
-
-   The proposed system was integrated with the Apollo lunar lander, and went all the way to the moon, don't you know.
-   It displayed the following behaviours, which show how well we solved cases A and B: ...
-\end{quotation}
-As you can see, the above text follows standard scientific convention, reads better than the first version, and does not explicitly name you as the authors.
-A reviewer might think it likely that the new paper was written by Zeus \etal, but cannot make any decision based on that guess.
-He or she would have to be sure that no other authors could have been contracted to solve problem B.
-\medskip
-
-\noindent
-FAQ\medskip\\
-{\bf Q:} Are acknowledgements OK?\\
-{\bf A:} No.  Leave them for the final copy.\medskip\\
-{\bf Q:} How do I cite my results reported in open challenges?
-{\bf A:} To conform with the double-blind review policy, you can report results of other challenge participants together with your results in your paper.
-For your results, however, you should not identify yourself and should not mention your participation in the challenge.
-Instead present your results referring to the method proposed in your paper and draw conclusions based on the experimental comparison to other results.\medskip\\
-
-\begin{figure}[t]
-  \centering
-  \fbox{\rule{0pt}{2in} \rule{0.9\linewidth}{0pt}}
-   %\includegraphics[width=0.8\linewidth]{egfigure.eps}
-
-   \caption{Example of caption.
-   It is set in Roman so that mathematics (always set in Roman: $B \sin A = A \sin B$) may be included without an ugly clash.}
-   \label{fig:onecol}
-\end{figure}
-
-\subsection{Miscellaneous}
-
-\noindent
-Compare the following:\\
-\begin{tabular}{ll}
- \verb'$conf_a$' &  $conf_a$ \\
- \verb'$\mathit{conf}_a$' & $\mathit{conf}_a$
-\end{tabular}\\
-See The \TeX book, p165.
-
-The space after \eg, meaning ``for example'', should not be a sentence-ending space.
-So \eg is correct, {\em e.g.} is not.
-The provided \verb'\eg' macro takes care of this.
-
-When citing a multi-author paper, you may save space by using ``et alia'', shortened to ``\etal'' (not ``{\em et.\ al.}'' as ``{\em et}'' is a complete word).
-If you use the \verb'\etal' macro provided, then you need not worry about double periods when used at the end of a sentence as in Alpher \etal.
-However, use it only when there are three or more authors.
-Thus, the following is correct:
-   ``Frobnication has been trendy lately.
-   It was introduced by Alpher~\cite{Alpher02}, and subsequently developed by
-   Alpher and Fotheringham-Smythe~\cite{Alpher03}, and Alpher \etal~\cite{Alpher04}.''
-
-This is incorrect: ``... subsequently developed by Alpher \etal~\cite{Alpher03} ...'' because reference~\cite{Alpher03} has just two authors.
-
-\begin{figure*}
-  \centering
-  \begin{subfigure}{0.68\linewidth}
-    \fbox{\rule{0pt}{2in} \rule{.9\linewidth}{0pt}}
-    \caption{An example of a subfigure.}
-    \label{fig:short-a}
-  \end{subfigure}
-  \hfill
-  \begin{subfigure}{0.28\linewidth}
-    \fbox{\rule{0pt}{2in} \rule{.9\linewidth}{0pt}}
-    \caption{Another example of a subfigure.}
-    \label{fig:short-b}
-  \end{subfigure}
-  \caption{Example of a short caption, which should be centered.}
-  \label{fig:short}
-\end{figure*}
+\smallskip\noindent\textbf{Contributions.}
+\begin{itemize}\setlength\itemsep{2pt}
+  \item We reframe efficient-decoder evaluation from ``can the computation be removed?''
+  to ``where and why is it removable?'', and give an evaluation protocol---prediction
+  flips resolved by boundary distance and anatomy, an oracle concentration analysis, and
+  flip-prediction AUROC---that exposes what aggregate Dice and FLOPs hide.
+  \item We characterize the redundancy empirically: the full decoder's net voxel benefit
+  is statistically indistinguishable from zero yet Dice-relevant through a thin boundary
+  band, and this net-neutral-but-boundary-localized pattern is consistent across three
+  architectures and three datasets.
+  \item We show that the beneficial flips are predictable in \emph{location} but not in
+  \emph{direction}, quantify the resulting ceiling on test-time region selection, and draw
+  concrete implications for designing and auditing region-adaptive decoders.
+\end{itemize}

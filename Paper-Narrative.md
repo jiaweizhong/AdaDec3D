@@ -214,25 +214,36 @@ Related Work 的落点应是：
 
 ### 5.3 Study Design 的组织
 
-不要按 O1–O11 写成十一组互相独立的小实验。Results 按**三个问题（=三组 metrics）**组织，
-与正文 §Results 完全一致：
+不要按 O1–O11 写成十一组互相独立的小实验。Results 按**三个问题、六个核心 metrics**组织
+（收敛于 2026-07-30，与正文 §Results 及 `run_observations.py` 默认输出完全一致）。旧的
+O1–O11 是**探索阶段**，正文只报告以下六个；其余降级到 appendix（`--appendix`）或从代码删除。
 
-#### Heterogeneity metrics — 收益是否均匀？
+#### Heterogeneity — decoder 的作用是否随位置/解剖不同？
 
-对应 **O1、O4、O10**（+ boundary-resolved flips、null-pair）：boundary vs interior 误差比、
-per-organ difficulty、organ size–difficulty（含偏相关）；并把"误差集中在边界"升级为
-"**net flip** 也向边界集中"（distance-to-boundary 分桶 + NSD），且超过 Full-vs-Full 的
-null-pair 地板。
+- **H1｜global P/N/net + subject CI**（代码 `O5`）：$R_{\text{net}}=R_{\text{pos}}-R_{\text{neg}}$
+  的 subject 均值与自助 CI。回答"是统一改善，还是修正与破坏并存"——$R_{\text{net}}\approx0$
+  而 $R_{\text{pos}},R_{\text{neg}}>0$ 即双向抵消，是 Dice 差看不出的。
+- **H2｜boundary- + anatomy-resolved net**（代码 `H2_boundary`〔新实现，此前被调用却未定义〕、
+  `O_anatomy`、`O_dice_aware`、`O_surface`、`O_errortype`）：按到边界距离分桶的 $R_{\text{net}}(D_k)$、
+  per-organ $R_{\text{net},c}$ + per-organ Dice Δ + NSD。回答收益**在哪里**——是否集中在一到两个
+  voxel 的边界薄带与小器官，解释 net≈0 何以与 Dice 差共存。并需超过 Full-vs-Full null-pair 地板。
 
-#### Concentration metrics — 少量区域是否贡献大部分净收益？
+#### Concentration — 有益计算是否空间集中？
 
-对应 **O2、O5、O9-oracle、O6**：entropy sparsity；subject-level $r(H,U)$；voxel-oracle
-top-k recovery（非部署上界）；训练演化（集中是否为暂态）。
+- **C1/C2｜oracle net-benefit coverage + top-k / K80**（代码 `O_pareto['oracle']` +
+  `O_pareto['concentration']`）：把 volume 切成 $16^3$ block，按真实净收益 $B(r)=\sum_{v\in r}U(v)$
+  排序画累计覆盖曲线；报告 top-10/20% 覆盖与达 80% 所需预算 $K_{80}$。**务必与绝对净收益一起报**——
+  曲线陡但总量≈0 是"小的绝对机会"，不可当成大收益。
 
-#### Predictability metrics — 测试时信号能否定位这些区域？
+#### Predictability — 测试时信号能否在无 GT 下定位这些区域？
 
-对应 **O3、O9-region、O11**：flip discrimination（AUROC/AUPRC）+ calibration（ECE）；
-region-level risk–coverage / opportunity curve；entropy/confidence/MC-dropout signal 比较。
+- **P1｜any / positive / direction AUROC**（代码 `O3`：`any_flip_/flip_/pos_vs_neg_auroc`）：
+  entropy 预测（a）是否发生 flip、（b）是否为 positive flip、（c）**方向**（flip voxel 内 pos vs neg）。
+  direction AUROC≈0.5 = 能预测"哪里会变"却不能预测"变好还是变坏"——全文核心障碍。
+- **P2｜signal vs oracle vs random，paired gap CI**（代码 `O_pareto` 各 signal +
+  `O_pareto['selection_gap_at_20pct']`）：同一 block 用无需 GT 的 signal 排序，与 oracle 和
+  matched-random 比 20% 预算下的净收益恢复；报告 (signal−random) 的 paired 自助 CI（不用 CaptureRatio，
+  oracle≈0 时会发散）。concat 下为 **negative result**：能定位、无可靠净收益可选择性恢复。
 
 > **Mechanism（因子分解，frozen encoder）** 单列一个 subsection：Full→channel-only /
 > Full→resolution-only / Full→combined，回答"高分辨率 stage 与宽通道各自为什么可删"。

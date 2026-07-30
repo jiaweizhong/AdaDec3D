@@ -630,39 +630,35 @@ Save all figures to `/root/obs/`.
 | **O10** | Organ size vs difficulty | `Spearman(volume, difficulty)` (=−0.54); partial `r(H, difficulty ∣ log volume)` (=0.81) | **C2** |
 | **O11** | Routing-signal comparison | `corr(signal, U)` for `H` vs `conf` vs MC-dropout; pick the cheap routing signal | **C3** |
 
-**Coverage of the three contributions:** C1 = {O5}; C2 = {O1, O2, O4, O6, O10} (+O5); C3 = {O3, O9, O11} (+O5); generality = {O7, O8}. O5 is the hinge — it defines the flip machinery (C1), shows the effect is small/bidirectional (C2), and shows it rises with entropy (C3).
+**Converged reporting framework (6 metrics, Heterogeneity → Concentration → Predictability, 2026-07-30).**
+The exploratory O1–O11 above are the *investigation*; the paper reports exactly **six**
+named metrics. `run_observations.py` now emits them by default and gates the deprecated
+diagnostics behind `--appendix`. Mapping (paper name → code):
 
-**Metric priority & de-duplication (updated for concat / net≈0, 2026-07-29).** The paper
-ranks metrics rather than listing all of them, and three are now **removed from code**
-(functions + calls deleted from `run_observations.py`; not produced by the re-run). The new
-benefit-specific metrics (O3-direction, O_dice_aware, O_errortype) **substitute** the
-now-dead O9-opportunity headline — they are additions in *code* but a *replacement* in the
-paper, so the reported set stays tight.
+| Axis | Metric | Physical meaning | Code (`save_obs` tag) |
+|---|---|---|---|
+| Heterogeneity | **H1** global P/N/net + subject CI | is the effect uniform or a bidirectional cancellation? | `O5` (`subject_{pos,neg,net}_rate_*`) |
+| Heterogeneity | **H2** boundary- + anatomy-resolved net (+ per-organ Dice Δ, NSD) | *where* the net benefit lives (thin boundary band, small organs) | `H2_boundary` (**newly implemented — was called but undefined**), `O_anatomy`, `O_dice_aware`, `O_surface`, `O_errortype` |
+| Concentration | **C1/C2** oracle net-benefit coverage + top-k / K80 | does the net benefit concentrate in few regions, and how strongly? | `O_pareto['oracle']` + `O_pareto['concentration']` |
+| Predictability | **P1** any / positive / **direction** AUROC | *where* preds change, *where* corrected, *whether* improved (direction ≈0.5 ⇒ instability predictable, improvement not) | `O3` (`any_flip_/flip_/pos_vs_neg_auroc`) |
+| Predictability | **P2** signal vs oracle vs random, paired gap CI | is the concentrated opportunity *recoverable* at test time? | `O_pareto` signals + `O_pareto['selection_gap_at_20pct']` |
 
-- **Headline (main text):** **O5** (voxel net flip ≈0), **O3 direction** (`pos_vs_neg`
-  AUROC — can entropy tell better-from-worse?), **O_dice_aware** (size-normalized per-organ
-  net + per-organ Dice Δ — resolves the net≈0-vs-Dice-gap paradox), **O_boundary** (net
-  flip vs distance-to-boundary; concat peaks at 0–1 vox). These carry the
-  "predictable-in-location, net-neutral-in-sign" thesis.
-- **Main-text supporting:** **O2** (entropy sparsity), **O_errortype** (FN/FP/misclass net
-  — which error type full fixes vs breaks), **O_anatomy** (per-organ net), **O_surface**
-  (NSD), **O3 any/positive AUROC** (location is predictable), **O9 + O_pareto** (oracle-vs-
-  entropy: does a findable opportunity exist — reported as a **negative result** at concat).
-- **One-line intro:** **O1** — "error concentrates at boundary," superseded by O_boundary.
-- **Kept (appendix, cheap):** **O4** (per-organ difficulty; still computed).
-- **DEPRECATED — not computed on the re-run:** **O6** (training-evolution curve; off-thesis
-  and needed milestones), **O10** (organ-size vs difficulty; subsumed by O_anatomy +
-  O_dice_aware), **O11** (routing signals; near-null — entropy≈confidence, MC-dropout invalid
-  at dropout=0). Each collapses to at most one appendix sentence if a reviewer asks.
-- **Not implemented (anti-duplication):** ⑤ oracle benefit map — **already in O9/O_pareto's
-  oracle curve**, so a separate metric would duplicate; ③ signed-boundary geometry —
-  **deferred**, only if O3 `pos_vs_neg` > 0.5 (i.e. direction turns out partly predictable).
-- **Caveat on O5's correlation:** subject-level `Pearson(H,U)` CI is wide (n=12); it is
-  concentration evidence, not strong predictability on its own.
+- **Headline:** H1 (net≈0), P1 direction (`pos_vs_neg`≈0.5), H2 boundary (peaks 0–1 vox),
+  C1 (steep coverage over a ≈0 absolute total — reported *with* the absolute net so shape
+  isn't over-read). Thesis: *net-neutral in voxel correctness, Dice-relevant via a thin
+  boundary band; flips predictable in location, not in sign.*
+- **Appendix only (`--appendix`):** **O1** (boundary error ratio — error-side view of H2),
+  **O2** (entropy sparsity), **O4** (per-organ difficulty), **O9** (halo/executed-volume
+  opportunity variant — superseded by C1/P2 in `O_pareto`).
+- **Deleted from code:** **O6** (training evolution), **O10** (size vs difficulty — subsumed
+  by H2 anatomy), **O11** (routing-signal correlation; MC-dropout invalid at dropout=0).
+- **Dropped from the main narrative:** O5's subject `Pearson(H,U)` correlation (a duplicate,
+  wide-CI correlation) — the flip *rates* from O5 are H1; the correlation is no longer featured.
+- **Anti-duplication:** the old ⑤ oracle-benefit-map is exactly C1; ③ signed-boundary geometry
+  stays deferred unless P1 direction AUROC > 0.5.
 
-Net: the re-run yields a tight, non-overlapping set — three benefit-specific additions in,
-O6/O10/O11 out. Headline thesis: *voxel net ≈0 (still Dice-relevant via a thin boundary
-band); flips predictable in location, not in sign.*
+`aggregate_generality.py` (Fig 4) now plots the two converged headline numbers per L-shape
+cell: H1 net rate (`O5.subject_net_rate_*`) and P1 direction AUROC (`O3.pos_vs_neg_*`).
 
 ### Common notebook setup
 
@@ -1637,22 +1633,25 @@ All O1–O11 metrics and figures come from one script,
 
 | Paper figure | Content | run_observations output |
 |---|---|---|
-| Fig 1 (Heterogeneity) | per-organ error bar (O1) | `O1_organ_error.png` |
-| Fig 2 (Concentration) | entropy sparsity (O2) + net-flip vs entropy (O5) | `O2_entropy.png`, `O5_decoder_gain.png` |
-| Fig 3 (Predictability) | region opportunity curve (O9) | `O9_opportunity_corrected.png` |
-| supp. | entropy–error scatter (O3), entropy evolution (O6) | `O3_unc_error.png`, `O6_entropy_evolution.png` |
+| Fig 1 (Heterogeneity, H2) | per-organ net flip + size (`O_anatomy`) | `O_anatomy.png` |
+| Fig 2 (Concentration/Predictability, C1+P2) | oracle net-benefit coverage vs deployable signals vs random (`O_pareto`) | `O_pareto.png` |
+| supp. (H2) | boundary-resolved net flip (`H2_boundary`) | `H2_boundary.png` |
+| supp. (P1) | entropy–error scatter (`O3`) | `O3_unc_error.png` |
 
-O10 is reported as ρ / partial-r numbers (no figure); O4 per-organ numbers feed Fig 1.
+Appendix figures only under `--appendix`: `O1_organ_error.png`, `O2_entropy.png`,
+`O9_opportunity_corrected.png`.
 
 ### Tables (Paper A) → source
 
 | Paper table | Content | Source |
 |---|---|---|
-| Table 1 | baseline Dice/HD95/MAC/params/latency | training CSV + `profile_macs.py` |
-| Table 2 | flip rates R_pos/R_neg/R_net + subject CI (O5) | `results.json["O5"]` |
-| Table (plan) | backbone × dataset grid | manual |
-| Predictability (text) | O3 AUROC/AUPRC/ECE; O9 net + paired CI; O11 subj corr | `results.json["O3","O9_corrected","O11"]` |
-| pending | cross-dataset (O7), cross-backbone (O8) | grid aggregation (≥2 cells) |
+| Table 1 (`tab:baseline`/`tab:arch`) | baseline Dice/HD95/MAC/params/latency | training CSV + `profile_macs.py` |
+| Table 2 (`tab:flips`) | H1 flip rates R_pos/R_neg/R_net + subject CI | `results.json["O5"]` |
+| Table (`tab:pred`) | P1 any / positive / direction AUROC | `results.json["O3"]` (`any_flip_/flip_/pos_vs_neg_auroc`) |
+| C1/C2 (text) | oracle coverage @10/20%, K80 | `results.json["O_pareto"]["concentration"]` |
+| P2 (text) | signal−random gap + CI @20% | `results.json["O_pareto"]["selection_gap_at_20pct"]` |
+| Table (`tab:plan`) | backbone × dataset L-shape | manual |
+| pending | cross-dataset (O7), cross-backbone (O8) | `aggregate_generality.py` (≥2 cells) |
 
 ---
 

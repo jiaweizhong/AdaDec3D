@@ -833,6 +833,88 @@ def O_surface_metrics(val_loader, analyzed, out_classes):
     save_obs("O_surface", res)
 
 
+def O_boundary_flips(val_loader, effi, full):
+    """H2-A: net decoder benefit resolved by distance to the GT organ boundary.
+
+    For each voxel v let d(v) be the Euclidean distance (voxels) to the nearest
+    foreground-boundary voxel; bin into {0-1, 1-2, 2-4, 4-8, >8}. Per bin report the
+    subject-mean positive / negative / net flip rate, with a subject bootstrap CI on
+    the net rate:
+
+        R_pos(D_k) = mean_v in D_k  P(v)   [full right, effi wrong]
+        R_neg(D_k) = mean_v in D_k  N(v)   [effi right, full wrong]
+        R_net(D_k) = R_pos(D_k) - R_neg(D_k)
+
+    Upgrades the error-based observation 'error concentrates at the boundary' to the
+    benefit-based claim 'the decoder's *net* benefit concentrates at the boundary'.
+    Rates are computed on the union(GT, Full, Effi) foreground so false positives are
+    not dropped."""
+    from scipy.ndimage import distance_transform_edt, binary_erosion
+    edges = [0, 1, 2, 4, 8, np.inf]
+    labels = ["0-1", "1-2", "2-4", "4-8", ">8"]
+    nb = len(labels)
+    s_pos = [[] for _ in range(nb)]
+    s_neg = [[] for _ in range(nb)]
+    s_net = [[] for _ in range(nb)]
+    with torch.no_grad():
+        for batch in val_loader:
+            img = batch["image"].cuda()
+            lbl = batch["label"].squeeze(1).long().cpu().squeeze().numpy()
+            pf = infer(full, img).argmax(1).cpu().squeeze().numpy()
+            pe = infer(effi, img).argmax(1).cpu().squeeze().numpy()
+            fg = lbl > 0
+            if not fg.any():
+                continue
+            pos = (pf == lbl) & (pe != lbl)
+            neg = (pf != lbl) & (pe == lbl)
+            bnd = fg & ~binary_erosion(fg, iterations=1)      # inner boundary shell
+            dist = distance_transform_edt(~bnd)               # 0 on the shell
+            body = fg | (pf > 0) | (pe > 0)                   # union foreground
+            for bi in range(nb):
+                lo, hi = edges[bi], edges[bi + 1]
+                m = body & (dist >= lo) & (dist < hi)
+                cnt = int(m.sum())
+                if cnt > 0:
+                    p = float(pos[m].sum()); q = float(neg[m].sum())
+                    s_pos[bi].append(p / cnt)
+                    s_neg[bi].append(q / cnt)
+                    s_net[bi].append((p - q) / cnt)
+
+    def _m(x):
+        return [float(np.mean(v)) if v else float("nan") for v in x]
+
+    pos_m, neg_m, net_m = _m(s_pos), _m(s_neg), _m(s_net)
+    rng = np.random.default_rng(0)
+    net_ci = []
+    for bi in range(nb):
+        v = np.asarray(s_net[bi], dtype=np.float64)
+        if v.size == 0:
+            net_ci.append([float("nan"), float("nan")]); continue
+        boot = [np.mean(rng.choice(v, v.size, replace=True)) for _ in range(2000)]
+        net_ci.append([float(np.percentile(boot, 2.5)), float(np.percentile(boot, 97.5))])
+    print("[H2-boundary] distance-to-boundary net flip (subject mean):")
+    for bi in range(nb):
+        print(f"      d={labels[bi]:>4}  pos={pos_m[bi]:.5f}  neg={neg_m[bi]:.5f}  "
+              f"net={net_m[bi]:.5f}  CI[{net_ci[bi][0]:.5f},{net_ci[bi][1]:.5f}]")
+    plt.figure(figsize=(7, 5)); xs = np.arange(nb)
+    plt.plot(xs, pos_m, "g--o", ms=4, alpha=.7, label="positive")
+    plt.plot(xs, neg_m, "r--o", ms=4, alpha=.7, label="negative")
+    plt.plot(xs, net_m, "b-o", ms=5, label="net")
+    plt.axhline(0, color="k", lw=.6, ls=":")
+    plt.xticks(xs, labels); plt.xlabel("distance to GT boundary (voxels)")
+    plt.ylabel("flip rate"); plt.title("H2: boundary-resolved decoder benefit")
+    plt.legend(); plt.tight_layout()
+    plt.savefig(f"{OBS_DIR}/H2_boundary.png", dpi=150); plt.close()
+    save_obs("H2_boundary", {
+        "distance_bins": labels,
+        "positive_rate": pos_m, "negative_rate": neg_m, "net_rate": net_m,
+        "net_rate_ci": net_ci,
+        "note": "voxels binned by distance-to-GT-boundary; subject-mean rates over "
+                "union(GT,Full,Effi) foreground; net = positive - negative",
+    })
+    return net_m
+
+
 def O_pareto(val_loader, effi, full, block_size=16, halo=4):
     """Fig 2 (headline): multi-signal region opportunity curve. Rank contiguous
     ``block_size`` blocks by several signals and plot the net-flip utility recovered
@@ -917,8 +999,47 @@ def O_pareto(val_loader, effi, full, block_size=16, halo=4):
     plt.title("Selective-allocation opportunity: signals vs.\\ random")
     plt.legend(); plt.tight_layout()
     plt.savefig(f"{OBS_DIR}/O_pareto.png", dpi=150); plt.close()
+
+    # ---- C1/C2: oracle concentration (how concentrated is the useful net benefit) ----
+    # out["oracle"]["net_recovered_mean"][k] is the fraction of the subject's positive-flip
+    # -normalized net benefit captured by the top-k% oracle blocks -> C_oracle(k).
+    orc = np.asarray(out["oracle"]["net_recovered_mean"], dtype=np.float64)
+
+    def _cov(bud):
+        return float(orc[int(np.where(budgets == bud)[0][0])])
+
+    k80 = next((int(b) for b, v in zip(budgets, orc) if v >= 0.8), None)
+    out["concentration"] = {                              # C1 + C2
+        "oracle_coverage_at_10pct": _cov(10),
+        "oracle_coverage_at_20pct": _cov(20),
+        "budget_for_80pct_net_pct": k80,
+        "note": "C1/C2: fraction of the subject positive-flip-normalized net benefit "
+                "recovered by the top-k% oracle blocks; K80 = smallest block budget "
+                "reaching 0.8. Read together with H1 absolute net (near zero) so the "
+                "coverage shape is not mistaken for a large absolute opportunity.",
+    }
+    # ---- P2: paired (signal - random) net recovery at the primary 20% budget ----
+    pidx = int(np.where(budgets == 20)[0][0])
+    rnd = np.asarray(rec["random"], dtype=np.float64)[:, pidx]
+    sel_gap = {}
+    for s in ["oracle", "entropy", "confidence", "boundary"]:
+        diff = np.asarray(rec[s], dtype=np.float64)[:, pidx] - rnd
+        boot = [float(diff[brng.integers(diff.shape[0], size=diff.shape[0])].mean())
+                for _ in range(n_boot)]
+        sel_gap[s] = {"mean_minus_random": float(diff.mean()),
+                      "ci": [float(np.percentile(boot, 2.5)),
+                             float(np.percentile(boot, 97.5))]}
+    out["selection_gap_at_20pct"] = {                     # P2
+        **sel_gap,
+        "note": "P2: paired subject-bootstrap of (signal - matched random) net recovered "
+                "at 20% block budget. A deployable signal beats random iff its CI excludes 0; "
+                "the oracle row is the non-deployable upper bound.",
+    }
     save_obs("O_pareto", out)
-    print(f"[O_pareto] multi-signal opportunity curve saved ({len(rec['oracle'])} subjects)")
+    print(f"[O_pareto] C1 oracle@20%={_cov(20):.3f} K80={k80}  "
+          f"P2 entropy-random@20%={sel_gap['entropy']['mean_minus_random']:.4f} "
+          f"CI[{sel_gap['entropy']['ci'][0]:.4f},{sel_gap['entropy']['ci'][1]:.4f}]  "
+          f"({len(rec['oracle'])} subjects)")
 
 
 def O_anatomy(val_loader, effi, full):
@@ -1096,6 +1217,11 @@ def main():
                    help="EffiDec3D decoder skip aggregation; must match how the effi "
                         "checkpoint was TRAINED. Default 'concatenation' = the EffiDec3D "
                         "network default / paper config; use 'addition' for legacy checkpoints.")
+    p.add_argument("--appendix", action="store_true",
+                   help="Also emit the demoted appendix diagnostics (O1 boundary-error "
+                        "ratio, O2 entropy histogram, O4 per-organ difficulty, and the O9 "
+                        "executed-volume/halo sensitivity). Default off: the main pipeline "
+                        "reports only the six converged metrics H1,H2,C1/C2,P1,P2.")
     args_ns = p.parse_args()
     OBS_DIR = args_ns.obs_dir
     RESULTS_FILE = os.path.join(OBS_DIR, "results.json")
@@ -1171,29 +1297,49 @@ def main():
         print(f"\nDone. Corrected O9 figure + results.json in {OBS_DIR}")
         return
 
-    # Single-model observations (run for both matched and control).
-    O1_error_distribution(val_loader, analyzed)
-    O2_entropy_distribution(val_loader, analyzed)
-    O3_unc_error_corr(val_loader, analyzed, full=(full if effi is not None else None))
-    O4_per_organ(val_loader, analyzed, post_pred, post_lbl)   # appendix: per-organ difficulty
-    O_surface_metrics(val_loader, analyzed, out_classes)   # E4: per-organ NSD
+    # Converged reporting framework: every main observation maps to one of the six
+    # metrics along Heterogeneity -> Concentration -> Predictability. The deprecated
+    # O1/O2/O4/O9 diagnostics survive only behind --appendix.
+    save_obs("framework_map", {
+        "H1_global_flips": "O5 (subject-mean positive/negative/net flip + bootstrap CI)",
+        "H2_boundary": "H2_boundary (distance-to-boundary net flip)",
+        "H2_anatomy": "O_anatomy (per-organ net flip + size)",
+        "H2_organ_support": "O_dice_aware (size-normalized net + per-organ Dice delta), "
+                            "O_surface (per-organ NSD), O_errortype (net by error type)",
+        "C1_C2_concentration": "O_pareto['oracle'] curve + O_pareto['concentration'] top-k/K80",
+        "P1_predictability": "O3 (any / positive / direction=pos-vs-neg AUROC)",
+        "P2_selection": "O_pareto signals vs oracle vs random + "
+                        "O_pareto['selection_gap_at_20pct'] paired diff CI",
+        "appendix": "O1, O2, O4, O9 (behind --appendix)",
+    })
 
-    # Matched-only observations (need the full-vs-EffiDec3D transition pair).
+    # ---- P1 predictability (single-model signal; flip-prediction needs the full pair) ----
+    O3_unc_error_corr(val_loader, analyzed, full=(full if effi is not None else None))
+    O_surface_metrics(val_loader, analyzed, out_classes)   # H2 support: per-organ NSD
+
+    # ---- H1/H2/C1/C2/P2: need the full-vs-EffiDec3D transition pair ----
     if effi is not None:
-        O5_decoder_gain(val_loader, effi, full)
-        O_boundary_flips(val_loader, effi, full)           # E3: boundary-resolved flips
-        O_anatomy(val_loader, effi, full)                  # Fig 3: per-organ benefit + size
-        O_dice_aware(val_loader, effi, full)               # C2: size-normalized net + Dice delta
-        O_errortype(val_loader, effi, full)                # C2: per-error-type net (fix vs break)
-        O9_opportunity(val_loader, effi, full, block_size=args_ns.o9_block_size,
-                       halo=args_ns.o9_halo, primary_budget=args_ns.o9_primary_budget,
-                       foreground=args_ns.o9_foreground,
-                       provenance={"network": network, "dataset": args_ns.dataset,
-                                   "full_checkpoint": e0[-1], "effi_checkpoint": e1[-1]})
+        O5_decoder_gain(val_loader, effi, full)            # H1: global P/N/net + subject CI
+        O_boundary_flips(val_loader, effi, full)           # H2-A: boundary-resolved net
+        O_anatomy(val_loader, effi, full)                  # H2-B: per-organ net + size
+        O_dice_aware(val_loader, effi, full)               # H2 support: size-norm net + Dice delta
+        O_errortype(val_loader, effi, full)                # H2 support: net by error type
         O_pareto(val_loader, effi, full, block_size=args_ns.o9_block_size,
-                 halo=args_ns.o9_halo)                     # Fig 2: multi-signal Pareto
+                 halo=args_ns.o9_halo)                     # C1+C2 (oracle) + P2 (signal vs random)
     else:
-        print("[O5/O9] skipped — ecological control has no EffiDec3D pair")
+        print("[H1/H2/C/P2] skipped — ecological control has no EffiDec3D pair")
+
+    # ---- Appendix diagnostics (demoted; error-based or superseded) ----
+    if args_ns.appendix:
+        O1_error_distribution(val_loader, analyzed)
+        O2_entropy_distribution(val_loader, analyzed)
+        O4_per_organ(val_loader, analyzed, post_pred, post_lbl)
+        if effi is not None:
+            O9_opportunity(val_loader, effi, full, block_size=args_ns.o9_block_size,
+                           halo=args_ns.o9_halo, primary_budget=args_ns.o9_primary_budget,
+                           foreground=args_ns.o9_foreground,
+                           provenance={"network": network, "dataset": args_ns.dataset,
+                                       "full_checkpoint": e0[-1], "effi_checkpoint": e1[-1]})
     print(f"\nDone. Figures + results.json in {OBS_DIR}")
 
 

@@ -102,58 +102,71 @@ test~\cite{mcnemar1947,dietterich1998}; volume rates are
 $R_{\mathrm{pos}}=\mathrm{mean}_v P(v)$, $R_{\mathrm{neg}}=\mathrm{mean}_v N(v)$, and
 $R_{\mathrm{net}}=R_{\mathrm{pos}}-R_{\mathrm{neg}}$.  As test-time signals computable
 from the efficient model alone we use predictive entropy
-$H(v)=-\sum_{c} p_c(v)\log p_c(v)$, confidence $\max_c p_c(v)$, and Monte-Carlo
-dropout variance~\cite{gal2016dropout}.
+$H(v)=-\sum_{c} p_c(v)\log p_c(v)$ and confidence $\max_c p_c(v)$.
 
 \paragraph{Characterization metrics.}
-We group the analysis into three questions; each metric is computed per grid cell and
-aggregated over subjects with a bootstrap, since the twelve validation volumes---not
-the correlated voxels---are the independent units.
+We organize the analysis as three questions and report exactly six metrics; each is
+computed per grid cell and aggregated over subjects with a bootstrap, since the twelve
+validation volumes---not the correlated voxels---are the independent units.
 
-\smallskip\noindent\textit{(1) Heterogeneity: is the benefit evenly distributed?}
+\smallskip\noindent\textit{(1) Heterogeneity: is the decoder's effect uniform, or does
+it depend on location and structure?}
 \begin{itemize}\setlength\itemsep{1pt}
-  \item \textbf{O1, boundary error ratio.} Mean voxel error on the eroded boundary
-  band divided by the eroded-interior error; ${>}1$ indicates boundary-concentrated
-  error.
-  \item \textbf{O4, per-organ difficulty.} Per-class Dice and mean entropy $H$,
-  ranking the structures the decoder struggles on.
-  \item \textbf{O10, size--difficulty relation.} Spearman $\rho$ between organ volume
-  and difficulty, and the partial correlation of $H$ and error given $\log$-volume.
-  \item \textbf{Boundary-resolved flips.} Positive/negative/net flip rate binned by
-  Euclidean distance to the nearest GT boundary---testing whether the decoder
-  \emph{benefit} (not just error) concentrates near boundaries. Complemented by
-  Normalized Surface Dice (NSD) at 1--2 voxel tolerance for a surface-level view.
+  \item \textbf{H1, global flip rates.} The subject-mean $R_{\mathrm{pos}}$,
+  $R_{\mathrm{neg}}$, and $R_{\mathrm{net}}=R_{\mathrm{pos}}-R_{\mathrm{neg}}$ of
+  Eqs.~(\ref{eq:pflip})--(\ref{eq:net}), with a subject bootstrap CI on
+  $R_{\mathrm{net}}$. \emph{Meaning:} whether the full decoder improves predictions
+  uniformly or simultaneously corrects and degrades them---$R_{\mathrm{net}}\!\approx\!0$
+  with $R_{\mathrm{pos}},R_{\mathrm{neg}}\!>\!0$ signals a bidirectional cancellation
+  that a Dice gap alone cannot reveal.
+  \item \textbf{H2, boundary- and anatomy-resolved net flips.} $R_{\mathrm{net}}(D_k)$
+  over voxels binned by Euclidean distance $d(v)$ to the nearest GT boundary
+  ($D_k\!\in\!\{0\text{--}1,1\text{--}2,2\text{--}4,4\text{--}8,{>}8\}$), and per-organ
+  $R_{\mathrm{net},c}$ alongside the per-organ Dice change
+  $\Delta\mathrm{Dice}_c=\mathrm{Dice}_{\mathrm{F},c}-\mathrm{Dice}_{\mathrm{E},c}$ and
+  NSD at 1--2 voxel tolerance. \emph{Meaning:} \emph{where} the effect lives---whether
+  the net benefit concentrates in a thin boundary band and in particular structures,
+  explaining how a near-zero global net coexists with a macro Dice gap.
 \end{itemize}
 
-\smallskip\noindent\textit{(2) Concentration: does a small subset carry most net benefit?}
+\smallskip\noindent\textit{(2) Concentration: is the beneficial computation spatially
+concentrated?}
 \begin{itemize}\setlength\itemsep{1pt}
-  \item \textbf{O2, entropy sparsity.} $\Pr[H(v)>\tau]$, the fraction of high-entropy
-  voxels.
-  \item \textbf{O5, uncertainty--benefit correlation.} Subject-level Pearson $r(H,U)$
-  between binned entropy and net flips.
-  \item \textbf{O9$^{\text{orc}}$, voxel recovery.}
-  $\sum_{\text{top-}k\%}P(v)\,/\,\sum P(v)$, the share of positive flips in the
-  highest-entropy $k\%$ of voxels---a non-deployable upper bound.
-  \item \textbf{O6, training persistence.} Mean entropy across checkpoints, testing
-  whether concentration is a training transient.
+  \item \textbf{C1, oracle net-benefit coverage.} Partition each volume into contiguous
+  $16^3$ blocks, score block $r$ by its true net benefit $B(r)=\sum_{v\in r}U(v)$, rank
+  by $B(r)$, and plot cumulative recovered net benefit against the fraction of blocks
+  selected. \emph{Meaning:} the ceiling---whether, \emph{with oracle knowledge}, a small
+  region subset carries the net benefit. We report the absolute net beside the coverage
+  so a steep curve over a near-zero total is not mistaken for a large opportunity.
+  \item \textbf{C2, top-$k$ coverage.} The oracle coverage at 10\% and 20\% of blocks
+  and the smallest budget $K_{80}$ reaching 80\% of the net benefit. \emph{Meaning:} a
+  compact summary of \emph{how} concentrated the opportunity is.
 \end{itemize}
 
-\smallskip\noindent\textit{(3) Predictability: can a test-time signal find the regions?}
+\smallskip\noindent\textit{(3) Predictability: can a test-time signal find the
+beneficial regions without the ground truth?}
 \begin{itemize}\setlength\itemsep{1pt}
-  \item \textbf{O3, flip discrimination and calibration.} AUROC and AUPRC of entropy
-  predicting flips~\cite{hendrycks2017baseline}, and expected calibration error
-  (ECE)~\cite{guo2017calibration}.
-  \item \textbf{O9, opportunity curve.} A risk--coverage
-  curve~\cite{geifman2017selective} over contiguous $16^3$ blocks (plus a $4$-voxel
-  halo) ranked by entropy, reporting net-flip utility recovered versus a
-  matched-random selector.
-  \item \textbf{O11, routing-signal comparison.} Subject-level correlation of entropy,
-  confidence, and MC-dropout with net flips.
+  \item \textbf{P1, flip-prediction AUROC.} Subject-level AUROC of the efficient model's
+  entropy $H(v)$~\cite{hendrycks2017baseline} for three progressively harder targets:
+  \emph{any} correctness-changing flip $P\!\vee\!N$, \emph{positive} flips $P$, and---
+  restricted to flip voxels---the \emph{direction} $P$ vs.\ $N$. \emph{Meaning:} whether
+  uncertainty predicts \emph{where} predictions change, \emph{where} they are corrected,
+  and \emph{whether} a change is an improvement; a direction AUROC near $0.5$ means
+  instability is predictable but improvement is not.
+  \item \textbf{P2, deployable region selection.} Using the same blocks, rank by a
+  ground-truth-free signal (entropy, confidence, a boundary proxy) and compare the
+  recovered net benefit against the oracle and a matched-random
+  selector~\cite{geifman2017selective}, reporting the paired (signal$-$random) gap with
+  a subject bootstrap CI at the 20\% budget. \emph{Meaning:} whether the concentrated
+  opportunity C1 identifies is actually \emph{recoverable} at inference---a signal helps
+  only if its gap over random excludes zero.
 \end{itemize}
 
 \smallskip\noindent Cross-dataset (\textbf{O7}) and cross-backbone (\textbf{O8})
-consistency re-evaluate these metrics across the rows and columns of
-Table~\ref{tab:plan}.
+consistency re-evaluate these six metrics across the rows and columns of
+Table~\ref{tab:plan}. Error-based diagnostics---boundary error ratio, per-organ
+difficulty, entropy sparsity, and the halo/executed-volume opportunity variant---are
+reported only in the appendix.
 
 \todo{Completed results below are the 3D UX-Net/BTCV grid cell. Remaining cells
 (other backbones and datasets) are in progress; cross-backbone (columns) and

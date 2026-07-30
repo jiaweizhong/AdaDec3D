@@ -9,20 +9,23 @@
 
 | | Paper A — this document | Paper B |
 |---|---|---|
-| **Claim** | With the parameter-matched efficient decoder, the full decoder's net benefit is statistically indistinguishable from zero — the removed decoder computation is genuinely redundant; residual flips are boundary-localized and entropy-predictable but net-neutral (**observation only**) | AdaDec3D realizes region-adaptive decoding — **iso-accuracy at lower executed cost** |
+| **Claim** | With the parameter-matched efficient decoder, the full decoder's net benefit is statistically indistinguishable from zero at the voxel level — net-neutral, **not** "genuinely redundant" (it is still Dice-relevant via a thin boundary band); residual flips are boundary-localized and predictable in location but not in direction (**observation only**) | AdaDec3D realizes region-adaptive decoding — **iso-accuracy at lower executed cost** |
 | **Venue** | WACV E&D / ISBI | MICCAI 2026 / TMI |
-| **Gate** | O1/O2/O3 hold (error concentration + flip predictability); O5/O9 show net≈0 / no opportunity at the matched config (concat, 2026-07-29) | O7, O8, O11 + AdaDec3D beats controls |
-| **Key result** | Net decoder benefit ≈ 0 across UX-Net (+0.047%, CI crosses 0) and Swin (−0.001%); flips boundary-localized + entropy-predictable (O3 AUROC ~0.91) but net-neutral → no selective-allocation opportunity | **DICE ≈ EffiDec3D at meaningfully lower executed MACs** (input-adaptive) |
+| **Gate** | H2/P1 hold (boundary concentration + location predictability); H1/C1/P2 show net≈0 / no recoverable opportunity at the matched config (concat, 2026-07-29) | O7, O8 + AdaDec3D beats controls |
+| **Key result** | Net decoder benefit ≈ 0 across UX-Net (+0.047%, CI crosses 0) and Swin (−0.001%); flips boundary-localized + predictable in **location** (P1 positive-flip AUROC ~0.90) but **not in direction** (P1 pos-vs-neg ~0.5) → no recoverable selective-allocation opportunity | **DICE ≈ EffiDec3D at meaningfully lower executed MACs** (input-adaptive) |
 
 > **Scope note**: Paper A is an **observation paper**. With the parameter-matched
 > (concatenation) efficient decoder, the full decoder's net flip rate is statistically
 > indistinguishable from zero across backbones (UX-Net +0.047% with CI crossing zero;
-> Swin −0.001%) — read here as evidence that the removed decoder computation is
-> *genuinely redundant*, not merely reducible. The residual flips are boundary-localized
-> and entropy-predictable (O3) but net-neutral, so there is **no** selective-allocation
-> opportunity (O9 marginal on UX-Net, negative on Swin) — reported honestly as a negative
-> result. Paper A makes no efficiency claim (that is Paper B); Paper B's design must adapt
-> to this net≈0 finding rather than assume the opportunity Paper A once expected.
+> Swin −0.001%) — read here as **net-neutral in voxel correctness**, *not* "genuinely
+> redundant": the removed capacity still moves macro Dice through a thin boundary band, so
+> it is net-neutral, not unused. The residual flips are boundary-localized (H2) and
+> predictable in **location** (P1 positive-flip AUROC) but **not in direction** (P1
+> pos-vs-neg ≈ 0.5), so there is **no** recoverable selective-allocation opportunity (C1
+> steep over a ≈0 total; P2 signal−random gap CI crosses zero on UX-Net, negative on Swin)
+> — reported honestly as a negative result. Paper A makes no efficiency claim (that is
+> Paper B); Paper B's design must adapt to this net≈0 finding rather than assume the
+> opportunity Paper A once expected.
 
 > **Configuration positioning (headline = canonical concat).** Two Effi configs exist and
 > must **not** be mixed in one table:
@@ -503,8 +506,8 @@ original paper actually built an EffiDec3D decoder pair — with a predeclared l
 
 | Backbones | EffiDec3D pair? | Datasets | Observations |
 |---|---|---|---|
-| 3D UX-Net (large-kernel CNN) | ✅ Full + EffiDec3D | BTCV, FeTA, MSD08 HepaticVessel (dataset axis) | **all O1–O11** (full-vs-efficient flips) |
-| SwinUNETR (Transformer), MedNeXt-M-K3 (ConvNeXt) | ✅ Full + EffiDec3D | BTCV (architecture axis) | **all O1–O11** |
+| 3D UX-Net (large-kernel CNN) | ✅ Full + EffiDec3D | BTCV, FeTA, MSD08 HepaticVessel (dataset axis) | **six metrics H1/H2/C1/C2/P1/P2** (full-vs-efficient flips) |
+| SwinUNETR (Transformer), MedNeXt-M-K3 (ConvNeXt) | ✅ Full + EffiDec3D | BTCV (architecture axis) | **six metrics H1/H2/C1/C2/P1/P2** |
 
 > **Why only these backbones.** EffiDec3D applies its decoder *only* to 3D UX-Net,
 > SwinUNETR, and SwinUNETRv2 (+MedNeXt), because its method targets large-channel /
@@ -544,13 +547,15 @@ python main_train_BTCV_TU.py --root $ROOT --output /root/output/${NET}_${DS}_eff
   --cache_rate 1.0 --num_workers 8 --gpu 0
 ```
 
-**Running observations per cell** (all cells are matched pairs → **all O1–O11**;
+**Running observations per cell** (all cells are matched pairs → **the six metrics
+H1/H2/C1/C2/P1/P2** by default; add `--appendix` for the demoted O1/O2/O4/O9 diagnostics;
 class count and organ names come from `--dataset`):
 
 ```bash
-# Matched cell → all O1–O11 (needs both full + EffiDec3D checkpoints)
+# Matched cell → six converged metrics (needs both full + EffiDec3D checkpoints)
 python run_observations.py --network SwinUNETR --dataset feta \
-  --root /root/autodl-tmp/feta-processed --output /root/output --obs_dir /root/obs/swin_feta
+  --root /root/autodl-tmp/feta-processed --output /root/output --obs_dir /root/obs/swin_feta \
+  --skip_aggregation concatenation
 ```
 
 Each cell writes its own `results.json` + figures under a distinct `--obs_dir`;
@@ -567,13 +572,13 @@ BTCV13, same 45k/lr1e-3/overlap0.7 protocol, standard Spacingd pipeline. Checkpo
 
 ```bash
 cd /root/AdaDec3D/EffiDec3D && git pull
-bash run_E0_E1_swin.sh          # E0 → E1 → O1–O11 (≈10–14 h on RTX 5090)
+bash run_E0_E1_swin.sh          # E0 → E1 → six metrics H1/H2/C1/C2/P1/P2 (≈10–14 h on RTX 5090)
 # or stage-by-stage:  bash run_E0_E1_swin.sh E0   then   bash run_E0_E1_swin.sh E1
 ```
 
 Calibration (EffiDec3D paper, BTCV 13-organ): SwinUNETR ≈ 80.1 Dice / 337.6 GFLOPs /
 69.2 M → +EffiDec3D ≈ 79.8 / 57.3 / 11.2 M (published gap ~0.3 pt). A local gap is
-footnoted per the reproduction-gap policy above and does not affect O5/O8/O9 direction.
+footnoted per the reproduction-gap policy above and does not affect the six-metric direction.
 
 **O8 Go (Swin):** O5 subject-r CI-lower > 0 **and** corrected O9 region-level paired
 CI-lower > 0, with O1/O2/O10 concentration recurring → decoder-benefit concentration
@@ -1103,7 +1108,7 @@ report the same positive flip, negative flip, net flip,
 spatial concentration, and opportunity curve with subject-level confidence
 intervals.
 
-**Question**: Do the O5/O9 findings replicate across datasets and modalities?
+**Question**: Do the H1/C1/P2 findings replicate across datasets and modalities?
 
 **Approach**: run the generalized `run_observations.py` on each frozen dataset
 with its matched Full + EffiDec3D checkpoints (class count and organ names are
@@ -1148,20 +1153,20 @@ EffiDec3D backbone family — a second (and optionally third/fourth) matched bac
 — rather than being specific to 3D UX-Net?
 
 **Approach**: run `run_observations.py` per matched backbone on BTCV; each is a
-full/efficient pair, so each yields all O1–O11:
+full/efficient pair, so each yields the six converged metrics H1/H2/C1/C2/P1/P2:
 
 ```bash
-# Matched EffiDec3D backbones → all O1–O11
+# Matched EffiDec3D backbones → six metrics H1/H2/C1/C2/P1/P2
 for NET in 3DUXNET SwinUNETR; do        # + SwinUNETRv2 MedNeXt for deeper coverage
-  python run_observations.py --network $NET --dataset BTCV13 \
+  python run_observations.py --network $NET --dataset BTCV13 --skip_aggregation concatenation \
     --root /root/autodl-tmp/btcv-synapse --output /root/output --obs_dir /root/obs/${NET}_btcv
 done
 ```
 
-**Go criterion (O8)**: on ≥2 matched backbones the O5/O9 flip–entropy
-direction holds (subj-r CI-lower `> 0`) and the O1/O2/O10 concentration pattern
-recurs → the decoder-benefit concentration is a property of the EffiDec3D backbone
-family, not an artifact of 3D UX-Net.
+**Go criterion (O8)**: on ≥2 matched backbones the headline direction recurs —
+H1 net ≈ 0 (CI crosses zero), H2 net concentrated at the boundary band, and P1
+direction AUROC ≈ 0.5 → the net-neutral, location-predictable-but-direction-unpredictable
+pattern is a property of the EffiDec3D backbone family, not an artifact of 3D UX-Net.
 
 **Result — O8: consistent across backbones at the parameter-matched (concat) config
 (BTCV13).** Headline uses concat (UX-Net, Swin); MedNeXt is an addition control and is
@@ -1547,15 +1552,15 @@ discrimination/calibration analysis (the pooled-bin r is descriptive only).
 ### Generalization criteria (not yet run)
 
 These are **within-study** criteria: each cell trains a Full/Effi pair (or a single
-control) under one protocol and checks whether the O1–O11 *direction* recurs.
+control) under one protocol and checks whether the six-metric *direction* recurs.
 Exact reproduction of the paper's absolute Dice is **not** a prerequisite — the
 observations are relational (Full-vs-Effi on identical local data), so they hold
 regardless of any single model's distance from the published number.
 
 | Obs | Axis | Criterion | Result | Pass? |
 |-----|------|-----------|--------|-------|
-| O7 | dataset | net-flip/entropy subj-r CI-lower > 0 on ≥3 frozen datasets spanning CT+MRI+lesion | pending matrix (BTCV/FeTA/MSD01/MSD06-08) | ☐ |
-| O8 | architecture (matched) | ≥2 matched EffiDec3D backbones (Swin, opt. SwinV2/MedNeXt) hold O5/O9 direction (subj-r CI-lower > 0) + O1/O2/O10 concentration | pending E0/E1-Swin | ☐ |
+| O7 | dataset | on ≥3 datasets spanning CT+MRI+lesion the headline recurs: H1 net ≈ 0 (CI crosses 0), H2 net concentrated at the boundary band, P1 direction AUROC ≈ 0.5 | pending matrix (BTCV/FeTA/MSD01/MSD06-08) | ☐ |
+| O8 | architecture (matched) | ≥2 matched EffiDec3D backbones (Swin, opt. SwinV2/MedNeXt) hold the same H1/H2/P1 direction | pending E0/E1-Swin | ☐ |
 | O11 | routing | Entropy is best or tied-best cheap routing signal | confidence 0.663 vs entropy 0.655; MC dropout inactive | ◐ partial |
 
 ---
@@ -1613,7 +1618,7 @@ decoder-only routing.
 > resolved flips, NSD, and the O9 `--o9_foreground` denominator option are in
 > `run_observations.py`.
 
-**Paper A conclusion (concat, 2026-07-29):** voxel net benefit ≈0, no region opportunity; flips predictable but net-neutral (O1/O2/O3 hold; O5/O9 negative). Paper B proceeds independently in
+**Paper A conclusion (concat, 2026-07-29):** voxel net benefit ≈0, no recoverable region opportunity; flips predictable in location but net-neutral in direction (H2/P1 hold; H1/C1/P2 negative). Paper B proceeds independently in
 [Experiment-Design-AdaDec3D.md](Experiment-Design-AdaDec3D.md), with E1 (77.0%) as
 the iso-accuracy target.
 
@@ -1623,9 +1628,9 @@ the iso-accuracy target.
 
 ### Producer
 
-All O1–O11 metrics and figures come from one script,
+The six converged metrics (H1/H2/C1/C2/P1/P2) and figures come from one script,
 `EffiDec3D/run_observations.py` (one invocation per grid cell → `results.json`
-+ PNGs). The reproduction baselines (Table 1) come from training
++ PNGs; `--appendix` adds the demoted O1/O2/O4/O9 diagnostics). The reproduction baselines (Table 1) come from training
 (`main_train_BTCV_TU.py` metrics CSV) and `profile_macs.py`, **not** from
 `run_observations.py`.
 
@@ -1695,7 +1700,7 @@ Week 5-6: Generalization matrix (run_observations.py --network/--dataset)
         NB: MedNeXt-Effi required two inherited-code bug fixes (BF1 --ds parse, BF2
             train/deploy head) before it was valid — see Part 0b Errata + EffiDec3D/MODIFICATIONS.md
   [ ] Dataset axis — freeze 2-3 more tasks (FeTA, MSD-Task08 HepaticVessel),
-      rerun matched UX-Net O1-O11 per dataset; aggregate CI-lower across CT+MRI+lesion
+      rerun matched UX-Net (six metrics) per dataset; aggregate H1 net + P1 direction across CT+MRI+lesion
   [ ] O7: cross-dataset consistency = aggregate over dataset axis (Go: ≥3 datasets)  — STILL PENDING
   [x] O8: architecture-family consistency (concat, 2026-07-29) — same pattern on matched backbones:
         Full−Effi Dice −1.5 (UX concat) / −1.0 (Swin concat) / −2.3% (MedNeXt addition, over-sized);
@@ -1707,7 +1712,7 @@ Week 5-6: Generalization matrix (run_observations.py --network/--dataset)
   [x] Corrected O9 contiguous-region opportunity curve (net/paired/halo) — NEGATIVE at matched concat (no opportunity)
   [ ] Corrected O3 subject-level discrimination/calibration analysis
   [ ] (optional) Matched E0/E1 multi-seed run with paper-equivalent preprocessing
-       — improves absolute numbers; NOT required for within-study O1-O11 direction
+       — improves absolute numbers; NOT required for within-study six-metric direction
   [ ] Patch-level whole-model adaptivity study (extend efficiency beyond decoder's 42%)
 
 Week 7: Paper A draft

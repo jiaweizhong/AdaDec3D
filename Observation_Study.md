@@ -1648,7 +1648,27 @@ Reading (→ paper `tab:factorial` + `sec:mechanism`):
 - **Channel width = more removable** — 384→48 costs only −0.6 Dice while dropping 95% of decoder params (46.7→2.2M).
 - **High-res stage = the compute + most of the (small) cost** — dropping it costs −2.5 Dice and is where the MACs go (657.8→319.1 at full C; 388.2→49.5 combined); params barely move → near-pure compute/accuracy knob.
 - **Factors ~independent** — combined (.784) tracks resolution-only; channel cut nearly free on top.
-- **Pending**: the per-factor *flip* localization (does dropping resolution push flips nearer the boundary?) needs the pairwise analysis **re-run on the converged code** (the run that produced these Dice was killed/old-code for the flip part).
+
+**Per-factor flip localization (H2_boundary, converged re-run, 2026-07-30)** — the pairwise
+Full→variant flip analysis ([results/obs-fz-channel](results/obs-fz-channel),
+[obs-fz-resolution](results/obs-fz-resolution), [obs-fz-combined](results/obs-fz-combined)).
+Net flip $R_{\text{net}}$ by distance-to-boundary (bins 0–1 / 1–2 / 2–4 / >4 vox):
+
+| Full→variant | H1 R_net (CI) | net-neutral? | 0–1 | 1–2 | 2–4 | >4 | P1 dir |
+|---|---|---|---|---|---|---|---|
+| **channel-only** | +.00027 [−.00027,+.00083] | **yes** | **−.020** | +.019 | +.007 | +.003 | .576 |
+| **resolution-only** | +.00046 [+.00007,+.00084] | no | **+.033** [.018,.047] | +.031 [.024,.038] | +.004 | −.011 | .542 |
+| **combined** | +.00102 [+.00038,+.00169] | no | +.019 | +.036 | +.006 | +.014 | .597 |
+
+**The mechanism hypothesis is supported** ✅ (→ fills `sec:mechanism`'s flip `\todo`):
+- **The high-resolution stage's benefit is boundary-concentrated.** Removing it (resolution-only) gives a **strongly positive net right at the boundary** (+.033 @0–1, +.031 @1–2, both CIs exclude 0) that decays to zero/negative in the interior (−.011 @>4). So the high-res stage is what does boundary refinement.
+- **Channel width is diffuse and near-neutral at the boundary.** Removing channels gives a **negative** net at 0–1 vox (−.020) and only a small mid-band positive (+.019 @1–2); it is smaller in magnitude and *not* boundary-peaked. Consistent with its tiny Dice cost (−0.6) and net-neutral H1 (CI crosses 0).
+- **Combined = both** — positive across the first two boundary bins, largest abs_net (15.4k vox vs ~5.4k for each single factor).
+
+**Honest caveats:**
+- On the *frozen* encoder, resolution-only and combined show a **small but significant positive** net (net_neutral=False), unlike the **net≈0** of the end-to-end matched pair. Reason: the factorial "full" is a *wider* (C=384) decoder than the real full decoder, so the capacity gap is larger and directional. The **boundary localization is the robust finding**; the net *magnitude* is inflated relative to the deployed pair.
+- **P1 direction stays weak** for every factor (.54–.60) — isolating a factor does not make the *direction* of a flip predictable.
+- **P2**: for the combined comparison entropy beats random (gap +.367, CI [.059,.582] excludes 0) because abs_net is larger; this does **not** overturn the end-to-end negative result, which holds at net≈0.
 
 **E0/E1 baseline cross-check (2026-07-30).** UX-Net & Swin `tab:baseline`/`tab:arch` numbers verified against the CSV (UX concat 11.7×/16.8×/5.1×/7.7×; Swin concat 5.5×/5.5×/2.2×). Fixed one stale prose figure (Swin said "6.5× / 2.6 pt" = the *addition* config; corrected to concat 5.5× / 1.0 pt). **MedNeXt row is provisional** — the CSV is the oversized f_s=48 model (full 39.3M vs standard 17.6M, 2.24×); refresh `tab:arch` MedNeXt after the f_s=32 retrain.
 

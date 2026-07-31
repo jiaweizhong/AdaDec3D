@@ -1,0 +1,414 @@
+{
+  "framework_map": {
+    "H1_global_flips": "O5 (subject-mean positive/negative/net flip + bootstrap CI)",
+    "H2_boundary": "H2_boundary (distance-to-boundary net flip)",
+    "H2_anatomy": "O_anatomy (per-organ union-fg net flip + per-organ Dice delta + size)",
+    "H2_support": "O_surface (per-organ NSD, optional boundary-quality column)",
+    "C1_C2_concentration": "O_pareto['oracle'] curve + O_pareto['concentration'] top-k/K80/abs_net",
+    "P1_predictability": "O3 (any / positive / direction=pos-vs-neg AUROC)",
+    "P2_selection": "O_pareto signals vs oracle vs random + O_pareto['selection_gap_at_20pct'] paired diff CI",
+    "appendix": "O1, O2, O4, O9 (behind --appendix)"
+  },
+  "O3": {
+    "flip_auroc_mean": 0.9185676861789629,
+    "flip_auroc_ci": [
+      0.8989260872643587,
+      0.9360073021393499
+    ],
+    "flip_auprc_mean": 0.2624691173077945,
+    "flip_auprc_ci": [
+      0.2326833343087757,
+      0.28563361134092136
+    ],
+    "positive_flip_prevalence_mean": 0.04119444444444444,
+    "flip_go": true,
+    "n_subjects_flip": 12,
+    "any_flip_auroc_mean": 0.9227067092193934,
+    "any_flip_auroc_ci": [
+      0.9028970161862301,
+      0.9378683200744964
+    ],
+    "neg_flip_auroc_mean": 0.8976507176932497,
+    "neg_flip_auroc_ci": [
+      0.8794556307562422,
+      0.9147294217286326
+    ],
+    "pos_vs_neg_auroc_mean": 0.5418990120844983,
+    "pos_vs_neg_auroc_ci": [
+      0.5157115317089368,
+      0.5708057629582104
+    ],
+    "n_subjects_pvn": 12,
+    "subject_auroc_mean": 0.853512019645378,
+    "subject_auroc_ci": [
+      0.7892236606047448,
+      0.89408754690984
+    ],
+    "subject_auprc_mean": 0.5156772425212387,
+    "subject_auprc_ci": [
+      0.48071170075099373,
+      0.5518684783777085
+    ],
+    "error_prevalence_mean": 0.15226083333333335,
+    "subject_ece_mean": 0.09199102265899382,
+    "subject_ece_ci": [
+      0.06706756998418478,
+      0.12225107523068575
+    ],
+    "n_subjects": 12,
+    "pooled_bin_pearson_r": 0.9642330563538577,
+    "pooled_bin_spearman_rho": 0.9759227202396179,
+    "pearson_r": 0.9642330563538577,
+    "spearman_rho": 0.9759227202396179,
+    "go": true
+  },
+  "O_surface": {
+    "nsd_tau1_mean": 0.7559224367141724,
+    "nsd_tau1_per_organ": {
+      "Spleen": 0.8469,
+      "R.Kidney": 0.8065,
+      "L.Kidney": 0.8428,
+      "Gallbladder": 0.6356,
+      "Esophagus": 0.7154,
+      "Liver": 0.8576,
+      "Stomach": 0.6332,
+      "Aorta": 0.9175,
+      "IVC": 0.7618,
+      "Veins": 0.7076,
+      "Pancreas": 0.5722,
+      "R.Adrenal": 0.7617,
+      "L.Adrenal": 0.7681
+    },
+    "nsd_tau2_mean": 0.8550550937652588,
+    "nsd_tau2_per_organ": {
+      "Spleen": 0.9178,
+      "R.Kidney": 0.8688,
+      "L.Kidney": 0.8993,
+      "Gallbladder": 0.7645,
+      "Esophagus": 0.8505,
+      "Liver": 0.9358,
+      "Stomach": 0.7674,
+      "Aorta": 0.958,
+      "IVC": 0.872,
+      "Veins": 0.8051,
+      "Pancreas": 0.7264,
+      "R.Adrenal": 0.8729,
+      "L.Adrenal": 0.8772
+    }
+  },
+  "O5": {
+    "mean_positive_rate": 0.0021882201253902167,
+    "mean_negative_rate": 0.0017241985284878563,
+    "subject_pos_rate_mean": 0.0021882201253902167,
+    "subject_neg_rate_mean": 0.0017241985284878563,
+    "subject_net_rate_mean": 0.0004640215969023605,
+    "subject_net_rate_ci": [
+      6.596350503969006e-05,
+      0.0008402976825891526
+    ],
+    "net_neutral": false
+  },
+  "H2_boundary": {
+    "distance_bins": [
+      "0-1",
+      "1-2",
+      "2-4",
+      ">4"
+    ],
+    "positive_rate": [
+      0.0870103240220711,
+      0.08110526150414883,
+      0.02639299277540813,
+      0.011589428495256064
+    ],
+    "negative_rate": [
+      0.05448918226105757,
+      0.05036565140473226,
+      0.02288180136978825,
+      0.022166925924624863
+    ],
+    "net_rate": [
+      0.03252114176101353,
+      0.03073961009941656,
+      0.003511191405619877,
+      -0.010577497429368796
+    ],
+    "net_rate_ci": [
+      [
+        0.01831207154167368,
+        0.0465236299885383
+      ],
+      [
+        0.023592052841471988,
+        0.03820802538263376
+      ],
+      [
+        -0.0038247839698354012,
+        0.01117891268175839
+      ],
+      [
+        -0.025212904248094702,
+        -0.00014093512857613552
+      ]
+    ],
+    "note": "voxels binned by distance-to-GT-boundary; subject-mean rates over union(GT,Full,Effi) foreground; net = positive - negative"
+  },
+  "O_anatomy": {
+    "organ": [
+      "Spleen",
+      "R.Kidney",
+      "L.Kidney",
+      "Gallbladder",
+      "Esophagus",
+      "Liver",
+      "Stomach",
+      "Aorta",
+      "IVC",
+      "Veins",
+      "Pancreas",
+      "R.Adrenal",
+      "L.Adrenal"
+    ],
+    "positive_rate": [
+      0.047075680719687124,
+      0.06542396782439899,
+      0.0441835118278307,
+      0.11639042795686322,
+      0.1434799372535728,
+      0.02441479102901671,
+      0.06005980965405918,
+      0.06203253977660097,
+      0.10124889286038925,
+      0.12491799393786533,
+      0.1261752513754989,
+      0.19406493991409526,
+      0.18070910763356499
+    ],
+    "negative_rate": [
+      0.050817396581225145,
+      0.05686410546257422,
+      0.08013190039318246,
+      0.11852951684748018,
+      0.06440161945093635,
+      0.018092121957379626,
+      0.04964985418372574,
+      0.037061419176179965,
+      0.05512801535102344,
+      0.11069719992596644,
+      0.10912516136282575,
+      0.08864737917276806,
+      0.09825381119923392
+    ],
+    "net_rate": [
+      -0.003741715861538021,
+      0.008559862361824773,
+      -0.03594838856535176,
+      -0.0021390888906169664,
+      0.07907831780263645,
+      0.006322669071637085,
+      0.010409955470333437,
+      0.024971120600421004,
+      0.04612087750936581,
+      0.014220794011898893,
+      0.017050090012673144,
+      0.1054175607413272,
+      0.08245529643433107
+    ],
+    "organ_size": [
+      55643.666666666664,
+      33459.75,
+      34212.0,
+      5265.727272727273,
+      3069.9166666666665,
+      378314.9166666667,
+      116621.75,
+      17620.25,
+      20680.666666666668,
+      6829.5,
+      19259.0,
+      996.75,
+      1173.9166666666667
+    ],
+    "dice_delta_full_minus_effi": [
+      -0.004954195299237685,
+      0.02357038531272526,
+      0.0083218090315349,
+      0.046196698369235345,
+      0.053517739924560104,
+      0.005287540656495171,
+      0.006087047486859842,
+      0.0118527850140423,
+      0.03073346741716454,
+      0.03435025677464709,
+      0.019336120959716152,
+      0.06020885511797747,
+      0.028643472195532205
+    ],
+    "size_net_spearman": -0.7087912087912087,
+    "foreground": "union(GT,Full,Effi) per organ"
+  },
+  "O_pareto": {
+    "budgets_pct": [
+      5,
+      10,
+      20,
+      30,
+      50
+    ],
+    "block_size": 16,
+    "oracle": {
+      "net_recovered_mean": [
+        0.968147,
+        0.999955,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "ci_lower": [
+        0.951915,
+        0.999865,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "ci_upper": [
+        0.98358,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "entropy": {
+      "net_recovered_mean": [
+        0.182976,
+        0.28875,
+        0.277557,
+        0.277557,
+        0.277557
+      ],
+      "ci_lower": [
+        0.003007,
+        -0.069642,
+        -0.152348,
+        -0.152348,
+        -0.152348
+      ],
+      "ci_upper": [
+        0.337447,
+        0.553822,
+        0.580414,
+        0.580414,
+        0.580414
+      ]
+    },
+    "confidence": {
+      "net_recovered_mean": [
+        0.199695,
+        0.301206,
+        0.277557,
+        0.277557,
+        0.277557
+      ],
+      "ci_lower": [
+        0.044219,
+        -0.080909,
+        -0.178493,
+        -0.178493,
+        -0.178493
+      ],
+      "ci_upper": [
+        0.345667,
+        0.570045,
+        0.583886,
+        0.583886,
+        0.583886
+      ]
+    },
+    "boundary": {
+      "net_recovered_mean": [
+        0.202762,
+        0.415705,
+        0.277557,
+        0.277557,
+        0.277557
+      ],
+      "ci_lower": [
+        0.130332,
+        0.216785,
+        -0.148771,
+        -0.148771,
+        -0.148771
+      ],
+      "ci_upper": [
+        0.283621,
+        0.586132,
+        0.587283,
+        0.587283,
+        0.587283
+      ]
+    },
+    "random": {
+      "net_recovered_mean": [
+        0.014581,
+        0.02516,
+        0.052224,
+        0.081287,
+        0.13362
+      ],
+      "ci_lower": [
+        -0.007569,
+        -0.016177,
+        -0.03042,
+        -0.042664,
+        -0.071477
+      ],
+      "ci_upper": [
+        0.031424,
+        0.057161,
+        0.116025,
+        0.176748,
+        0.29376
+      ]
+    },
+    "concentration": {
+      "oracle_coverage_at_10pct": 0.999955,
+      "oracle_coverage_at_20pct": 1.0,
+      "budget_for_80pct_net_pct": 5,
+      "abs_net_voxels_mean": 5358.666666666667,
+      "abs_pos_mass_voxels_mean": 16585.5,
+      "note": "C1/C2: coverage = fraction of the subject's positive net mass sum_r max(B(r),0) recovered by the top-k% oracle blocks; K80 = smallest block budget reaching 0.8. abs_net is the signed total net benefit in voxels: report it WITH the coverage so a steep curve over a ~0 absolute total is not mistaken for a large opportunity."
+    },
+    "selection_gap_at_20pct": {
+      "oracle": {
+        "mean_minus_random": 0.9477759501363683,
+        "ci": [
+          0.8874508222865609,
+          1.031028093907695
+        ]
+      },
+      "entropy": {
+        "mean_minus_random": 0.2253330253017842,
+        "ci": [
+          -0.1372243450420339,
+          0.4726828240888818
+        ]
+      },
+      "confidence": {
+        "mean_minus_random": 0.2253330253017842,
+        "ci": [
+          -0.10995609351595098,
+          0.47041003907637696
+        ]
+      },
+      "boundary": {
+        "mean_minus_random": 0.2253330253017842,
+        "ci": [
+          -0.11035783219806618,
+          0.47132818790964365
+        ]
+      },
+      "note": "P2: paired subject-bootstrap of (signal - matched random) net recovered at 20% block budget. A deployable signal beats random iff its CI excludes 0; the oracle row is the non-deployable upper bound."
+    }
+  }
+}

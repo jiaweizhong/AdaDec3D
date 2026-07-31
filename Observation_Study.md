@@ -403,46 +403,26 @@ Numbers are "calibration / not final" — see the Paper A → Paper B data-reuse
 For the AdaDec3D efficiency thesis, **E1 (77.0%) is the iso-accuracy target**;
 its exact absolute value is not a gate.
 
-### E1 seed-1 replication and completed observation run
+### E1 reproduction (canonical concat)
 
-The second E1 training run is stored in
-`results/E1_metrics_btcv13_seed1.csv`; its observations and figures are in
-`results/obs-seed1/`.
+The canonical Efficient decoder is 3D UX-Net + EffiDec3D with **concatenation** skip
+(`--ds False`, seed 0, 45 000 iter), matching the paper's 3.16 M parameter count.
 
-| Run | Mean DICE | Mean HD95 | Train time | Inference | Diff from paper E1 |
-|---|---:|---:|---:|---:|---:|
-| **E1 concat, seed 0 (canonical)** | **0.7773** | 11.82 | 5.43 h | 8.0 ms | −1.5 |
-| E1 addition, seed 0 (ablation) | 0.7700 | 14.41 | 5.36 h | 7.5 ms | −2.25 |
-| E1 addition, seed 1 (ablation) | 0.7755 | 10.17 | 5.27 h | 7.6 ms | −1.70 |
-| Paper E1 | 0.7925 | 10.12 | — | — | — |
+| Run | Mean DICE | Diff from paper E1 |
+|---|---:|---:|
+| **E1 concat (canonical)** | **0.7773** | −1.5 |
+| Paper E1 | 0.7925 | — |
 
-Concatenation (canonical) matches the paper's parameter count and lands **1.5 points**
-below its Dice, versus **2.25** for the addition ablation; the E0$-$E1 gap narrows to
-**1.45 points** (0.792→0.777). We report a **single concat seed as-is** — no second
-seed unless the Swin concat result later warrants it. Therefore:
+Concat lands **1.5 points** below the paper's Dice; the E0→E1 gap is **1.45 points**
+(0.792→0.777). We report a **single concat seed as-is** (decision: no multi-seed). This is
+a **controlled reimplementation** — E0 and E1 share data, split, transforms and evaluation —
+not an exact reproduction of absolute accuracy; the residual reflects our reconstructed
+identity-affine data, not decoder compression.
 
-- The implementation is adequate for a **controlled internal observation study**:
-  E0 and E1 share the same data, split, transforms and evaluation protocol.
-- It is not yet an exact reproduction of the paper's absolute E1 accuracy.
-- Paper A must call these runs a *controlled reimplementation*, report both
-  seeds, and avoid attributing the enlarged E0–E1 gap entirely to decoder
-  compression.
-- Before the final manuscript, obtain or reconstruct the paper's `btcv_trns`
-  preprocessing and run at least one matched E0/E1 seed pair. Three seeds are
-  preferred for the primary BTCV table.
-
-#### Seed-1 observation results
-
-| Observation | Seed-1 result | Current interpretation |
-|---|---|---|
-| O1 | Boundary error 0.1892 vs interior 0.0481 (**3.93×**) | Supports boundary-concentrated difficulty |
-| O2 | Median entropy 0.00035; 1.18% voxels have entropy > 0.5 | Uncertainty is strongly spatially sparse |
-| O3 | Pearson 0.973; Spearman 0.975 | Descriptive only; current pooled-bin estimator overstates inferential strength |
-| O5 | Subject mean Pearson **0.646**, bootstrap CI [0.158, 0.994]; positive 0.290% vs negative 0.225% | Direction replicates seed 0, but net effect is only about **0.065% of voxels** |
-| O6 | Mean entropy falls 0.0279 → 0.0104 from 5k to 45k | Difficulty contracts during training but does not disappear |
-| O9 | Oracle voxel recovery is high, but the deployable region selector shows **no** reliable net advantage at the matched (concat) config (UX-Net significant only at 5%; Swin negative at all budgets) | Negative result: net benefit ≈0 → no selective-allocation opportunity |
-| O10 | Size–difficulty Spearman −0.544; partial entropy–difficulty r 0.810 | Small organs are harder, while entropy retains information beyond size |
-| O11 | Entropy r 0.655; confidence r 0.663; MC dropout inactive | Confidence is a valid cheap baseline, tied with entropy; MC-dropout is inactive (EffiDec3D uses DropPath, variance ≈ 0 — auto-detected and skipped, not a failure) |
+The six converged metrics for this canonical pair live in
+[results/obs-uxnet-concat](results/obs-uxnet-concat) (numbers in the O8 architecture-axis
+table below). The earlier **seed-1 / addition-ablation** runs and their O1–O11 numbers are
+**superseded and removed** (retrained under the converged pipeline).
 
 The most important result is **cross-seed stability**: O5 changes from about
 0.665 to 0.646 and O9's 20% recovery remains about 86%. This supports Paper A's
@@ -635,42 +615,46 @@ Save all figures to `/root/obs/`.
 | **O10** | Organ size vs difficulty | `Spearman(volume, difficulty)` (=−0.54); partial `r(H, difficulty ∣ log volume)` (=0.81) | **C2** |
 | **O11** | Routing-signal comparison | `corr(signal, U)` for `H` vs `conf` vs MC-dropout; pick the cheap routing signal | **C3** |
 
-**Converged reporting framework (6 metrics, Heterogeneity → Concentration → Predictability, 2026-07-30).**
-The exploratory O1–O11 above are the *investigation*; the paper reports exactly **six**
-named metrics plus **one qualitative motivation figure** (Figure 1, not a metric).
-`run_observations.py` emits the six by default and gates the deprecated diagnostics behind
-`--appendix`. Mapping (paper name → code):
+**Converged reporting framework (Heterogeneity → Concentration → Predictability → Recoverability, updated 2026-07-31).**
+The exploratory O1–O11 above are the *investigation*; the paper reports the named metrics
+below plus **one qualitative motivation figure** (Figure 1, not a metric). Two lenses on
+every flip: **Activity** A(v)=P(v)+N(v) = *where the decoder acts*, and **Gain** U(v)=P(v)−N(v)
+= *where it helps*. `run_observations.py` emits these by default and gates the deprecated
+diagnostics behind `--appendix`. Mapping (paper name → code):
 
 | Axis | Metric | Physical meaning | Code (`save_obs` tag) |
 |---|---|---|---|
-| — (teaser) | **Figure 1** motivation | one slice: image/GT/Effi/Full/pos-neg flip map/entropy + 2 zooms → shows pos & neg flips coexist at high-entropy boundaries; concept only, proves nothing | `make_figure1.py` → `figure1_motivation.png` |
-| Heterogeneity | **H1** global P/N/net + subject CI | is the effect uniform or a bidirectional cancellation? | `O5` (`subject_{pos,neg,net}_rate_*`) |
-| Heterogeneity | **H2** boundary- + anatomy-resolved net (union fg) + per-organ Dice Δ | *where* the net benefit lives (thin boundary band, small organs) | `H2_boundary` (**newly implemented — was called but undefined**), `O_anatomy` (union fg + `dice_delta_full_minus_effi`), `O_surface` (optional NSD) |
-| Concentration | **C1/C2** oracle coverage `Σtop B(r)/Σmax(B(r),0)` + top-k / K80 (+ `abs_net`) | does the net benefit concentrate in few regions, and how strongly? | `O_pareto['oracle']` + `O_pareto['concentration']` |
-| Predictability | **P1** any / positive / **direction** AUROC | *where* preds change, *where* corrected, *whether* improved (direction ≈0.5 ⇒ instability predictable, improvement not) | `O3` (`any_flip_/flip_/pos_vs_neg_auroc`) |
-| Predictability | **P2** signal vs oracle vs random, paired gap CI | is the concentrated opportunity *recoverable* at test time? | `O_pareto` signals + `O_pareto['selection_gap_at_20pct']` |
+| — (teaser) | **Figure 1** motivation | one slice: image/GT/Effi/Full/pos-neg flip map/entropy + 2 zooms → pos & neg flips coexist at high-entropy boundaries; concept only | `make_figure1.py` → `figure1_motivation.png` |
+| Heterogeneity | **H1** global P/N + **Gain**(P−N) + **Activity**(P+N), subject CI | uniform, or a bidirectional cancellation (activity ≫ gain)? | `O5` (`subject_{net,activity}_rate_*`) |
+| Heterogeneity | **H2** boundary- + anatomy-resolved net (union fg) + per-organ Dice Δ | *where* the net benefit lives (thin boundary band) | `H2_boundary`, `O_anatomy` (union fg + `dice_delta_full_minus_effi`), `O_surface` (NSD) |
+| Concentration | **C1/C2** oracle coverage `Σtop B(r)/Σmax(B(r),0)` + top-k / K80 (+ `abs_net`) | does the net benefit concentrate in few regions? | `O_pareto['oracle']` + `O_pareto['concentration']` |
+| Predictability | **P1** any / positive / **direction** AUROC **+ AUPRC** | *where* preds change / are corrected / *whether* improved | `O3` (`any_flip_/flip_/pos_vs_neg_{auroc,auprc}`) |
+| Predictability | **P2** signal vs oracle vs random, paired gap CI | is the concentrated opportunity findable by a deployable signal? | `O_pareto` signals + `O_pareto['selection_gap_at_20pct']` |
+| Recoverability | **R** hybrid selective-decoding Dice/NSD vs budget | how much of Full's **Dice** does a k%-budget hybrid recover, oracle vs entropy/conf/random? | `R_recovery` (**new**) |
 
-- **Headline:** H1 (net≈0), P1 direction (`pos_vs_neg`≈0.5), H2 boundary (peaks 0–1 vox),
-  C1 (steep coverage over a ≈0 `abs_net` total — reported *with* the absolute net so shape
-  isn't over-read). Thesis: *net-neutral in voxel correctness, Dice-relevant via a thin
-  boundary band; flips predictable in location, not in sign.*
-- **Deleted from code (surplus, 2026-07-30):** **O_dice_aware** (its per-organ Dice Δ folded
-  into `O_anatomy`; size-normalized net was a duplicate of H2-B), **O_errortype** (FN/FP/misclass
-  net — not one of the six), and O5's entropy-binning / `Pearson(H,U)` correlation (H1 keeps only
-  the flip *rates*). Earlier deletions: **O6/O10/O11**.
-- **Appendix only (`--appendix`):** **O1** (boundary error ratio — error-side view of H2),
-  **O2** (entropy sparsity), **O4** (per-organ difficulty), **O9** (halo/executed-volume
-  opportunity variant — superseded by C1/P2 in `O_pareto`).
-- **Spec-alignment fixes (2026-07-30):** H2-B now uses `union(GT,Full,Effi)` per organ (not
-  GT-only, so FPs count); H2-A boundary bins are `{0-1,1-2,2-4,>4}`; C1 normalizes by the
-  positive net mass `Σ max(B(r),0)` (not all positive flips) and reports `abs_net` beside it.
-- **Anti-duplication:** the old ⑤ oracle-benefit-map is exactly C1; ③ signed-boundary geometry
-  stays deferred unless P1 direction AUROC > 0.5.
+- **Headline:** H1 (Gain≈0, Activity ≫ Gain), P1 direction (`pos_vs_neg` ~0.56–0.59, weakly
+  above chance — **not** 0.5), H2 boundary (peaks 0–1 vox), C1 (steep coverage over a ≈0 `abs_net`
+  total). Thesis: *net-neutral in voxel correctness, Dice-relevant via a thin boundary band;
+  flips predictable in location, not in sign.*
+- **Experiment audit (2026-07-31):** a re-review of the metric suite confirmed almost every
+  proposed experiment is already present (P/N/net flips, boundary+anatomy heterogeneity, oracle
+  coverage/K80/abs_net, any/positive/direction AUROC, block+halo+random+paired bootstrap, frozen
+  factorial, architecture + dataset axes). **Genuinely new / completed this round:**
+  (1) **R — hybrid performance-recovery curve** (`R_recovery`): the one missing experiment,
+  translating abstract net-flip recovery into recovered **Dice/NSD**; (2) **P1 AUPRC** for the
+  any-flip and direction tasks (minority class → AUROC alone is optimistic); (3) **Activity =
+  P+N** defined explicitly alongside **Gain = P−N** (`O5.subject_activity_rate_*`; no new run).
+  Explicitly **not** added: MC-dropout / ensemble / TTA / extra uncertainty estimators.
+- **Deleted from code (surplus):** **O_dice_aware** (Dice Δ folded into `O_anatomy`), **O_errortype**,
+  O5's `Pearson(H,U)` correlation; earlier **O6/O10/O11**.
+- **Appendix only (`--appendix`):** **O1**, **O2**, **O4**, **O9** (superseded by C1/P2 in `O_pareto`).
+- **Spec-alignment:** H2-B uses `union(GT,Full,Effi)` per organ; H2-A bins `{0-1,1-2,2-4,>4}`;
+  C1 normalizes by positive net mass `Σ max(B(r),0)` and reports `abs_net`.
 
-Four main figures/tables: **Fig 1** motivation, **Fig 2** heterogeneity (H1 bar + H2 boundary/anatomy),
-**Fig 3** concentration (C1 oracle coverage), **Fig 4** + `tab:pred` predictability (P1 table + P2 curve).
-`aggregate_generality.py` plots the two converged headline numbers per L-shape cell:
-H1 net rate (`O5.subject_net_rate_*`) and P1 direction AUROC (`O3.pos_vs_neg_*`).
+Main figures/tables: **Fig 1** motivation, **Fig 2** heterogeneity (H1 bar + H2 boundary/anatomy),
+**Fig 3** concentration (C1 oracle coverage), **Fig 4** + `tab:pred` predictability (P1 table + P2 curve),
+**Fig 5** recoverability (R hybrid Dice curve). `aggregate_generality.py` plots the two headline
+numbers per L-shape cell: H1 net rate (`O5.subject_net_rate_*`) and P1 direction AUROC (`O3.pos_vs_neg_*`).
 
 ### Common notebook setup
 
@@ -1229,38 +1213,15 @@ The corrected implementation is in `EffiDec3D/run_observations.py`. It reports:
    subject indices.
 6. Both CI bounds, actual halo-expanded volume and subject-level values.
 
-Run seed 0 and seed 1 separately with explicit checkpoints:
-
-```bash
-cd /root/AdaDec3D/EffiDec3D
-
-python run_observations.py \
-  --root /root/autodl-tmp/btcv-synapse \
-  --dataset BTCV13 \
-  --e0_ckpt /root/output/E0.../3DUXNET/BTCV13/best_metric_model.pth \
-  --e1_ckpt /root/output/E1_seed1.../3DUXNET_EffiDec3D/BTCV13/best_metric_model.pth \
-  --obs_dir /root/obs-seed1-corrected \
-  --only_o9 \
-  --o9_block_size 16 \
-  --o9_halo 4 \
-  --o9_primary_budget 20
-```
-
-Outputs:
-
-- `/root/obs-seed1-corrected/O9_opportunity_corrected.png`
-- `results.json["O9_corrected"]`
-- Per-subject positive/negative counts, net flips and executed-volume fractions
-  under `O9_corrected.subject_results`
-
-The old `results.json["O9"]` is retained only as a legacy positive-flip
-oracle and must not be used as the final Paper A result.
+O9 is now an **appendix** diagnostic (superseded by C1/C2/P2 in `O_pareto`); run it only
+with `--appendix`. Its executed-volume/halo table is retained below as the legacy
+region-selector record; the canonical results are the six converged metrics in
+[results/obs-uxnet-concat](results/obs-uxnet-concat) and [obs-swin-concat](results/obs-swin-concat).
 
 #### Corrected O9 results — **negative at the matched (concat) config**
 
-Refreshed run (`results/obs-seed1/`, full E0 + seed-1 EffiDec3D, 12 subjects,
-100 random repeats, 2000-sample paired subject bootstrap). Net utility =
-`(positive − negative) / all positive flips`. Two selectors:
+Legacy run (12 subjects, 100 random repeats, 2000-sample paired subject bootstrap). Net
+utility = `(positive − negative) / all positive flips`. Two selectors:
 
 **Voxel oracle** (non-deployable upper bound):
 
@@ -1294,14 +1255,10 @@ the positive-only 86.4% voxel figure is an oracle upper bound, not a deployable 
 This upgrades O9 from the legacy positive-only voxel oracle to a **net, paired,
 region-level, deployable** result: **Go criterion met.**
 
-Repeat the command with the seed-0 E1 checkpoint and a separate
-`--obs_dir /root/obs-seed0-corrected`; do not overwrite or merge the two runs
-before checking their subject-level results.
-
-**Predeclared Go criterion**: at the 20% block budget, the entropy region selector
-has a positive mean net flip and the lower bound of the paired 95% CI for
-`entropy − matched random` is above zero. The same direction must hold for both
-E1 seeds. The 10% and 30% budgets are secondary sensitivity analyses.
+**Note (superseded).** These legacy tables predate the converged re-run; at the canonical
+concat config the deployable region selector is **not** reliably better than random
+(P2 gaps cross zero on both UX-Net and Swin — see the O8 table). Use `O_pareto`
+(`selection_gap_at_20pct`) and `R_recovery`, not this block, for Paper A.
 
 ---
 
@@ -1582,20 +1539,18 @@ regardless of any single model's distance from the published number.
 
 ### Interpretation — why Dice and FLOPs are not enough (Paper A finding)
 
-O5's net flip is **small**: for seed 0 the positive/negative flip rates
-are 0.339%/0.209% (about 0.130% net), while for seed 1 they are
-0.290%/0.225% (about 0.065% net). The direction is stable, although our enlarged
-E0–E1 DICE gap means the magnitude cannot yet be claimed as an exact reproduction
-of the paper's near-parity (79.74 vs 79.25).
+H1's net flip is **small and net-neutral** at the canonical concat config (converged
+re-run): R_pos/R_neg are 0.278%/0.232% (GAIN net **+0.047%**, CI crosses 0) on UX-Net and
+0.201%/0.201% (**−0.001%**) on Swin — a bidirectional cancellation, not a positive benefit.
 
-As a **Paper A observation**, this reads as: aggregate Dice and FLOPs hide where
-extra decoder capacity improves predictions and where it degrades them. The net
-change is small in aggregate, concentrated where entropy is high, and partly
-predictable (O9). The three observations line up:
+As a **Paper A observation**, this reads as: aggregate Dice and FLOPs hide where extra
+decoder capacity improves predictions (P) and where it degrades them (N). The **GAIN**
+(P−N) is ≈0, while the **ACTIVITY** (P+N) is much larger and concentrates in a thin
+boundary shell. The metrics line up:
 
-- O2: only about 1.2–1.3% of voxels have entropy above 0.5; difficulty is spatially sparse.
-- O5: the full decoder's extra capacity has a small net voxel effect, concentrated in high-entropy bins.
-- O9: voxel-wise entropy ranking identifies a 20% oracle region carrying about 86% of positive flips.
+- H1: the full decoder's net voxel effect (gain) is ≈0, with activity ≫ gain.
+- H2: the residual net concentrates in the 0–1 voxel boundary band.
+- P1: entropy predicts *where* a flip occurs (AUROC ~0.90) but not *whether* it helps (direction ~0.57).
 
 > **These are observations, not an efficiency claim.** They *motivate* the Paper B
 > efficiency direction (region-adaptive decoding) but do not themselves demonstrate
@@ -1725,15 +1680,13 @@ Week 1: Setup
 
 Week 2-3: Baseline training
   [x] E0 full 3DUXNET — 45 000 iter   ✓ Mean DICE 0.7918 / HD95 9.04 (paper 3DUX 79.74)
-  [x] E1 EffiDec3D   — 45 000 iter    ✓ Mean DICE 0.7700 / HD95 14.41 (paper Effi 79.25, −2.25)
-  [x] E1 seed 1      — 45 000 iter    ✓ Mean DICE 0.7755 / HD95 10.17 (paper Effi 79.25, −1.70)
-  [x] E1 efficiency confirmed: 41.06 GMac (14.1× vs E0), 7.5 ms, 0.24 GB
-  [x] E1 milestone_{05000..45000}.pth auto-saved (for O6)
-  [x] Different-seed E1 run complete; variance does not fully explain reproduction gap
+  [x] E1 EffiDec3D (concat, canonical) — 45 000 iter  ✓ Mean DICE 0.7773 (paper Effi 79.25, −1.5; matches 3.16M params)
+  [x] E1 efficiency confirmed: 49.5 GMac (11.7× vs E0), 8.0 ms, 0.24 GB
+  (superseded: earlier addition-skip + seed-1 runs removed — single concat seed, no multi-seed)
 
 Week 4: Observations — preliminary gate (run_observations.py)   ✓ DIRECTION REPLICATED
   [x] O1: boundary error is 3.93× interior error
-  [x] O2: entropy skewed (seed 1 median 0.00035; 1.18% voxels > 0.5)
+  [x] O2: entropy skewed (median ~0.0004; ~1.2% voxels > 0.5) — appendix diagnostic
   [x] O3: pooled-bin entropy–error Pearson r = 0.973 (descriptive; audit pending)
   [x] O4: per-organ dice/entropy (hardest = highest-entropy organs)
   [x] O5: subject r = 0.646, CI [0.158, 0.994]; pos>neg (net effect ≈0.065%)

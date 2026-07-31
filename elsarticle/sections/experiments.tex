@@ -1,12 +1,10 @@
 \section{Experiments and Results}
 \label{sec:experiments}
 
-\subsection{Experimental Setup and Baseline Reproduction}
-We evaluate matched decoder pairs across three representative 3D medical image segmentation architectures: a large-kernel CNN (3D UX-Net \cite{lee20233d}), a vision transformer backbone (SwinUNETR \cite{hatamizadeh2022swin}), and a ConvNeXt-style network (MedNeXt-M-K3 \cite{roy2023mednext}). Experiments are performed on the BTCV multi-organ CT dataset (13 organs) \cite{landman2015btcv} and the FeTA 2021 fetal brain MRI dataset (7 structures) \cite{payette2021feta}.
+\subsection{Computational and Accuracy Trade-offs}
+We evaluate matched decoder pairs across three 3D medical image segmentation backbones: a large-kernel CNN (3D UX-Net \cite{lee20233d}), a vision transformer (SwinUNETR \cite{hatamizadeh2022swin}), and a ConvNeXt-style network (MedNeXt-M-K3 \cite{roy2023mednext}). Benchmarks are conducted on the BTCV multi-organ CT dataset (13 organs) \cite{landman2015btcv} and the FeTA 2021 fetal brain MRI dataset \cite{payette2021feta}.
 
-\textbf{Hardware and Training Protocol}: Models were trained on AutoDL NVIDIA RTX 5090 GPUs (32 GB VRAM) using PyTorch 2.6 and CUDA 12.8 with BF16 mixed precision. Both full decoders ($E_0$) and efficient baseline decoders ($E_1$) were trained for 45,000 steps with identical data augmentations, initial learning rate (0.001), and crop dimensions ($96\times96\times96$). Validation was conducted every 250 steps.
-
-\textbf{Baseline Comparison}: Table \ref{tab:main_results} reports aggregate computational complexity and segmentation accuracy across all three architectures. The efficient decoder configuration ($E_1$) follows the parameter reduction strategy of EffiDec3D \cite{effidec3d}. Across all backbones, $E_1$ achieves substantial computational savings (up to $91.4\%$ FLOP reduction in 3D UX-Net) while preserving overall segmentation accuracy. For instance, MedNeXt-M-K3 $E_1$ achieves an 81.47\% Mean Dice score (compared to 83.74\% for $E_0$) while reducing inference latency from 40.9 ms to 18.7 ms.
+\textbf{Baseline Comparison}: Table \ref{tab:main_results} summarizes the aggregate computational complexity and segmentation performance under standard end-to-end model training. The efficient baseline ($E_1$) implements the parameter reduction strategy of EffiDec3D \cite{effidec3d}. Across all three backbones, $E_1$ achieves substantial FLOP reductions (up to 91.4\% in 3D UX-Net) while retaining competitive Mean Dice scores. For example, MedNeXt-M-K3 $E_1$ maintains an 81.47\% Mean Dice (vs. 83.74\% for $E_0$) while reducing inference latency from 40.9 ms to 18.7 ms.
 
 \begin{table}[t]
 \centering
@@ -30,7 +28,9 @@ We evaluate matched decoder pairs across three representative 3D medical image s
 }
 \end{table}
 
-\textbf{Factorial Factor Analysis}: To separate the effects of decoder channel dimension ($C_{dec}$) and spatial resolution scaling ($RF$), we conduct a $2\times2$ factorial ablation on 3D UX-Net (Table \ref{tab:factorial}). Reducing decoder channels from 384 to 48 ($C_{48}, RF_1$) reduces parameters from 46.72M to 2.24M while maintaining a 79.80\% Mean Dice. Omitting the high-resolution stage ($C_{384}, RF_2$) reduces inference latency to 16.1 ms. Combining channel reduction and stage removal ($C_{48}, RF_2$) yields the $E_1$ configuration (1.84M params, 49.49 GMac), confirming that channel scaling and resolution reduction act as distinct efficiency factors.
+\textbf{Factorial Factor Analysis}: In our decoder-isolated attribution analysis on 3D UX-Net with frozen shared encoders (Table \ref{tab:factorial}), we separate channel reduction ($C_{dec}$) from stage removal ($RF$). Reducing channels from 384 to 48 ($C_{48}, RF_1$) compresses parameters from 46.72M to 2.24M while maintaining a 79.80\% Mean Dice. Omitting the high-resolution stage ($C_{384}, RF_2$) reduces latency to 16.1 ms. Combining both ($C_{48}, RF_2$) yields the $E_1$ configuration (1.84M params, 49.49 GMac).
+
+Aggregate metrics confirm the overall efficiency-accuracy trade-off, but they do not reveal where additional decoder computation acts or helps across volumetric space.
 
 \begin{table}[t]
 \centering
@@ -51,11 +51,17 @@ Effi ($C_{48}, RF_2$) & 48 & 2 & 1.84 & 49.49 & 8.0 & 78.35 \\
 \end{table}
 
 \subsection{Spatial Heterogeneity of Decoder Contribution}
-We evaluate whether additional decoder capacity yields uniform prediction changes across volumetric space. For parameter-matched decoder pairs, the global net benefit of full decoders remains statistically net-neutral across architectures. On the BTCV benchmark, the subject-mean net flip rate is $+0.046\%$ (95\% CI: $[-0.0002\%, +0.0011\%]$) for 3D UX-Net, $-0.0008\%$ (95\% CI: $[-0.044\%, +0.039\%]$) for SwinUNETR, and $+0.085\%$ (95\% CI: $[+0.024\%, +0.152\%]$) for MedNeXt-M-K3. As shown in Figure \ref{fig:heterogeneity}, positive voxel corrections are counterbalanced by negative degradations across the global volume.
 
-Spatially, boundary-level analysis demonstrates that this net-neutrality is driven by localized prediction shifts. The error rate near object boundaries is $3.93\times$ higher than in interior regions for 3D UX-Net and $4.67\times$ higher for MedNeXt-M-K3. Net flip activity across all three networks is concentrated within a narrow boundary band (0--1 voxels from organ edges).
+\subsubsection{Global Correction-Degradation Balance}
+Evaluating voxel-level prediction shifts between matched $E_0$ and $E_1$ decoders reveals that positive corrections $P(v)$ and negative degradations $N(v)$ are comparable in magnitude across backbones. The subject-mean net gain $R_{net}$ remains small ($<0.1\%$) across all models: $+0.046\%$ (95\% CI: $[-0.020\%, +0.110\%]$) for 3D UX-Net, $-0.0008\%$ (95\% CI: $[-0.044\%, +0.039\%]$) for SwinUNETR, and $+0.085\%$ (95\% CI: $[+0.024\%, +0.152\%]$) for MedNeXt-M-K3 (Figure \ref{fig:heterogeneity}, left column). While 3D UX-Net and SwinUNETR exhibit global confidence intervals crossing zero, MedNeXt-M-K3 shows a small, statistically significant positive shift. Overall, positive voxel corrections are largely counterbalanced by negative degradations across global volumes.
 
-Anatomical evaluation confirms this spatial heterogeneity across organ types (Figure \ref{fig:heterogeneity_anatomy}). Small and complex structures show higher prediction volatility: the left and right adrenal glands exhibit positive flip rates of 16.2\%/16.9\% in 3D UX-Net, 14.4\%/14.8\% in SwinUNETR, and 18.3\%/10.4\% in MedNeXt-M-K3. Conversely, large organs such as the liver maintain low flip rates ($<3\%$) across all models.
+\subsubsection{Boundary Localization of Decoder Activity}
+Spatial stratification reveals that decoder activity $A(v) = P(v) + N(v)$ is concentrated near anatomical boundaries. Error rates in boundary regions are $3.93\times$ higher than in organ interiors for 3D UX-Net and $4.67\times$ higher for MedNeXt-M-K3. Figure \ref{fig:heterogeneity} (right column) shows that both positive corrections and negative degradations peak sharply within a 0--1 voxel boundary band, demonstrating that decoder capacity acts primarily at spatial transitions.
+
+\subsubsection{Anatomical Volatility}
+Anatomical structure analysis (Figure \ref{fig:heterogeneity_anatomy}) demonstrates that small, morphologically complex organs exhibit high flip volatility. The left and right adrenal glands show positive correction rates of 16.2\%/16.9\% in 3D UX-Net, 14.4\%/14.8\% in SwinUNETR, and 18.3\%/10.4\% in MedNeXt-M-K3. Conversely, large structures like the liver remain highly stable ($<3\%$ Activity).
+
+Extra decoder computation is largely inactive in smooth organ interiors, but frequently alters predictions near boundaries and difficult structures.
 
 \begin{figure}[t]
 \centering
@@ -70,7 +76,7 @@ Anatomical evaluation confirms this spatial heterogeneity across organ types (Fi
 \includegraphics[width=0.45\textwidth]{figures/obs-mednext/O_boundary_flips.png} \\
 (e) MedNeXt-M-K3 Global Flips & (f) MedNeXt-M-K3 Boundary Flips \\
 \end{tabular}
-\caption{Voxel-level net benefit and spatial boundary concentration across architectures. Left Column: Global positive, negative, and net flip rates for (a) 3D UX-Net, (c) SwinUNETR, and (e) MedNeXt-M-K3. Right Column: Net flip rate as a function of distance to organ boundaries for (b) 3D UX-Net, (d) SwinUNETR, and (f) MedNeXt-M-K3.}
+\caption{Voxel-level net gain and spatial boundary concentration across architectures. Left Column: Global positive corrections, negative degradations, and net gain ($R_{net} < 0.1\%$). Right Column: Activity and net gain as a function of distance to organ boundaries.}
 \label{fig:heterogeneity}
 \end{figure}
 
@@ -82,16 +88,14 @@ Anatomical evaluation confirms this spatial heterogeneity across organ types (Fi
 \vspace{-2pt}{\small (b) SwinUNETR Organ-Level Flips} \\[4pt]
 \includegraphics[width=0.85\textwidth]{figures/obs-mednext/O_anatomy.png} \\
 \vspace{-2pt}{\small (c) MedNeXt-M-K3 Organ-Level Flips} \\
-\caption{Organ-level flip breakdown across (a) 3D UX-Net, (b) SwinUNETR, and (c) MedNeXt-M-K3. Complex and small anatomical structures show high prediction volatility, whereas large organs remain stable.}
+\caption{Organ-level flip breakdown across backbones. Complex and small anatomical structures show high prediction volatility, whereas large organs remain stable.}
 \label{fig:heterogeneity_anatomy}
 \end{figure}
 
-These results indicate that decoder interventions are localized to anatomical boundaries and smaller structures. Having established spatial heterogeneity, we next measure whether beneficial prediction flips are broadly distributed or spatially concentrated.
-
 \subsection{Spatial Concentration of Decoder Benefit}
-We evaluate the spatial concentration of positive net benefit across volumetric sub-blocks. Figure \ref{fig:concentration} shows the oracle coverage curves for 3D UX-Net, SwinUNETR, and MedNeXt-M-K3. Across all three architectures, an oracle selecting the top 5\% of blocks recovers 80\% of the full decoder's total positive net gain ($K_{80} = 5\%$). At a 10\% volume budget, oracle coverage reaches 99.98\%, reaching 100\% at a 20\% budget.
+Figure \ref{fig:concentration} presents oracle coverage curves evaluating the spatial concentration of positive net gain $G(r)$. Across all three architectures, an oracle selecting the top 5\% of blocks recovers 80\% of the full decoder's total positive net gain ($K_{80} = 5\%$). At a 10\% volume budget, oracle coverage reaches 99.98\%, reaching 100\% at 20\%.
 
-While the full decoder modifies predictions across broad spatial regions, net accuracy gains are restricted to 5\% of the volume. In the remaining 95\% of spatial blocks, additional decoder parameters generate redundant transformations without improving net correctness. This spatial concentration confirms that uniform decoder scaling introduces structured spatial redundancy.
+The top 5\% of spatial blocks account for 80\% of the observed positive net gain ($K_{80} = 5\%$), indicating strong spatial concentration of beneficial decoder effects. This does not imply that the remaining 95\% of blocks are entirely inactive or dispensable, but rather that high-capacity decoder computation yields diminishing net returns outside this core subset.
 
 \begin{figure}[t]
 \centering
@@ -105,21 +109,18 @@ While the full decoder modifies predictions across broad spatial regions, net ac
 \includegraphics[width=0.45\textwidth]{figures/obs-mednext/O_pareto.png}
 
 {\small (c) MedNeXt-M-K3 Concentration Curve}
-\caption{Oracle concentration curves for (a) 3D UX-Net, (b) SwinUNETR, and (c) MedNeXt-M-K3, showing that 80\% of positive net benefit ($K_{80}$) is concentrated in 5\% of spatial blocks.}
+\caption{Oracle concentration curves showing that 80\% of positive net gain ($K_{80}$) is concentrated in 5\% of spatial blocks across all three backbones.}
 \label{fig:concentration}
 \end{figure}
 
-\subsection{Predictability of Decoder Utility}
-We test whether inference-time uncertainty signals (predictive entropy and confidence) from the efficient baseline can identify beneficial spatial regions prior to full decoder execution.
-
-Across all backbones (Figure \ref{fig:predictability}), we observe a divergence between predicting prediction instability and predicting net improvement:
+\subsection{Predictability of Decoder Activity and Gain}
+We test whether cheap inference-time signals (predictive entropy) can locate these beneficial spatial regions prior to full decoder execution. Figure \ref{fig:predictability} shows a sharp divergence between predicting Activity and predicting Net Gain:
 \begin{itemize}
-    \item \textbf{3D UX-Net}: AUROC for flip location (instability) is 0.903 (95\% CI: $[0.876, 0.926]$), whereas AUROC for flip direction (improvement vs. degradation) is 0.592 (95\% CI: $[0.560, 0.626]$).
-    \item \textbf{SwinUNETR}: Flip location AUROC is 0.912 (95\% CI: $[0.884, 0.934]$), while flip direction AUROC is 0.561 (95\% CI: $[0.512, 0.608]$).
-    \item \textbf{MedNeXt-M-K3}: Flip location AUROC is 0.931 (95\% CI: $[0.917, 0.944]$), while flip direction AUROC is 0.545 (95\% CI: $[0.526, 0.567]$).
+    \item \textbf{Activity Prediction (Flip Location AUROC)}: Predictive entropy reliably identifies active blocks ($A(r) > 0$), achieving high location AUROCs of 0.903 for 3D UX-Net, 0.912 for SwinUNETR, and 0.931 for MedNeXt-M-K3.
+    \item \textbf{Directional Utility Prediction (Direction AUROC)}: Predictive entropy fails to distinguish positive corrections from negative degradations ($G(r) > 0$ vs. $G(r) < 0$), yielding direction AUROCs near random chance (0.592 for 3D UX-Net, 0.561 for SwinUNETR, 0.545 for MedNeXt-M-K3).
 \end{itemize}
 
-Because uncertainty fails to discriminate flip direction, the deployable selection gap remains zero. At a 20\% execution budget, entropy-guided block selection yields net accuracy gains indistinguishable from a random selection baseline across all three networks. This demonstrates that identifying uncertain regions is insufficient for selective decoder execution, as routing decisions require directional utility estimation.
+Entropy-guided routing provides architecture-dependent and incomplete recovery of the oracle opportunity: while entropy selection yields a small, statistically significant improvement over random selection at a 20\% budget in 3D UX-Net, it fails to achieve significant gains in SwinUNETR and MedNeXt-M-K3. Overall, simple scalar entropy gating fails to reliably recover the theoretical oracle opportunity across backbones.
 
 \begin{figure}[t]
 \centering
@@ -133,6 +134,6 @@ Because uncertainty fails to discriminate flip direction, the deployable selecti
 \includegraphics[width=0.45\textwidth]{figures/obs-mednext/O3_unc_error.png}
 
 {\small (c) MedNeXt-M-K3 Predictability}
-\caption{Inference-time flip predictability across (a) 3D UX-Net, (b) SwinUNETR, and (c) MedNeXt-M-K3. Predictive entropy reliably identifies flip locations (AUROC $>0.90$) but cannot distinguish positive corrections from negative degradations (AUROC $\approx 0.55$).}
+\caption{Inference-time predictability: Predictive entropy reliably identifies active blocks (Location AUROC $>0.90$) but cannot distinguish positive corrections from negative degradations (Direction AUROC $\approx 0.55$).}
 \label{fig:predictability}
 \end{figure}

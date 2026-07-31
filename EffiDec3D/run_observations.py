@@ -311,7 +311,8 @@ def O3_unc_error_corr(val_loader, effi, full=None):
     x_ent, y_err = [], []                                  # pooled-bin (descriptive)
     subj_auroc, subj_auprc, subj_ece, subj_prev = [], [], [], []
     subj_fauroc, subj_fauprc, subj_fprev = [], [], []      # positive-flip prediction
-    subj_nauroc, subj_aauroc, subj_pvn = [], [], []        # neg-flip, any-flip, pos-vs-neg
+    subj_nauroc, subj_aauroc, subj_pvn = [], [], []        # neg-flip, any-flip, pos-vs-neg AUROC
+    subj_aauprc, subj_pvnprc = [], []                      # any-flip, direction AUPRC (minority-class)
     predict_flip = full is not None and full is not effi
     with torch.no_grad():
         for batch in val_loader:
@@ -361,9 +362,11 @@ def O3_unc_error_corr(val_loader, effi, full=None):
                 ya = anyflip.astype(bool)                  # (c) any flip: the prediction changes
                 if ya.sum() > 0 and (~ya).sum() > 0:
                     subj_aauroc.append(_auroc(e, ya))
+                    subj_aauprc.append(_auprc(e, ya))      # flips are the minority class
                 # (d) KEY: within flip voxels, can entropy tell better-from-worse?
                 if ya.sum() > 10 and yf[ya].sum() > 0 and (~yf[ya]).sum() > 0:
                     subj_pvn.append(_auroc(e[ya], yf[ya]))
+                    subj_pvnprc.append(_auprc(e[ya], yf[ya]))
     r_p = float(pearsonr(x_ent, y_err)[0]); r_s = float(spearmanr(x_ent, y_err)[0])
 
     def _boot_ci(vals):
@@ -382,7 +385,9 @@ def O3_unc_error_corr(val_loader, effi, full=None):
     fprev_m = float(np.mean(subj_fprev)) if subj_fprev else float("nan")
     nauroc_m, nauroc_ci = _boot_ci(subj_nauroc)     # negative-flip prediction
     aauroc_m, aauroc_ci = _boot_ci(subj_aauroc)     # any-flip prediction
+    aauprc_m, aauprc_ci = _boot_ci(subj_aauprc)
     pvn_m, pvn_ci = _boot_ci(subj_pvn)              # KEY: pos-vs-neg discrimination
+    pvnprc_m, pvnprc_ci = _boot_ci(subj_pvnprc)
     err_go = bool(not np.isnan(auroc_ci[0]) and auroc_ci[0] > 0.5)
     flip_go = bool(not np.isnan(fauroc_ci[0]) and fauroc_ci[0] > 0.5)
     go = flip_go if predict_flip else err_go        # headline gate = flip when available
@@ -406,10 +411,12 @@ def O3_unc_error_corr(val_loader, effi, full=None):
         "flip_auprc_mean": fauprc_m, "flip_auprc_ci": fauprc_ci,
         "positive_flip_prevalence_mean": fprev_m, "flip_go": flip_go,
         "n_subjects_flip": len(subj_fauroc),
-        # flip discrimination: any / negative / and KEY positive-vs-negative
+        # flip discrimination: any / negative / and KEY positive-vs-negative (AUROC + AUPRC)
         "any_flip_auroc_mean": aauroc_m, "any_flip_auroc_ci": aauroc_ci,
+        "any_flip_auprc_mean": aauprc_m, "any_flip_auprc_ci": aauprc_ci,
         "neg_flip_auroc_mean": nauroc_m, "neg_flip_auroc_ci": nauroc_ci,
         "pos_vs_neg_auroc_mean": pvn_m, "pos_vs_neg_auroc_ci": pvn_ci,
+        "pos_vs_neg_auprc_mean": pvnprc_m, "pos_vs_neg_auprc_ci": pvnprc_ci,
         "n_subjects_pvn": len(subj_pvn),
         # baseline: entropy predicts the efficient model's own error
         "subject_auroc_mean": auroc_m, "subject_auroc_ci": auroc_ci,
@@ -455,11 +462,13 @@ def O4_per_organ(val_loader, effi, post_pred, post_lbl):
 def O5_decoder_gain(val_loader, effi, full):
     """H1: global positive / negative / net flip rates with a subject bootstrap CI.
 
-    For each subject R_pos = mean_v P(v), R_neg = mean_v N(v), R_net = R_pos - R_neg over
-    the whole volume; we bootstrap the twelve subject-level R_net values (not the
-    correlated voxels). Answers whether the full decoder improves predictions uniformly or
-    simultaneously corrects and degrades them: R_net ~ 0 with R_pos, R_neg > 0 is a
-    bidirectional cancellation that a Dice gap alone cannot reveal."""
+    For each subject R_pos = mean_v P(v), R_neg = mean_v N(v), and two summaries:
+      - GAIN     R_net = R_pos - R_neg  = U(v)=P(v)-N(v)  (where the decoder *helps*)
+      - ACTIVITY R_act = R_pos + R_neg  = A(v)=P(v)+N(v)  (where the decoder *acts*, either way)
+    We bootstrap the twelve subject-level values (not the correlated voxels). Answers whether
+    the full decoder improves predictions uniformly or simultaneously corrects and degrades
+    them: R_net ~ 0 with a much larger R_act > 0 is a bidirectional cancellation (lots of
+    activity, ~no net gain) that a Dice gap alone cannot reveal."""
     subj_pos_rate, subj_neg_rate = [], []
     with torch.no_grad():
         for batch in val_loader:
@@ -473,14 +482,18 @@ def O5_decoder_gain(val_loader, effi, full):
     if not subj_pos_rate:
         print("[H1] no subjects; skipping"); return
     mean_pos, mean_neg = float(np.mean(subj_pos_rate)), float(np.mean(subj_neg_rate))
-    net_rate = np.array(subj_pos_rate) - np.array(subj_neg_rate)
+    net_rate = np.array(subj_pos_rate) - np.array(subj_neg_rate)     # GAIN  = P - N
+    act_rate = np.array(subj_pos_rate) + np.array(subj_neg_rate)     # ACTIVITY = P + N
     rng = np.random.default_rng(0)
     nr_boot = [np.mean(rng.choice(net_rate, len(net_rate), replace=True)) for _ in range(2000)]
     nr_ci = [float(np.percentile(nr_boot, 2.5)), float(np.percentile(nr_boot, 97.5))]
+    ar_boot = [np.mean(rng.choice(act_rate, len(act_rate), replace=True)) for _ in range(2000)]
+    ar_ci = [float(np.percentile(ar_boot, 2.5)), float(np.percentile(ar_boot, 97.5))]
     net_neutral = bool(nr_ci[0] <= 0 <= nr_ci[1])
     print(f"[H1] R_pos={mean_pos:.5f}  R_neg={mean_neg:.5f}  "
-          f"R_net={float(net_rate.mean()):.5f}  95%CI[{nr_ci[0]:.5f},{nr_ci[1]:.5f}]  "
-          f"{'net-neutral (CI crosses 0)' if net_neutral else 'directional'}")
+          f"GAIN(R_net)={float(net_rate.mean()):.5f} CI[{nr_ci[0]:.5f},{nr_ci[1]:.5f}] "
+          f"{'net-neutral' if net_neutral else 'directional'}  "
+          f"ACTIVITY(R_act)={float(act_rate.mean()):.5f} CI[{ar_ci[0]:.5f},{ar_ci[1]:.5f}]")
     plt.figure(figsize=(5, 4))
     plt.bar([0, 1, 2], [mean_pos, mean_neg, float(net_rate.mean())],
             color=["seagreen", "firebrick", "steelblue"], alpha=.8)
@@ -493,8 +506,10 @@ def O5_decoder_gain(val_loader, effi, full):
     plt.tight_layout(); plt.savefig(f"{OBS_DIR}/H1_global_flips.png", dpi=150); plt.close()
     save_obs("O5", {"mean_positive_rate": mean_pos, "mean_negative_rate": mean_neg,
                     "subject_pos_rate_mean": mean_pos, "subject_neg_rate_mean": mean_neg,
-                    "subject_net_rate_mean": float(net_rate.mean()),
+                    "subject_net_rate_mean": float(net_rate.mean()),      # GAIN = P - N
                     "subject_net_rate_ci": nr_ci,
+                    "subject_activity_rate_mean": float(act_rate.mean()),  # ACTIVITY = P + N
+                    "subject_activity_rate_ci": ar_ci,
                     "net_neutral": net_neutral})
 
 
@@ -1098,6 +1113,156 @@ def O_anatomy(val_loader, effi, full):
     })
 
 
+def O_recovery(val_loader, effi, full, out_classes, block_size=16, halo=4):
+    """Recoverability (R): hybrid selective-decoding performance-recovery curve.
+
+    For a spatial budget k%, build a HYBRID prediction --- the top-k% of contiguous 16^3
+    blocks (ranked by a routing signal) take the FULL decoder's argmax, the rest keep the
+    EFFICIENT decoder's argmax --- and report the resulting mean foreground Dice vs budget
+    for four routers: true-net ORACLE (upper bound), entropy, confidence, and matched
+    random; plus the Efficient-only (0%) and Full (100%) anchors, per-router NSD at the
+    20% budget, and the halo-expanded executed-volume fraction (the real compute proxy).
+    This turns the abstract net-flip recovery (P2) into *actual segmentation performance*
+    recovered: how much of Full's Dice can a k%-budget selective decoder recover, and can a
+    deployable signal find those regions? Offline analysis --- not a deployed system."""
+    try:
+        from monai.metrics import compute_surface_dice
+        have_nsd = True
+    except Exception:
+        have_nsd = False
+    budgets = np.array([5, 10, 20, 30, 50]); n_random = 10; n_boot = 2000
+    nsd_budget = 20; fgcls = list(range(1, out_classes))
+    signals = ["oracle", "entropy", "confidence", "random"]
+
+    def _dice(pred, gt):
+        ds = []
+        for c in fgcls:
+            b = (gt == c)
+            if int(b.sum()) == 0:
+                continue
+            a = (pred == c); s = int(a.sum()) + int(b.sum())
+            ds.append(2.0 * int((a & b).sum()) / s if s > 0 else 0.0)
+        return float(np.mean(ds)) if ds else float("nan")
+
+    def _nsd(pred, gt, tau=1.0):
+        if not have_nsd:
+            return float("nan")
+        def oh(a):
+            return AsDiscrete(to_onehot=out_classes)(torch.as_tensor(a)[None].long()).unsqueeze(0)
+        v = compute_surface_dice(oh(pred), oh(gt),
+                                 class_thresholds=[tau] * (out_classes - 1),
+                                 include_background=False)
+        return float(np.nanmean(v.numpy()))
+
+    rec_dice = {s: [] for s in signals}     # per subject -> [len(budgets)]
+    rec_exec = {s: [] for s in signals}
+    rec_nsd20 = {s: [] for s in signals}    # per subject NSD at the 20% budget
+    effi_dice, full_dice, effi_nsd, full_nsd = [], [], [], []
+    srng = np.random.default_rng(0); brng = np.random.default_rng(1)
+    with torch.no_grad():
+        for batch in val_loader:
+            img = batch["image"].cuda()
+            gt = batch["label"].squeeze(1).long().cpu().squeeze().numpy()
+            pf = infer(full, img).argmax(1).cpu().squeeze().numpy()
+            le = infer(effi, img); prob_e = le.softmax(1).cpu()
+            pe = le.argmax(1).cpu().squeeze().numpy()
+            ent = (-(prob_e * torch.log(prob_e + 1e-8)).sum(1)).squeeze().numpy()
+            conf = (1 - prob_e.max(1).values.squeeze()).numpy()   # high = uncertain
+            body = (gt > 0) | (pf > 0) | (pe > 0)
+            net = ((pf == gt) & (pe != gt)).astype(np.float32) - ((pf != gt) & (pe == gt)).astype(np.float32)
+            shp = ent.shape
+            cores = [(slice(z, min(z + block_size, shp[0])),
+                      slice(y, min(y + block_size, shp[1])),
+                      slice(x, min(x + block_size, shp[2])))
+                     for z in range(0, shp[0], block_size)
+                     for y in range(0, shp[1], block_size)
+                     for x in range(0, shp[2], block_size)]
+            nb = len(cores)
+            s_net = np.array([float(net[c][body[c]].sum()) if body[c].any() else 0.0 for c in cores])
+            s_ent = np.array([float(ent[c][body[c]].mean()) if body[c].any() else -np.inf for c in cores])
+            s_conf = np.array([float(conf[c][body[c]].mean()) if body[c].any() else -np.inf for c in cores])
+            score = {"oracle": s_net, "entropy": s_ent, "confidence": s_conf}
+
+            def hybrid(ids):
+                out = pe.copy(); m = np.zeros(shp, dtype=bool)
+                for b in ids:
+                    m[cores[int(b)]] = True
+                out[m] = pf[m]
+                return out
+
+            def exec_frac(ids):
+                m = np.zeros(shp, dtype=bool)
+                for b in ids:
+                    cz, cy, cx = cores[int(b)]
+                    m[max(0, cz.start - halo):min(shp[0], cz.stop + halo),
+                      max(0, cy.start - halo):min(shp[1], cy.stop + halo),
+                      max(0, cx.start - halo):min(shp[2], cx.stop + halo)] = True
+                return float(m.mean())
+
+            effi_dice.append(_dice(pe, gt)); full_dice.append(_dice(pf, gt))
+            effi_nsd.append(_nsd(pe, gt)); full_nsd.append(_nsd(pf, gt))
+            for s in signals:
+                sd, sx, snsd20 = [], [], float("nan")
+                for bud in budgets:
+                    k = max(1, int(np.ceil(nb * bud / 100)))
+                    if s == "random":
+                        ds, xs = [], []
+                        for _ in range(n_random):
+                            ids = srng.choice(nb, k, replace=False)
+                            ds.append(_dice(hybrid(ids), gt)); xs.append(exec_frac(ids))
+                        sd.append(float(np.mean(ds))); sx.append(float(np.mean(xs)))
+                        if bud == nsd_budget:
+                            snsd20 = _nsd(hybrid(srng.choice(nb, k, replace=False)), gt)
+                    else:
+                        ids = np.argsort(score[s])[::-1][:k]
+                        hy = hybrid(ids)
+                        sd.append(_dice(hy, gt)); sx.append(exec_frac(ids))
+                        if bud == nsd_budget:
+                            snsd20 = _nsd(hy, gt)
+                rec_dice[s].append(sd); rec_exec[s].append(sx); rec_nsd20[s].append(snsd20)
+
+    if not effi_dice:
+        print("[R-recovery] no subjects; skipping"); return
+    ed, fd = float(np.mean(effi_dice)), float(np.mean(full_dice))
+    en, fn = float(np.nanmean(effi_nsd)), float(np.nanmean(full_nsd))
+    out = {"budgets_pct": budgets.tolist(), "block_size": int(block_size), "halo": int(halo),
+           "effi_dice": ed, "full_dice": fd, "full_minus_effi_dice": fd - ed,
+           "effi_nsd_tau1": en, "full_nsd_tau1": fn, "nsd_budget_pct": nsd_budget}
+    colors = {"oracle": "black", "entropy": "steelblue", "confidence": "darkorange", "random": "gray"}
+    plt.figure(figsize=(7, 5))
+    plt.axhline(ed, color="seagreen", ls=":", lw=1, label=f"Efficient only ({ed:.3f})")
+    plt.axhline(fd, color="crimson", ls=":", lw=1, label=f"Full ({fd:.3f})")
+    for s in signals:
+        arr = np.asarray(rec_dice[s], dtype=np.float64)      # (subjects, budgets)
+        m = arr.mean(0)
+        boot = np.array([arr[brng.integers(arr.shape[0], size=arr.shape[0])].mean(0) for _ in range(n_boot)])
+        lo, hi = np.percentile(boot, 2.5, axis=0), np.percentile(boot, 97.5, axis=0)
+        ls = "--" if s == "random" else "-"
+        plt.plot(budgets, m, ls, marker="o", color=colors[s], label=s)
+        if s in ("oracle", "entropy", "random"):
+            plt.fill_between(budgets, lo, hi, color=colors[s], alpha=.12)
+        out[s] = {"dice_mean": m.round(5).tolist(),
+                  "dice_ci_lower": lo.round(5).tolist(), "dice_ci_upper": hi.round(5).tolist(),
+                  "executed_volume_fraction_mean": np.mean(rec_exec[s], axis=0).round(4).tolist(),
+                  f"nsd_tau1_at_{nsd_budget}pct_mean": float(np.nanmean(rec_nsd20[s]))}
+    plt.xlabel("Spatial budget: blocks routed to Full decoder (%)")
+    plt.ylabel("Mean foreground Dice")
+    plt.title("Recoverability: hybrid selective-decoding Dice")
+    plt.legend(fontsize=8); plt.tight_layout()
+    plt.savefig(f"{OBS_DIR}/R_recovery.png", dpi=150); plt.close()
+    # Dice-space recovered fraction at 20% for the deployable entropy router vs oracle.
+    i20 = int(np.where(budgets == 20)[0][0]); gap = max(fd - ed, 1e-9)
+    ent20 = out["entropy"]["dice_mean"][i20]; orc20 = out["oracle"]["dice_mean"][i20]; rnd20 = out["random"]["dice_mean"][i20]
+    out["recovered_fraction_at_20pct"] = {
+        "oracle": (orc20 - ed) / gap, "entropy": (ent20 - ed) / gap, "random": (rnd20 - ed) / gap,
+        "note": "(hybrid Dice - Efficient Dice) / (Full Dice - Efficient Dice) at 20% block budget",
+    }
+    save_obs("R_recovery", out)
+    print(f"[R-recovery] Effi={ed:.3f} Full={fd:.3f} (gap {fd-ed:+.3f})  @20%: "
+          f"oracle={orc20:.3f} entropy={ent20:.3f} random={rnd20:.3f}  "
+          f"entropy recovers {(ent20-ed)/gap*100:.0f}% of the gap")
+
+
 def main():
     global OBS_DIR, RESULTS_FILE, CLASS_NAMES
     p = argparse.ArgumentParser()
@@ -1231,6 +1396,9 @@ def main():
         "P1_predictability": "O3 (any / positive / direction=pos-vs-neg AUROC)",
         "P2_selection": "O_pareto signals vs oracle vs random + "
                         "O_pareto['selection_gap_at_20pct'] paired diff CI",
+        "R_recovery": "R_recovery (hybrid selective-decoding Dice/NSD vs budget; "
+                      "oracle/entropy/confidence/random + Effi/Full anchors)",
+        "activity_gain": "O5 activity=P+N (where the decoder acts) vs gain=P-N (where it helps)",
         "appendix": "O1, O2, O4, O9 (behind --appendix)",
     })
 
@@ -1245,6 +1413,8 @@ def main():
         O_anatomy(val_loader, effi, full)                  # H2-B: per-organ union-fg net + Dice delta
         O_pareto(val_loader, effi, full, block_size=args_ns.o9_block_size,
                  halo=args_ns.o9_halo)                     # C1+C2 (oracle) + P2 (signal vs random)
+        O_recovery(val_loader, effi, full, out_classes,    # R: hybrid Dice recovery curve
+                   block_size=args_ns.o9_block_size, halo=args_ns.o9_halo)
     else:
         print("[H1/H2/C/P2] skipped — ecological control has no EffiDec3D pair")
 

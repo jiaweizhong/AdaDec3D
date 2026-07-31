@@ -1,19 +1,21 @@
 \section{Discussion}
 \label{sec:discussion}
 
-This characterization study provides insights into how decoder capacity functions across spatial regions in 3D medical image segmentation. Rather than relying solely on global performance metrics, our analysis examines the spatial mechanisms governing decoder utility.
+This characterization study shifts the evaluation of decoder efficiency from empirical FLOPs reduction toward understanding spatial computation dynamics. This section synthesizes the underlying mechanisms and distills design directions for future adaptive 3D segmentation decoders.
 
-\subsection{Mechanisms of Boundary Concentration and Net-Neutrality}
-Deep encoder backbones extract high-level semantic representations capable of segmenting homogeneous organ interiors. Consequently, additional decoder capacity provides minimal marginal benefit inside solid anatomical structures. At organ boundaries, however, voxels present class ambiguity and complex structural transitions. While full decoders attempt to refine these boundary voxels, static capacity produces a two-sided effect: positive corrections are offset by negative degradations on previously correct predictions, resulting in a net-neutral global balance ($R_{net} \approx 0$).
+\subsection{Why Aggregate Metrics Hide Decoder Behavior}
+Standard evaluation paradigms assess segmentation models using global metrics like Dice or Hausdorff distance. These macroscopic metrics average positive corrections and negative degradations across the entire volume, concealing localized micro-dynamics. Furthermore, because homogeneous organ interiors dominate the voxel count, net boundary improvements are diluted by large inactive regions. This explains why conventional evaluation frameworks have historically encouraged uniform decoder expansion despite underlying spatial redundancy.
 
-Standard evaluation metrics such as the Dice similarity coefficient average positive corrections and negative degradations across the entire volume, concealing this localized net-neutral behavior. This explains why global evaluation paradigms have historically favored uniform decoder scaling despite underlying spatial redundancy.
+\subsection{Spatial Concentration Creates an Opportunity, Not a Solution}
+Our findings demonstrate that positive decoder net gain is strongly concentrated ($K_{80} = 5\%$). However, it is essential to distinguish \textit{intrinsic spatial concentration} from \textit{practical deployable recoverability}. Oracle concentration proves that selective decoding is theoretically worthwhile under an ideal selector. But realizing these computational savings requires identifying beneficial regions prior to executing the full decoder. Concentration illustrates the theoretical opportunity; it does not solve the routing problem.
 
-\subsection{Uncertainty and Directional Utility}
-Predictive entropy measures epistemic difficulty and spatial ambiguity, effectively identifying where predictions are unstable near boundaries (AUROC $>0.90$). However, entropy indicates region difficulty rather than whether a static decoder has the appropriate inductive bias to resolve the error. Because the efficient baseline is already competitive, executing a heavy decoder on uncertain voxels is equally likely to degrade a correct prediction as it is to fix an error (AUROC $\approx 0.55$).
+\subsection{Uncertainty Is an Activity Signal, Not a Utility Signal}
+Why does predictive entropy predict flip locations ($>0.90$ AUROC) but fail to predict directional improvement ($\approx 0.55$ AUROC)? Entropy measures epistemic task difficulty and spatial ambiguity, effectively locating boundary regions where predictions are unstable. However, entropy indicates region difficulty rather than whether a static full decoder possesses the correct inductive bias to fix the error. Because efficient baseline decoders are already competitive, executing additional decoder capacity on uncertain voxels is equally likely to degrade a correct prediction as it is to fix an error. \textit{Prediction difficulty and computational utility are related but fundamentally distinct quantities.}
 
-\subsection{Architectural Implications and Scope Bounds}
-These spatial patterns are consistent across large-kernel CNNs (3D UX-Net), vision transformers (SwinUNETR), and ConvNeXt-style architectures (MedNeXt-M-K3), demonstrating that structured decoder redundancy is a general characteristic of U-shaped 3D segmentation models. 
-
-Consequently, theoretical efficiency gains cannot be realized simply by gating static decoders with uncertainty thresholds. Moving forward, dynamic decoder designs should allocate capacity based on feature complexity and directional utility rather than scalar uncertainty scores.
-
-Finally, our scope is explicitly bounded: we characterize decoder computation under controlled interventions while holding encoders fixed. This focus isolates decoder dynamics without claiming that encoder representations are redundant or that U-Net architectures as a whole are unnecessary.
+\subsection{Design Directions for Adaptive Decoders}
+Based on these empirical findings, we distill three evidence-backed directions for designing future adaptive decoders:
+\begin{enumerate}
+    \item \textbf{Explore Spatially Selective Refinement}: The concentration results motivate sparse or region-specific high-resolution decoding rather than uniformly allocating maximum decoder capacity across the entire volumetric grid.
+    \item \textbf{Predict Expected Gain Rather Than Uncertainty Alone}: Difficulty signals identify where predictions are unstable, but predicting directional improvement requires routing modules designed to estimate expected net gain from extra computation.
+    \item \textbf{Couple Routing More Closely with Refinement}: The limited performance of scalar post-hoc signals motivates exploring learned utility predictors or jointly optimized routing and refinement modules trained end-to-end with directional supervision.
+\end{enumerate}

@@ -5,20 +5,24 @@ Precise 3D medical image segmentation is essential for clinical tasks such as su
 
 However, standard evaluation paradigms assess decoder designs almost exclusively through aggregate metrics such as the global Dice similarity coefficient or Hausdorff distance. While these macroscopic metrics summarize overall performance, they obscure the spatial distribution of prediction changes. Consequently, a basic scientific question remains open: 
 \begin{center}
-\textit{How does additional decoder computation contribute to 3D medical image segmentation?}
+\textit{How does additional decoder computation actually contribute to 3D medical image segmentation?}
 \end{center}
 
-To address this question, we present a characterization study of decoder computation in 3D segmentation models. Rather than introducing a new network architecture, we advocate computation characterization as a research approach complementary to architecture design. We utilize matched pairs of full and efficient decoders (building on the EffiDec3D framework \cite{effidec3d}) as controlled experimental probes. By holding encoder weights, training protocols, and data splits fixed, we isolate decoder capacity and directly observe voxel-level prediction shifts (referred to as ``flips'') induced by decoder scaling (Figure \ref{fig:motivation}).
+To address this question, we present a characterization study of decoder computation in 3D segmentation models. Rather than introducing a new network architecture, we advocate computation characterization as a research approach complementary to architecture design. We structure our evaluation across two distinct experimental levels:
+\begin{enumerate}
+    \item \textbf{End-to-End Model Comparison}: We evaluate matched full and efficient decoder pairs across standard end-to-end training settings to test whether spatial characterization patterns generalize across representative 3D backbones and clinical datasets.
+    \item \textbf{Decoder-Isolated Attribution Analysis}: Building on frozen shared-encoder factorials (derived from EffiDec3D \cite{effidec3d}), we freeze feature extractor weights to strictly isolate decoder capacity interventions (channel reduction and stage removal), ensuring controlled causal attribution of prediction shifts (Figure \ref{fig:motivation}).
+\end{enumerate}
 
-We focus specifically on the decoder pathway as a well-defined subsystem responsible for spatial resolution reconstruction and multi-scale feature fusion. This focus allows controlled causal attribution while leaving feature-extractor encoders fixed. Skip-feature fusion is treated as part of the decoder pathway, whereas encoder representation dynamics present separate research questions requiring distinct experimental controls. Unlike efficient architecture papers that optimize for speed, our primary objective is to understand computation itself.
+We focus specifically on the decoder pathway as a well-defined subsystem responsible for spatial resolution reconstruction and multi-scale feature fusion. Skip-feature fusion is treated as part of the decoder pathway, whereas encoder representation dynamics present separate research questions requiring distinct experimental controls. Unlike efficient architecture papers that optimize for speed, our primary objective is to understand computation itself.
 
-We characterize decoder computation across three complementary dimensions: (i) spatial heterogeneity, (ii) benefit concentration, and (iii) inference-time predictability.
+We characterize the contribution of additional decoder computation across three complementary dimensions: (i) spatial heterogeneity, (ii) benefit concentration, and (iii) inference-time predictability.
 
 The remainder of this paper is organized as follows: Section \ref{sec:related} reviews related literature and highlights key gaps. Section \ref{sec:methods} describes our evaluation framework and metrics. Section \ref{sec:experiments} details our experimental results. Section \ref{sec:discussion} discusses underlying mechanisms and practical implications, and Section \ref{sec:conclusion} concludes the paper.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{figures/obs-uxnet-concat/figure1_motivation.png}
-\caption{Motivation: Decoder computation produces spatially localized prediction flips. While the full decoder corrects certain errors of the efficient baseline (positive flips), it also alters previously correct predictions (negative flips) near high-entropy organ boundaries, demonstrating non-uniform spatial utility.}
+\caption{Motivation: Decoder computation produces spatially localized prediction flips. While the full decoder corrects certain errors of the efficient baseline (positive flips), it also alters previously correct predictions (negative flips) near high-entropy organ boundaries, demonstrating non-uniform spatial contribution.}
 \label{fig:motivation}
 \end{figure}

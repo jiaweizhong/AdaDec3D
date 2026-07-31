@@ -1,49 +1,67 @@
 \section{Methods: A Characterization Framework}
 \label{sec:methods}
 
-To understand the spatial and functional utility of decoder computation, we design a controlled observation study. We treat a matched full decoder and an efficient decoder as experimental instruments, isolating the effect of decoder capacity on voxel-level predictions.
+To understand the spatial and functional contribution of decoder computation, we establish a controlled observation framework. We evaluate matched pairs of full and efficient decoders as experimental probes under two complementary regimes: (i) \textit{end-to-end model comparison} across independently trained networks to assess real-world generalization, and (ii) \textit{decoder-isolated attribution analysis} using frozen shared encoders to isolate decoder capacity interventions.
 
-We define decoder computation as the sequence of upsampling, skip-feature fusion, and post-fusion refinement operations that transform the bottleneck representation into dense high-resolution predictions. In our experimental design, the encoder feature extractor is held fixed, architecture-specific skip features are held fixed, and interventions occur strictly on decoder width (channel count) and depth (stage removal). For stage removal interventions, the associated skip-fusion operations are treated as part of the removed decoder pathway.
-
-\subsection{Experimental Setup}
-Let $v$ denote a voxel within a 3D medical image. We evaluate two decoder configurations sharing identical encoder features, training protocols, and data splits:
+\subsection{Controlled Decoder Comparison}
+Let $v$ denote a voxel within a 3D medical image volume $V$. We compare two decoder configurations:
 \begin{itemize}
-    \item \textbf{Efficient Decoder ($E_1$)}: Parameter-matched efficient decoder based on the EffiDec3D configuration \cite{effidec3d}, utilizing concatenation for skip aggregation to strictly align with published parameter counts.
-    \item \textbf{Full Decoder ($E_0$)}: The standard dense, high-resolution decoder of the respective backbone architecture.
+    \item \textbf{Efficient Decoder ($E_1$)}: A parameter-matched efficient decoder following the EffiDec3D specification \cite{effidec3d}, utilizing channel reduction and stage removal with concatenation skip aggregation.
+    \item \textbf{Full Decoder ($E_0$)}: The standard dense, multi-stage high-resolution decoder of the respective backbone architecture.
 \end{itemize}
+Let $y(v)$ be the ground truth label, $\hat{y}_e(v)$ be the prediction from the efficient decoder, and $\hat{y}_f(v)$ be the prediction from the full decoder. Interventions occur strictly within the decoder pathway (upsampling, skip fusion, and refinement).
 
-For a given voxel $v$, let $y(v)$ be the ground truth label, $\hat{y}_e(v)$ be the prediction from the efficient decoder, and $\hat{y}_f(v)$ be the prediction from the full decoder.
+\begin{table}[t]
+\centering
+\caption{Overview of characterization objectives and evaluation measures.}
+\label{tab:framework_summary}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lll}
+\toprule
+\textbf{Analysis Objective} & \textbf{Evaluation Measure} & \textbf{Question Answered} \\
+\midrule
+Spatial effect & Activity $A(v)$ & Where does additional decoder computation change correctness? \\
+Directional effect & Net Gain $G(v)$ & Where does it help rather than harm? \\
+Concentration & Oracle $K_{80}$ & How concentrated is positive net gain? \\
+Activity predictability & Location AUROC & Can cheap signals identify changed regions? \\
+Gain predictability & Direction AUROC & Can cheap signals distinguish beneficial from harmful changes? \\
+Practical recovery & Routing Gain / Recovery & Does selective execution improve actual segmentation metrics? \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
 
-\subsection{Voxel-level Flip Analysis}
-Rather than relying solely on aggregate macroscopic metrics like Dice \cite{taha2015metrics}, which average errors globally, we track how the full decoder alters the prediction of the efficient baseline. Drawing upon prediction disagreement and flip characterization principles from model behavior and uncertainty literature \cite{jungoreyes,cmig2025quality,uncertaintyreview,geirhos2020shortcut}, we define three categories of prediction ``flips'' when transitioning from the efficient to the full decoder:
+\subsection{Decoder-Induced Corrections and Degradations}
+Comparing predictions between the efficient and full decoders at each voxel yields three possible outcomes: the full decoder corrects an error, introduces an error, or leaves prediction correctness unchanged:
 \begin{itemize}
-    \item \textbf{Positive Flip ($P(v)$)}: The full decoder improves a previously incorrect prediction. $P(v) = 1[\hat{y}_e(v) \neq y(v) \wedge \hat{y}_f(v) = y(v)]$.
-    \item \textbf{Negative Flip ($N(v)$)}: The full decoder degrades a previously correct prediction. $N(v) = 1[\hat{y}_e(v) = y(v) \wedge \hat{y}_f(v) \neq y(v)]$.
-    \item \textbf{Net Benefit ($U(v)$)}: The voxel-wise difference between improvements and degradations. $U(v) = P(v) - N(v)$.
+    \item \textbf{Positive Correction ($P(v)$)}: $P(v) = 1[\hat{y}_e(v) \neq y(v) \wedge \hat{y}_f(v) = y(v)]$.
+    \item \textbf{Negative Degradation ($N(v)$)}: $N(v) = 1[\hat{y}_e(v) = y(v) \wedge \hat{y}_f(v) \neq y(v)]$.
 \end{itemize}
-The global rates are defined as $R_{pos} = \text{mean}_v P(v)$, $R_{neg} = \text{mean}_v N(v)$, and $R_{net} = R_{pos} - R_{neg}$.
+We define two fundamental analytical quantities:
+\begin{itemize}
+    \item \textbf{Decoder Activity ($A(v) = P(v) + N(v)$)}: Indicates where additional decoder capacity alters prediction correctness, regardless of direction.
+    \item \textbf{Decoder Net Gain ($G(v) = P(v) - N(v)$)}: Distinguishes beneficial corrections from harmful degradations.
+\end{itemize}
+\textit{Decoder activity measures where the decoder acts, whereas decoder gain measures whether those changes are beneficial or harmful.}
 
-\subsection{Core Metrics}
-We operationalize our investigation into structured redundancy through five formal metrics:
+\subsection{Spatial Characterization of Decoder Effects}
+We analyze Activity $A(v)$ and Net Gain $G(v)$ across two spatial dimensions:
+\begin{enumerate}
+    \item \textbf{Boundary-Distance Stratification}: Distance to the nearest organ boundary using a multi-class union foreground mask $\bigcup_{c} (y(v)=c \cup \hat{y}_e(v)=c \cup \hat{y}_f(v)=c)$ \cite{taha2015metrics}.
+    \item \textbf{Anatomical Structure Breakdown}: Aggregated $A(v)$ and $G(v)$ across individual organ structures.
+\end{enumerate}
 
-\textbf{1. Global Net Benefit}: Evaluates the macro-level necessity of the full decoder. The global net flip rate $R_{net}$ is computed as the expected voxel-wise net benefit over the volume $V$:
+\subsection{Spatial Concentration and Oracle Opportunity}
+We partition the 3D volume into spatial sub-blocks $b_r$ and compute block net gain $G(r) = \sum_{v \in b_r} G(v)$. Sorting blocks by $G(r)$, the fraction of positive gain recovered by the top $k\%$ of blocks is defined by:
 \begin{equation}
-R_{net} = \frac{1}{|V|} \sum_{v \in V} U(v)
+Coverage(k) = \frac{\sum_{r=1}^{k\% \cdot |B|} \max(G(r), 0)}{\sum_{r=1}^{|B|} \max(G(r), 0)}
 \end{equation}
-This indicates whether the full decoder provides a unidirectional advantage ($R_{net} > 0$) or if positive corrections and negative degradations balance each other out ($R_{net} \approx 0$).
+We record $K_{80}$, defined as the smallest fraction of spatial blocks required by a perfect selector to recover 80\% of the total positive decoder gain. A selective hybrid prediction $\hat{y}_k(v)$ executes the full decoder on selected blocks $S_k$ and the efficient baseline elsewhere.
 
-\textbf{2. Boundary and Anatomy Resolution}: To evaluate spatial heterogeneity, we analyze the net benefit $U(v)$ as a function of Euclidean distance to the nearest organ boundary, as well as its distribution across anatomical structures.
-
-\textbf{3. Oracle Concentration}: Measures the spatial sparsity of decoder utility, adapting Pareto concentration and selective classification formulations \cite{cmig2025quality,geifman2017selective}. We partition the image volume into 3D sub-blocks $b_r$ and compute the block-level net benefit $B(r) = \sum_{v \in b_r} U(v)$. Sorting blocks by $B(r)$, the fraction of total positive net mass recovered by the top $k\%$ of blocks is defined as:
-\begin{equation}
-Coverage(k) = \frac{\sum_{r=1}^{k\% \times |B|} \max(B(r), 0)}{\sum_{r=1}^{|B|} \max(B(r), 0)}
-\end{equation}
-We summarize this curve using $K_{80}$, representing the volume percentage required to recover 80\% of the full decoder's positive net benefit.
-
-\textbf{4. Flip Predictability}: Evaluates whether decoder behavior can be forecast before execution. We compute lightweight inference-time signals from the efficient decoder, such as predictive Shannon entropy \cite{shannon1948mathematical,gal2016dropout,jungoreyes}:
-\begin{equation}
-H(v) = -\sum_{c=1}^{C} p_c(v) \log p_c(v)
-\end{equation}
-where $p_c(v)$ is the softmax probability for class $c$. Following standard error detection and calibration protocols \cite{hendrycks2017baseline,guo2017calibration,jungoreyes,cmig2025clinical,cmig2025quality}, we measure predictability via the Area Under the Receiver Operating Characteristic (AUROC) for predicting both flip location (instability) and flip direction (improvement vs. degradation).
-
-\textbf{5. Selection Gap}: Measures the deployable opportunity for selective computation \cite{geifman2017selective,cmig2025quality}. We compare the net benefit recovered by an entropy-guided block selector against a random selection baseline at a fixed computational budget (e.g., 20\%).
+\subsection{Predictability and Practical Routing Gain}
+Using predictive Shannon entropy $H(v) = -\sum_{c=1}^{C} p_c(v) \log p_c(v)$ from the efficient baseline \cite{shannon1948mathematical,gal2016dropout}, we measure:
+\begin{enumerate}
+    \item \textbf{Location AUROC}: Discrimination of active blocks ($A(r) > 0$) vs. inactive blocks ($A(r) = 0$) \cite{hendrycks2017baseline}.
+    \item \textbf{Direction AUROC}: Discrimination of net positive blocks ($G(r) > 0$) vs. net negative blocks ($G(r) < 0$) \cite{cmig2025quality}.
+    \item \textbf{Practical Routing Gain}: Segmentation metric recovery (Dice/HD95) achieved by entropy-guided selection over the efficient baseline $E_1$, compared against a random selection baseline under identical spatial budgets.
+\end{enumerate}

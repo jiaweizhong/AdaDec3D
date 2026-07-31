@@ -11,7 +11,7 @@ However, standard evaluation paradigms assess decoder designs almost exclusively
 To address this question, we present a characterization study of decoder computation in 3D segmentation models. Rather than introducing a new network architecture, we advocate computation characterization as a research approach complementary to architecture design. We structure our evaluation across two distinct experimental levels:
 \begin{enumerate}
     \item \textbf{End-to-End Model Comparison}: We evaluate matched full and efficient decoder pairs across standard end-to-end training settings to test whether spatial characterization patterns generalize across representative 3D backbones and clinical datasets.
-    \item \textbf{Decoder-Isolated Attribution Analysis}: Building on frozen shared-encoder factorials (derived from EffiDec3D \cite{effidec3d}), we freeze feature extractor weights to strictly isolate decoder capacity interventions (channel reduction and stage removal), ensuring controlled causal attribution of prediction shifts (Figure \ref{fig:motivation}).
+    \item \textbf{Decoder-Isolated Attribution Analysis}: Building on frozen shared-encoder factorials (derived from EffiDec3D \cite{effidec3d}), we freeze feature extractor weights to strictly isolate decoder capacity interventions (channel reduction and stage removal), ensuring controlled causal attribution of prediction shifts (Figure \ref{fig:motivation}; see Supplementary Figures S1 and S2 for corresponding SwinUNETR and MedNeXt-M-K3 qualitative visualizations).
 \end{enumerate}
 
 We focus specifically on the decoder pathway as a well-defined subsystem responsible for spatial resolution reconstruction and multi-scale feature fusion. Skip-feature fusion is treated as part of the decoder pathway, whereas encoder representation dynamics present separate research questions requiring distinct experimental controls. Unlike efficient architecture papers that optimize for speed, our primary objective is to understand computation itself.
@@ -23,6 +23,6 @@ The remainder of this paper is organized as follows: Section \ref{sec:related} r
 \begin{figure*}[t]
 \centering
 \includegraphics[width=0.9\textwidth]{figures/obs-uxnet-concat/figure1_motivation.png}
-\caption{Motivation: Decoder computation produces spatially localized prediction flips. While the full decoder corrects certain errors of the efficient baseline (positive flips), it also alters previously correct predictions (negative flips) near high-entropy organ boundaries, demonstrating non-uniform spatial contribution.}
+\caption{Motivation: Decoder computation produces spatially localized prediction flips. While the full decoder corrects certain errors of the efficient baseline (positive flips), it also alters previously correct predictions (negative flips) near high-entropy organ boundaries, demonstrating non-uniform spatial contribution (see Supplementary Figures S1 and S2 for SwinUNETR and MedNeXt-M-K3).}
 \label{fig:motivation}
 \end{figure*}

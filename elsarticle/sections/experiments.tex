@@ -4,14 +4,14 @@
 \subsection{Computational and Accuracy Trade-offs}
 We evaluate matched decoder pairs across three 3D medical image segmentation backbones: a large-kernel CNN (3D UX-Net \cite{lee20233d}), a vision transformer (SwinUNETR \cite{hatamizadeh2022swin}), and a ConvNeXt-style network (MedNeXt-M-K3 \cite{roy2023mednext}). Benchmarks are conducted on the BTCV multi-organ CT dataset (13 organs) \cite{landman2015btcv} and the FeTA 2021 fetal brain MRI dataset \cite{payette2021feta}.
 
-\textbf{Baseline Comparison}: Table \ref{tab:main_results} summarizes the aggregate computational complexity and segmentation performance under standard end-to-end model training. The efficient baseline ($E_1$) implements the parameter reduction strategy of EffiDec3D \cite{effidec3d}. Across all three backbones, $E_1$ achieves substantial FLOP reductions (up to 91.4\% in 3D UX-Net) while retaining competitive Mean Dice scores. For example, MedNeXt-M-K3 $E_1$ maintains an 81.47\% Mean Dice (vs. 83.74\% for $E_0$) while reducing inference latency from 40.9 ms to 18.7 ms.
+\textbf{Baseline Comparison}: Table \ref{tab:main_results} summarizes the aggregate computational complexity and segmentation performance under standard end-to-end model training. For each backbone, we evaluate the standard Full decoder ($E_0$) against an Efficient baseline ($E_1$) implementing the parameter reduction strategy of EffiDec3D \cite{effidec3d}. Across all three backbones, $E_1$ achieves substantial FLOP reductions (up to 91.4\% in 3D UX-Net) while retaining competitive Mean Dice scores (e.g., MedNeXt-M-K3 $E_0$ achieves 83.74\% Mean Dice vs. 81.47\% for $E_1$, while $E_1$ reduces inference latency from 40.9 ms to 18.7 ms).
 
 \begin{table*}[tb]
 \centering
 \caption{Quantitative comparison of Full ($E_0$) vs. Efficient ($E_1$) decoders on the BTCV 13-organ dataset across three backbones.}
 \label{tab:main_results}
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{lcccccc}
+\small
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}lcccccc}
 \toprule
 \textbf{Architecture} & \textbf{Variant} & \textbf{Params (M)} $\downarrow$ & \textbf{FLOPs (GMac)} $\downarrow$ & \textbf{Latency (ms)} $\downarrow$ & \textbf{Mean Dice (\%)} $\uparrow$ & \textbf{Mean HD95 (mm)} $\downarrow$ \\
 \midrule
@@ -24,8 +24,7 @@ We evaluate matched decoder pairs across three 3D medical image segmentation bac
 \multirow{2}{*}{\textbf{MedNeXt-M-K3}} & Full ($E_0$) & 39.32 & 230.87 & 40.9 & 83.74 & 5.77 \\
  & Effi ($E_1$) & 12.95 & 106.91 & 18.7 & 81.47 & 6.60 \\
 \bottomrule
-\end{tabular}%
-}
+\end{tabular*}
 \end{table*}
 
 \textbf{Factorial Factor Analysis}: In our decoder-isolated attribution analysis on 3D UX-Net with frozen shared encoders (Table \ref{tab:factorial}), we separate channel reduction ($C_{dec}$) from stage removal ($RF$). Reducing channels from 384 to 48 ($C_{48}, RF_1$) compresses parameters from 46.72M to 2.24M while maintaining a 79.80\% Mean Dice. Omitting the high-resolution stage ($C_{384}, RF_2$) reduces latency to 16.1 ms. Combining both ($C_{48}, RF_2$) yields the $E_1$ configuration (1.84M params, 49.49 GMac).
@@ -36,8 +35,8 @@ Aggregate metrics confirm the overall efficiency-accuracy trade-off, but they do
 \centering
 \caption{$2\times2$ Factorial analysis of decoder channel reduction ($C_{dec}$) and resolution scaling ($RF$) on 3D UX-Net (BTCV dataset).}
 \label{tab:factorial}
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{lcccccc}
+\small
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}lcccccc}
 \toprule
 \textbf{Configuration} & $C_{dec}$ & $RF$ & \textbf{Params (M)} & \textbf{FLOPs (GMac)} & \textbf{Latency (ms)} & \textbf{Mean Dice (\%)} \\
 \midrule
@@ -46,8 +45,7 @@ Chan-Only ($C_{48}, RF_1$) & 48 & 1 & 2.24 & 388.15 & 35.2 & 79.80 \\
 Res-Only ($C_{384}, RF_2$) & 384 & 2 & 46.32 & 319.10 & 16.1 & 77.97 \\
 Effi ($C_{48}, RF_2$) & 48 & 2 & 1.84 & 49.49 & 8.0 & 78.35 \\
 \bottomrule
-\end{tabular}%
-}
+\end{tabular*}
 \end{table*}
 
 \subsection{Spatial Heterogeneity of Decoder Contribution}
@@ -104,17 +102,17 @@ Figure \ref{fig:concentration} presents oracle coverage curves evaluating the sp
 
 The top 5\% of spatial blocks account for 80\% of the observed positive net gain ($K_{80} = 5\%$), indicating strong spatial concentration of beneficial decoder effects. This does not imply that the remaining 95\% of blocks are entirely inactive or dispensable, but rather that high-capacity decoder computation yields diminishing net returns outside this core subset.
 
-\begin{figure*}[tb]
+\begin{figure}[tb]
 \centering
-\begin{tabular}{ccc}
-\includegraphics[width=0.30\textwidth]{figures/obs-uxnet-concat/O_pareto.png} &
-\includegraphics[width=0.30\textwidth]{figures/obs-swin-concat/O_pareto.png} &
-\includegraphics[width=0.30\textwidth]{figures/obs-mednext/O_pareto.png} \\
-(a) 3D UX-Net Concentration Curve & (b) SwinUNETR Concentration Curve & (c) MedNeXt-M-K3 Concentration Curve \\
-\end{tabular}
+\includegraphics[width=0.82\columnwidth]{figures/obs-uxnet-concat/O_pareto.png} \\
+\vspace{-2pt}{\small (a) 3D UX-Net Concentration Curve} \\[4pt]
+\includegraphics[width=0.82\columnwidth]{figures/obs-swin-concat/O_pareto.png} \\
+\vspace{-2pt}{\small (b) SwinUNETR Concentration Curve} \\[4pt]
+\includegraphics[width=0.82\columnwidth]{figures/obs-mednext/O_pareto.png} \\
+\vspace{-2pt}{\small (c) MedNeXt-M-K3 Concentration Curve}
 \caption{Oracle concentration curves showing that 80\% of positive net gain ($K_{80}$) is concentrated in 5\% of spatial blocks across all three backbones.}
 \label{fig:concentration}
-\end{figure*}
+\end{figure}
 
 \subsection{Predictability of Decoder Activity and Gain}
 We test whether cheap inference-time signals (predictive entropy) can locate these beneficial spatial regions prior to full decoder execution. Figure \ref{fig:predictability} shows a sharp divergence between predicting Activity and predicting Net Gain:
@@ -125,14 +123,14 @@ We test whether cheap inference-time signals (predictive entropy) can locate the
 
 Entropy-guided routing provides architecture-dependent and incomplete recovery of the oracle opportunity: while entropy selection yields a small, statistically significant improvement over random selection at a 20\% budget in 3D UX-Net, it fails to achieve significant gains in SwinUNETR and MedNeXt-M-K3. Overall, simple scalar entropy gating fails to reliably recover the theoretical oracle opportunity across backbones.
 
-\begin{figure*}[tb]
+\begin{figure}[tb]
 \centering
-\begin{tabular}{ccc}
-\includegraphics[width=0.30\textwidth]{figures/obs-uxnet-concat/O3_unc_error.png} &
-\includegraphics[width=0.30\textwidth]{figures/obs-swin-concat/O3_unc_error.png} &
-\includegraphics[width=0.30\textwidth]{figures/obs-mednext/O3_unc_error.png} \\
-(a) 3D UX-Net Predictability & (b) SwinUNETR Predictability & (c) MedNeXt-M-K3 Predictability \\
-\end{tabular}
+\includegraphics[width=0.82\columnwidth]{figures/obs-uxnet-concat/O3_unc_error.png} \\
+\vspace{-2pt}{\small (a) 3D UX-Net Predictability} \\[4pt]
+\includegraphics[width=0.82\columnwidth]{figures/obs-swin-concat/O3_unc_error.png} \\
+\vspace{-2pt}{\small (b) SwinUNETR Predictability} \\[4pt]
+\includegraphics[width=0.82\columnwidth]{figures/obs-mednext/O3_unc_error.png} \\
+\vspace{-2pt}{\small (c) MedNeXt-M-K3 Predictability}
 \caption{Inference-time predictability: Predictive entropy reliably identifies active blocks (Location AUROC $>0.90$) but cannot distinguish positive corrections from negative degradations (Direction AUROC $\approx 0.55$).}
 \label{fig:predictability}
-\end{figure*}
+\end{figure}

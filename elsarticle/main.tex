@@ -98,7 +98,7 @@ Modern 3D medical image segmentation architectures increasingly incorporate heav
 
 %% Declaration of competing interest
 \section*{Declaration of competing interest}
-The authors declare that they have no known competing financial interests or personal relationships that could have appeared to influence the work reported in this paper.
+The authors declare that they have no known competing financial interests or personal relationships that me could have appeared to influence the work reported in this paper.
 
 %% Data availability
 \section*{Data availability}
@@ -107,5 +107,31 @@ The data used in this study (BTCV/Synapse, FeTA 2021) are publicly available.
 %% Bibliography
 \bibliographystyle{elsarticle-num} 
 \bibliography{refs}
+
+%% Supplementary Material Section (Integrated in main.pdf)
+\clearpage
+\appendix
+\renewcommand{\thefigure}{S\arabic{figure}}
+\renewcommand{\thetable}{S\arabic{table}}
+\setcounter{figure}{0}
+\setcounter{table}{0}
+
+\section*{Supplementary Material: Qualitative Visualizations for SwinUNETR and MedNeXt-M-K3}
+
+This section provides supplementary qualitative visualizations for SwinUNETR and MedNeXt-M-K3 backbones, complementing the 3D UX-Net qualitative motivation example in Figure 1 of the main manuscript.
+
+\begin{figure*}[htbp]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/obs-swin-concat/figure1_motivation.png}
+\caption{Supplementary Figure S1: Qualitative motivation visualization for SwinUNETR ($E_0$ vs. $E_1$) on BTCV CT multi-organ segmentation. Voxel-level prediction flips (positive corrections and negative degradations) are tightly localized to high-entropy organ boundaries.}
+\label{fig:supp_swin}
+\end{figure*}
+
+\begin{figure*}[htbp]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/obs-mednext/figure1_motivation.png}
+\caption{Supplementary Figure S2: Qualitative motivation visualization for MedNeXt-M-K3 ($E_0$ vs. $E_1$) on BTCV CT multi-organ segmentation. Consistent with 3D UX-Net and SwinUNETR, decoder-induced flips are concentrated within narrow boundary bands.}
+\label{fig:supp_mednext}
+\end{figure*}
 
 \end{document}

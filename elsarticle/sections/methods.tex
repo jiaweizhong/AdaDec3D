@@ -6,29 +6,28 @@ To understand the spatial and functional contribution of decoder computation, we
 \subsection{Controlled Decoder Comparison}
 Let $v$ denote a voxel within a 3D medical image volume $V$. We compare two decoder configurations:
 \begin{itemize}
-    \item \textbf{Efficient Decoder ($E_1$)}: A parameter-matched efficient decoder following the EffiDec3D specification \cite{effidec3d}, utilizing channel reduction and stage removal with concatenation skip aggregation.
     \item \textbf{Full Decoder ($E_0$)}: The standard dense, multi-stage high-resolution decoder of the respective backbone architecture.
+    \item \textbf{Efficient Decoder ($E_1$)}: A parameter-matched efficient decoder following the EffiDec3D specification \cite{effidec3d}, utilizing channel reduction and stage removal with concatenation skip aggregation.
 \end{itemize}
-Let $y(v)$ be the ground truth label, $\hat{y}_e(v)$ be the prediction from the efficient decoder, and $\hat{y}_f(v)$ be the prediction from the full decoder. Interventions occur strictly within the decoder pathway (upsampling, skip fusion, and refinement).
+Let $y(v)$ be the ground truth label, $\hat{y}_f(v)$ be the prediction from the full decoder, and $\hat{y}_e(v)$ be the prediction from the efficient decoder. Interventions occur strictly within the decoder pathway (upsampling, skip fusion, and refinement).
 
 \begin{table*}[t]
 \centering
 \caption{Overview of characterization objectives and evaluation measures.}
 \label{tab:framework_summary}
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{lll}
+\small
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}lll}
 \toprule
 \textbf{Analysis Objective} & \textbf{Evaluation Measure} & \textbf{Question Answered} \\
 \midrule
-Spatial effect & Activity $A(v)$ & Where does additional decoder computation change correctness? \\
-Directional effect & Net Gain $G(v)$ & Where does it help rather than harm? \\
-Concentration & Oracle $K_{80}$ & How concentrated is positive net gain? \\
-Activity predictability & Location AUROC & Can cheap signals identify changed regions? \\
+Spatial effect & Activity $A(v)$ & Where does additional decoder computation change predictions? \\
+Directional effect & Net Gain $G(v)$ & Where does the decoder improve correctness overall? \\
+Concentration & Oracle $K_{80}$ & How spatially concentrated is positive net gain? \\
+Activity predictability & Location AUROC & Can cheap signals detect where the decoder acts? \\
 Gain predictability & Direction AUROC & Can cheap signals distinguish beneficial from harmful changes? \\
-Practical recovery & Routing Gain / Recovery & Does selective execution improve actual segmentation metrics? \\
+Practical recovery & Routing Gain & Does selective execution improve segmentation metrics? \\
 \bottomrule
-\end{tabular}%
-}
+\end{tabular*}
 \end{table*}
 
 \subsection{Decoder-Induced Corrections and Degradations}
@@ -52,14 +51,28 @@ We analyze Activity $A(v)$ and Net Gain $G(v)$ across two spatial dimensions:
 \end{enumerate}
 
 \subsection{Spatial Concentration and Oracle Opportunity}
-We partition the 3D volume into spatial sub-blocks $b_r$ and compute block net gain $G(r) = \sum_{v \in b_r} G(v)$. Sorting blocks by $G(r)$, the fraction of positive gain recovered by the top $k\%$ of blocks is defined by:
+We partition the 3D volume into spatial sub-blocks $b_r$ and compute block net gain:
+\begin{equation}
+G(r) = \sum_{v \in b_r} G(v)
+\end{equation}
+Sorting blocks by $G(r)$, the fraction of positive gain recovered by the top $k\%$ of blocks is defined by the coverage curve:
 \begin{equation}
 Coverage(k) = \frac{\sum_{r=1}^{k\% \cdot |B|} \max(G(r), 0)}{\sum_{r=1}^{|B|} \max(G(r), 0)}
 \end{equation}
-We record $K_{80}$, defined as the smallest fraction of spatial blocks required by a perfect selector to recover 80\% of the total positive decoder gain. A selective hybrid prediction $\hat{y}_k(v)$ executes the full decoder on selected blocks $S_k$ and the efficient baseline elsewhere.
+We record $K_{80}$, defined as the smallest fraction of spatial blocks required by a perfect selector to recover 80\% of the total positive decoder gain. A selective hybrid prediction $\hat{y}_k(v)$ executes the full decoder on selected blocks $S_k$ and the efficient baseline elsewhere:
+\begin{equation}
+\hat{y}_k(v) = \begin{cases}
+\hat{y}_f(v), & \text{if } v \in S_k \\
+\hat{y}_e(v), & \text{otherwise}
+\end{cases}
+\end{equation}
 
 \subsection{Predictability and Practical Routing Gain}
-Using predictive Shannon entropy $H(v) = -\sum_{c=1}^{C} p_c(v) \log p_c(v)$ from the efficient baseline \cite{shannon1948mathematical,gal2016dropout}, we measure:
+We compute predictive Shannon entropy $H(v)$ from the efficient baseline outputs \cite{shannon1948mathematical,gal2016dropout}:
+\begin{equation}
+H(v) = -\sum_{c=1}^{C} p_c(v) \log p_c(v)
+\end{equation}
+where $p_c(v)$ represents the softmax probability for class $c$ at voxel $v$. Using $H(v)$, we evaluate three predictability measures:
 \begin{enumerate}
     \item \textbf{Location AUROC}: Discrimination of active blocks ($A(r) > 0$) vs. inactive blocks ($A(r) = 0$) \cite{hendrycks2017baseline}.
     \item \textbf{Direction AUROC}: Discrimination of net positive blocks ($G(r) > 0$) vs. net negative blocks ($G(r) < 0$) \cite{cmig2025quality}.

@@ -643,8 +643,21 @@ diagnostics behind `--appendix`. Mapping (paper name → code):
   (1) **R — hybrid performance-recovery curve** (`R_recovery`): the one missing experiment,
   translating abstract net-flip recovery into recovered **Dice/NSD**; (2) **P1 AUPRC** for the
   any-flip and direction tasks (minority class → AUROC alone is optimistic); (3) **Activity =
-  P+N** defined explicitly alongside **Gain = P−N** (`O5.subject_activity_rate_*`; no new run).
-  Explicitly **not** added: MC-dropout / ensemble / TTA / extra uncertainty estimators.
+  P+N** defined explicitly alongside **Gain = P−N** (`O5.subject_activity_rate_*`; no new run);
+  (4) **P1 density plot** — entropy distribution by flip class (`O3_entropy_by_flip.png`), which
+  visually shows pos & neg flips overlap at high entropy (→ direction is hard).
+- **TTA uncertainty diagnostic (opt-in `--tta`, `O_tta`), added 2026-07-31.** *Reverses the
+  earlier blanket "no TTA".* Rationale: the direction result (AUROC ~0.57) is the paper's most
+  attackable claim ("you just used a weak scalar"); testing **one** richer, retraining-free
+  signal hardens it. We use the augmentation **disagreement** — mutual information
+  `MI = H(mean_k p_k) − mean_k H(p_k)` (BALD) over axis-flip views, **not** entropy-of-the-mean
+  (which would just re-confirm entropy) — and report its any/positive/**direction** AUROC+AUPRC
+  head-to-head with O3 entropy. No-lose: TTA still low-direction ⇒ *even multi-sample uncertainty
+  can't predict gain* (stronger thesis); TTA improves direction ⇒ honest nuance. Priority: a
+  **strengthening diagnostic, run after the dataset axis** — do not block HepaticVessel on it.
+  Still excluded: **MC-dropout** (no effective dropout), **Deep Ensemble** (N trainings),
+  **Evidential** (changes training objective → breaks the controlled comparison), and the
+  UCM/ESCE/HDice calibration zoo — Paper A is decoder characterization, not an uncertainty survey.
 - **Deleted from code (surplus):** **O_dice_aware** (Dice Δ folded into `O_anatomy`), **O_errortype**,
   O5's `Pearson(H,U)` correlation; earlier **O6/O10/O11**.
 - **Appendix only (`--appendix`):** **O1**, **O2**, **O4**, **O9** (superseded by C1/P2 in `O_pareto`).

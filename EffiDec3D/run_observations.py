@@ -313,6 +313,7 @@ def O3_unc_error_corr(val_loader, effi, full=None):
     subj_fauroc, subj_fauprc, subj_fprev = [], [], []      # positive-flip prediction
     subj_nauroc, subj_aauroc, subj_pvn = [], [], []        # neg-flip, any-flip, pos-vs-neg AUROC
     subj_aauprc, subj_pvnprc = [], []                      # any-flip, direction AUPRC (minority-class)
+    ent_by = {"no-flip": [], "pos-flip": [], "neg-flip": []}   # density plot: entropy by flip class
     predict_flip = full is not None and full is not effi
     with torch.no_grad():
         for batch in val_loader:
@@ -367,6 +368,11 @@ def O3_unc_error_corr(val_loader, effi, full=None):
                 if ya.sum() > 10 and yf[ya].sum() > 0 and (~yf[ya]).sum() > 0:
                     subj_pvn.append(_auroc(e[ya], yf[ya]))
                     subj_pvnprc.append(_auprc(e[ya], yf[ya]))
+                # density-plot samples (capped per subject) by flip class
+                for _nm, _mk in (("pos-flip", yf), ("neg-flip", yn), ("no-flip", ~ya)):
+                    _ev = e[_mk]
+                    if _ev.size:
+                        ent_by[_nm].append(_ev if _ev.size <= 5000 else rng.choice(_ev, 5000, replace=False))
     r_p = float(pearsonr(x_ent, y_err)[0]); r_s = float(spearmanr(x_ent, y_err)[0])
 
     def _boot_ci(vals):
@@ -405,6 +411,16 @@ def O3_unc_error_corr(val_loader, effi, full=None):
     plt.xlabel("Mean entropy (bin)"); plt.ylabel("Error rate (bin)")
     plt.title(f"O3: pooled-bin r={r_p:.3f} (descriptive); flip AUROC={fauroc_m:.3f}")
     plt.tight_layout(); plt.savefig(f"{OBS_DIR}/O3_unc_error.png", dpi=150); plt.close()
+    if any(ent_by.values()):     # P1 density: pos & neg flips overlap at high entropy => direction hard
+        plt.figure(figsize=(6, 4))
+        for _nm, _col in (("no-flip", "gray"), ("pos-flip", "seagreen"), ("neg-flip", "firebrick")):
+            if ent_by[_nm]:
+                plt.hist(np.concatenate(ent_by[_nm]), bins=50, density=True,
+                         histtype="step", lw=1.6, color=_col, label=_nm)
+        plt.xlabel("efficient-model entropy"); plt.ylabel("density")
+        plt.title("O3: entropy by flip class (pos vs neg overlap $\\Rightarrow$ direction hard)")
+        plt.legend(); plt.tight_layout()
+        plt.savefig(f"{OBS_DIR}/O3_entropy_by_flip.png", dpi=150); plt.close()
     save_obs("O3", {
         # primary: entropy predicts positive flips (needs full pair)
         "flip_auroc_mean": fauroc_m, "flip_auroc_ci": fauroc_ci,
@@ -1270,6 +1286,101 @@ def O_recovery(val_loader, effi, full, out_classes, block_size=16, halo=4):
           f"entropy recovers {(ent20-ed)/gap*100:.0f}% of the gap")
 
 
+def O_tta(val_loader, effi, full, n_flips=8):
+    """P1 robustness diagnostic (opt-in): does a RICHER, multi-sample uncertainty predict
+    flip DIRECTION any better than single-pass entropy?
+
+    We build test-time-augmentation (TTA) uncertainty for the efficient model with axis-flip
+    views (K flip combinations over the 3 spatial axes; the softmax is flipped back into the
+    original frame before averaging). The signal is the augmentation DISAGREEMENT, i.e. the
+    mutual information MI = H(mean_k p_k) - mean_k H(p_k) (BALD) --- NOT entropy-of-the-mean,
+    which would just re-confirm single-pass entropy. We report MI's per-subject any-flip /
+    positive-flip / direction AUROC and AUPRC, directly comparable to O3's entropy. Expensive
+    (K forward passes); excludes MC-dropout (no effective dropout here), ensembles and
+    evidential methods (both need retraining and would break the controlled comparison)."""
+    from itertools import combinations
+    try:
+        from sklearn.metrics import roc_auc_score, average_precision_score
+        def _auroc(s, y): return float(roc_auc_score(y, s))
+        def _auprc(s, y): return float(average_precision_score(y, s))
+    except Exception:
+        from scipy.stats import rankdata
+        def _auroc(s, y):
+            npos = int(y.sum()); nneg = int((~y).sum())
+            if npos == 0 or nneg == 0:
+                return float("nan")
+            r = rankdata(s)
+            return float((r[y].sum() - npos * (npos + 1) / 2) / (npos * nneg))
+        def _auprc(s, y):
+            o = np.argsort(s)[::-1]; ys = y[o].astype(np.float64)
+            tp = np.cumsum(ys); fp = np.cumsum(1 - ys)
+            prec = tp / np.maximum(tp + fp, 1e-9); tot = ys.sum()
+            return float(np.sum(np.diff(np.concatenate([[0.0], tp / tot])) * prec)) if tot else float("nan")
+
+    dims = [2, 3, 4]
+    flipsets = [()]
+    for r in (1, 2, 3):
+        flipsets += [tuple(c) for c in combinations(dims, r)]
+    flipsets = flipsets[:max(2, n_flips)]
+    rng = np.random.default_rng(0)
+    keys = ["any_auroc", "any_auprc", "pos_auroc", "pos_auprc", "dir_auroc", "dir_auprc"]
+    subj = {k: [] for k in keys}
+    with torch.no_grad():
+        for batch in val_loader:
+            img = batch["image"].cuda()
+            lbl = batch["label"].squeeze(1).long().cpu().squeeze()
+            sum_p = None; sum_ent = None                       # running sums (avoid stacking K probs)
+            for fs in flipsets:
+                x = torch.flip(img, fs) if fs else img
+                lo = infer(effi, x)
+                if fs:
+                    lo = torch.flip(lo, fs)
+                p = lo.softmax(1).cpu()
+                h = -(p * torch.log(p + 1e-8)).sum(1)          # per-sample entropy (1,*)
+                sum_p = p if sum_p is None else sum_p + p
+                sum_ent = h if sum_ent is None else sum_ent + h
+            K = len(flipsets)
+            pbar = sum_p / K
+            ent_mean = -(pbar * torch.log(pbar + 1e-8)).sum(1) # H(mean)
+            mi = (ent_mean - sum_ent / K).squeeze().numpy().reshape(-1)   # mutual information
+            pred = pbar.argmax(1).cpu().squeeze()
+            pred_f = infer(full, img).argmax(1).cpu().squeeze()
+            body = ((lbl > 0) | (pred > 0)).numpy().reshape(-1)
+            idx = np.flatnonzero(body)
+            if idx.size == 0:
+                continue
+            if idx.size > 300000:
+                idx = rng.choice(idx, 300000, replace=False)
+            s = mi[idx]
+            pos = ((pred_f == lbl) & (pred != lbl)).numpy().reshape(-1)[idx]
+            neg = ((pred_f != lbl) & (pred == lbl)).numpy().reshape(-1)[idx]
+            anyf = (pos | neg).astype(bool); yf = pos.astype(bool)
+            if anyf.sum() > 0 and (~anyf).sum() > 0:
+                subj["any_auroc"].append(_auroc(s, anyf)); subj["any_auprc"].append(_auprc(s, anyf))
+            if yf.sum() > 0 and (~yf).sum() > 0:
+                subj["pos_auroc"].append(_auroc(s, yf)); subj["pos_auprc"].append(_auprc(s, yf))
+            if anyf.sum() > 10 and yf[anyf].sum() > 0 and (~yf[anyf]).sum() > 0:
+                subj["dir_auroc"].append(_auroc(s[anyf], yf[anyf]))
+                subj["dir_auprc"].append(_auprc(s[anyf], yf[anyf]))
+
+    def _ci(v):
+        v = np.asarray([x for x in v if not np.isnan(x)], dtype=np.float64)
+        if v.size == 0:
+            return float("nan"), [float("nan"), float("nan")]
+        b = [np.mean(rng.choice(v, v.size, replace=True)) for _ in range(2000)]
+        return float(v.mean()), [float(np.percentile(b, 2.5)), float(np.percentile(b, 97.5))]
+
+    out = {"n_flips": len(flipsets), "signal": "TTA mutual information (axis-flip augmentation)"}
+    for k in keys:
+        m, c = _ci(subj[k]); out[k + "_mean"] = m; out[k + "_ci"] = c
+    save_obs("O_tta", out)
+    print(f"[O_tta] TTA-MI (K={len(flipsets)})  any AUROC={out['any_auroc_mean']:.3f}  "
+          f"pos AUROC={out['pos_auroc_mean']:.3f}  "
+          f"DIRECTION AUROC={out['dir_auroc_mean']:.3f} "
+          f"CI[{out['dir_auroc_ci'][0]:.3f},{out['dir_auroc_ci'][1]:.3f}]  "
+          f"(compare to O3 entropy direction; low => richer uncertainty still can't tell better-from-worse)")
+
+
 def main():
     global OBS_DIR, RESULTS_FILE, CLASS_NAMES
     p = argparse.ArgumentParser()
@@ -1316,6 +1427,11 @@ def main():
                         "ratio, O2 entropy histogram, O4 per-organ difficulty, and the O9 "
                         "executed-volume/halo sensitivity). Default off: the main pipeline "
                         "reports only the six converged metrics H1,H2,C1/C2,P1,P2.")
+    p.add_argument("--tta", action="store_true",
+                   help="Also run the TTA-uncertainty P1 diagnostic (O_tta): does richer "
+                        "multi-sample (flip-augmentation mutual-information) uncertainty "
+                        "predict flip DIRECTION better than single-pass entropy? Expensive "
+                        "(K forward passes); opt-in.")
     args_ns = p.parse_args()
     OBS_DIR = args_ns.obs_dir
     RESULTS_FILE = os.path.join(OBS_DIR, "results.json")
@@ -1406,6 +1522,10 @@ def main():
         "R_recovery": "R_recovery (hybrid selective-decoding Dice/NSD vs budget; "
                       "oracle/entropy/confidence/random + Effi/Full anchors)",
         "activity_gain": "O5 activity=P+N (where the decoder acts) vs gain=P-N (where it helps)",
+        "P1_density": "O3 entropy-by-flip-class density (O3_entropy_by_flip.png)",
+        "tta_diagnostic": "O_tta (opt-in --tta): TTA mutual-information vs entropy on "
+                          "any/positive/direction AUROC+AUPRC — richer uncertainty still can't "
+                          "predict direction?",
         "appendix": "O1, O2, O4, O9 (behind --appendix)",
     })
 
@@ -1422,6 +1542,8 @@ def main():
                  halo=args_ns.o9_halo)                     # C1+C2 (oracle) + P2 (signal vs random)
         O_recovery(val_loader, effi, full, out_classes,    # R: hybrid Dice recovery curve
                    block_size=args_ns.o9_block_size, halo=args_ns.o9_halo)
+        if args_ns.tta:
+            O_tta(val_loader, effi, full)                  # P1 robustness: TTA-MI vs entropy
     else:
         print("[H1/H2/C/P2] skipped — ecological control has no EffiDec3D pair")
 

@@ -133,8 +133,10 @@ def main():
             ax.text(0.5, 0.5, f"no {label}\non this slice", ha="center", va="center",
                     fontsize=9); ax.axis("off"); return
         y0, x0 = box; sl = (slice(y0, y0 + 2 * half), slice(x0, x0 + 2 * half))
-        ax.imshow(im2[sl], cmap="gray")
-        ax.imshow(flip_rgb[sl])
+        # interpolation="nearest": crisp voxel squares, no smoothing blur when upsampling
+        # the ~32x32 crop (each square is one real voxel).
+        ax.imshow(im2[sl], cmap="gray", interpolation="nearest")
+        ax.imshow(flip_rgb[sl], interpolation="nearest")
         ax.contour(ent2[sl], levels=[np.percentile(ent2, 90)], colors="cyan", linewidths=0.8)
         ax.set_title(label, color=color, fontsize=10)
         ax.set_xticks([]); ax.set_yticks([])

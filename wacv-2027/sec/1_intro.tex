@@ -62,8 +62,9 @@ numbers of voxels, so the net flip rate is statistically indistinguishable from 
 $1$--$2$ point Dice gap, because the near-balanced flips concentrate in a thin band within
 one to two voxels of organ boundaries---exactly where Dice is most sensitive. Finally,
 the efficient model's own uncertainty predicts \emph{where} a prediction will change
-(AUROC $\approx\!0.9$) but not \emph{whether} the change is an improvement (direction
-AUROC $\approx\!0.5$): predicting instability is easy, predicting improvement is not. This
+(AUROC $\approx\!0.9$) but only weakly \emph{whether} the change is an improvement
+(direction AUROC $0.56$--$0.59$): predicting instability is much easier than predicting
+improvement. This
 last result is the central obstacle to turning decoder redundancy into a deployable,
 benefit-aware efficient decoder, and it holds consistently across the three architectures.
 

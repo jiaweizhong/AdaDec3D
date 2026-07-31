@@ -1179,19 +1179,27 @@ pattern is a property of the EffiDec3D backbone family, not an artifact of 3D UX
 (BTCV13).** Headline uses concat (UX-Net, Swin); MedNeXt is an addition control and is
 currently over-sized (fs=48 → 2× the paper's MedNeXt-M-K3; retrain at fs=32 pending):
 
+Six-metric numbers below are from the **converged-code re-run** (2026-07-30,
+[results/obs-uxnet-concat](results/obs-uxnet-concat), [results/obs-swin-concat](results/obs-swin-concat)):
+
 | Metric | 3D UX-Net (concat) | SwinUNETR (concat) | MedNeXt (addition\*) |
 |---|---|---|---|
 | Full → Effi Dice | .792 → .777 (−1.5%) | .805 → .795 (−1.0%) | .837 → .815 (−2.3%) |
 | GMac (× reduction) | 579 → 49 (11.7×) | 308 → 56 (5.5×) | 231 → 107 (2.2×) |
-| O1 boundary/interior err | 4.39× | 3.54× | 4.67× |
-| O3 flip AUROC | .903 | .910 | .931 |
-| **O5 subject net-flip** | **+0.047% (CI crosses 0)** | **−0.001% (CI crosses 0)** | +0.085% (CI>0) |
-| O9 region opportunity | marginal (5% only) | **negative (all budgets)** | positive |
-| O_boundary net-flip peak | 0–1 vox | 0–2 vox | 1–2 vox |
-| O_anatomy size↔net ρ | −.37 | −.07 | −.30 |
+| **H1** R_net (subject CI) | **+0.047% [−.020,+.109]** | **−0.001% [−.045,+.040]** | pending fs=32 |
+| **H2** boundary net peak | +0.085 @0–1 vox [.070,.101] | +0.015/+0.021 @0–2 vox | pending |
+| **H2** size↔net ρ (union fg) | +0.02 | −0.58 | pending |
+| **P1** any / positive / **direction** AUROC | .901 / .903 / **.593** [.560,.627] | .912 / .910 / **.561** [.512,.609] | pending |
+| **C1** oracle cov @10% / K80 / abs_net | >99% / 5% / **+6.1k vox** | 100% / 5% / **−1.3k vox** | pending |
+| **P2** entropy−random @20% | +0.23 [−.06,+.45] | −0.06 [−.37,+.22] | pending |
 
 \* MedNeXt has no addition/concat decoder knob; listed at its native config but over-sized
-(fs=48), so its positive net flip is **not** a canonical result until re-trained at fs=32.
+(fs=48), so it is **not** a canonical result until re-trained at fs=32.
+
+**Two honesty corrections from the re-run** (vs earlier drafts):
+1. **Direction AUROC is ~0.56–0.59, NOT ≈0.5** — weakly but significantly above chance (CIs exclude 0.5). Thesis still holds strongly (location ~0.90 ≫ direction ~0.57): *predicting instability is much easier than predicting improvement*, but we no longer say direction is "at chance."
+2. **No robust size→benefit law** — with union foreground the organ-size/net Spearman flips sign across backbones (+0.02 UX, −0.58 Swin). Report per-organ *heterogeneity* (some organs gain, e.g. UX L.Kidney +0.061; some lose, UX L.Adrenal −0.071) without claiming smaller structures systematically gain (the old GT-only ρ=−0.37 did not survive).
+3. **C1 nuance confirmed** — oracle coverage is extremely steep (K80=5%) yet abs_net is tiny/negative (+6.1k UX, −1.3k Swin voxels): steep concentration over a ≈0 absolute total. **P2** deployable gaps cross zero on both → no recoverable opportunity (negative result holds).
 
 The **consistent** finding on the two parameter-matched backbones is a **voxel-level net
 flip indistinguishable from zero** (both CIs cross zero), with boundary-localized,
@@ -1729,11 +1737,12 @@ Week 5-6: Generalization matrix (run_observations.py --network/--dataset)
   [ ] Dataset axis — freeze 2-3 more tasks (FeTA, MSD-Task08 HepaticVessel),
       rerun matched UX-Net (six metrics) per dataset; aggregate H1 net + P1 direction across CT+MRI+lesion
   [ ] O7: cross-dataset consistency = aggregate over dataset axis (Go: ≥3 datasets)  — STILL PENDING
-  [x] O8: architecture-family consistency (concat, 2026-07-29) — same pattern on matched backbones:
-        Full−Effi Dice −1.5 (UX concat) / −1.0 (Swin concat) / −2.3% (MedNeXt addition, over-sized);
-        O1 boundary/interior 4.39 / 3.54 / 4.67×;  O3 flip AUROC .903 / .910 / .931;
-        O5 subject net-flip ≈0, CI crosses 0 (UX +.00047 / Swin −.00001 / MedNeXt +.00085 CI>0);
-        O9 region opportunity marginal (UX 5% only) / negative (Swin all budgets);  O_anatomy ρ −.37 / −.07 / −.30
+  [x] O8: architecture-family consistency (converged six-metric re-run, 2026-07-30) — UX-Net & Swin (concat):
+        H1 R_net ≈0, CI crosses 0 (UX +.047% [−.020,+.109] / Swin −.001% [−.045,+.040]);
+        P1 location AUROC .90/.91 but direction (pos-vs-neg) only .593/.561 (weakly > chance);
+        H2 boundary net peak +0.085@0–1vox (UX) / +0.02@0–2vox (Swin); size↔net ρ +.02/−.58 (no robust law);
+        C1 oracle steep (K80=5%) but abs_net +6.1k/−1.3k vox; P2 entropy−random gap CI crosses 0 both → no opportunity.
+        MedNeXt pending fs=32 retrain.
   [x] O10: organ size vs difficulty
   [~] O11: entropy and confidence complete; MC dropout invalid/inactive
   [x] Corrected O9 contiguous-region opportunity curve (net/paired/halo) — NEGATIVE at matched concat (no opportunity)

@@ -46,6 +46,9 @@ def main():
                    help="slicing axis of the (D,H,W) volume")
     p.add_argument("--slice", type=int, default=None,
                    help="slice index; default = the slice with the most flips")
+    p.add_argument("--zoom_half", type=int, default=24,
+                   help="zoom half-window in voxels; crop is 2*zoom_half square "
+                        "(16=tight 32^2, 24=48^2 default, 32=64^2 wide context)")
     p.add_argument("--out", default="/root/obs/figure1_motivation.png")
     p.add_argument("--skip_aggregation", default="concatenation",
                    choices=["addition", "concatenation"],
@@ -115,7 +118,7 @@ def main():
 
     # Locate one positive and one negative zoom region (largest connected flip cluster).
     from scipy.ndimage import label as _cc_label, center_of_mass
-    half = 16                                        # zoom half-window (voxels)
+    half = args.zoom_half                            # zoom half-window (voxels); crop = 2*half square
 
     def _pick(mask):
         lab, n = _cc_label(mask)

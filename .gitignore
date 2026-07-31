@@ -80,4 +80,4 @@ per_class_dice_*.csv
 !*.pdf
 
 # Local reference copy of upstream EffiDec3D (not versioned)
-EffiDec3D-orignal/
+elsarticle/reference

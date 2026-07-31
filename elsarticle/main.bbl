@@ -1,0 +1,26 @@
+\begin{thebibliography}{1}
+\expandafter\ifx\csname url\endcsname\relax
+  \def\url#1{\texttt{#1}}\fi
+\expandafter\ifx\csname urlprefix\endcsname\relax\def\urlprefix{URL }\fi
+\expandafter\ifx\csname href\endcsname\relax
+  \def\href#1#2{#2} \def\path#1{#1}\fi
+
+\bibitem{effidec3d}
+A.~Author, et~al., Efficient 3d medical image segmentation, Journal Name (2024).
+
+\bibitem{efficientmednext}
+B.~Author, et~al., Efficientmednext: Multi-receptive dilated convolutions for medical image segmentation, Journal Name (2024).
+
+\bibitem{jungoreyes}
+A.~Jungo, M.~Reyes, Assessing reliability and challenges of uncertainty estimations for medical image segmentation, MICCAI (2019).
+
+\bibitem{cmig2025clinical}
+C.~Author, et~al., Evaluating uncertainty quantification in medical image segmentation: A multi-dataset, multi-algorithm study, Computerized Medical Imaging and Graphics (2025).
+
+\bibitem{cmig2025quality}
+D.~Author, et~al., Uncertainty-aware segmentation quality prediction via deep learning bayesian modeling, Computerized Medical Imaging and Graphics (2025).
+
+\bibitem{uncertaintyreview}
+E.~Author, et~al., A review of uncertainty estimation and its application in medical imaging, Journal Name (2023).
+
+\end{thebibliography}

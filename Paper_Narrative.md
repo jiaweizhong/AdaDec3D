@@ -1,205 +1,276 @@
-# Paper Narrative (Observation Study)
 
-# Working Title
+# Paper Narrative (Final Research Direction)
 
-**Characterizing Decoder Computation in 3D Medical Image Segmentation: A Characterization Study**
+## Working Title
 
-> Alternative (if emphasizing redundancy):
->
-> **Rethinking Decoder Redundancy in Efficient 3D Medical Image Segmentation: A Characterization Study**
+**Rethinking Decoder Redundancy in Efficient 3D Medical Image Segmentation: A Characterization Study**
 
 ---
 
-# Core Scientific Question
+# 1. Paper Position
 
-Modern medical image segmentation models devote substantial computation to the decoder, yet almost all work evaluates decoder designs only through **final Dice, HD95, FLOPs, and parameter count**.
+This is a **characterization paper**, not a method paper.
 
-These aggregate metrics answer **how much** performance changes, but not:
+The paper does not introduce a new decoder or adaptive inference algorithm. Instead, it asks a fundamental scientific question:
 
-- Where does decoder computation actually matter?
-- Is its contribution spatially uniform?
-- Is useful decoder computation concentrated?
-- Can useful decoder computation be predicted before executing the full decoder?
+> **Where, how much, and under what conditions is additional decoder computation actually useful?**
 
-This paper answers these questions through a **systematic characterization study**, not a new segmentation method.
+Matched full and efficient decoders are treated as controlled experimental instruments for understanding decoder computation.
 
 ---
 
-# Central Hypothesis
+# 2. Scientific Narrative
 
-Decoder computation is **not uniformly useful**.
+## RQ1 — Heterogeneity
 
-Instead, decoder benefit exhibits three intrinsic properties:
+Question:
 
-1. **Heterogeneity**
-2. **Concentration**
-3. **Predictability**
+> Is decoder contribution spatially uniform?
 
-Together these properties characterize how decoder computation contributes to segmentation performance.
+Evidence:
 
----
+- Positive / Negative Flip
+- Boundary analysis
+- Organ-level analysis
+- Difficulty analysis
 
-# Scientific Narrative
+Claim:
 
-## Stage 1 — Heterogeneity
-
-### Research Question
-
-**Is decoder computation uniformly useful?**
-
-Method:
-
-Compare a parameter-matched Full Decoder and Efficient Decoder under the same training pipeline.
-
-Measure
-
-- Positive Flip
-- Negative Flip
-- Net Flip
-
-Analyze
-
-- Global
-- Boundary distance
-- Organ-wise
-
-### Main Finding
-
-Decoder computation is highly heterogeneous.
-
-Some regions improve.
-
-Some regions deteriorate.
-
-Many regions are unaffected.
-
-The decoder is therefore **not uniformly beneficial**.
+> Decoder contribution is spatially heterogeneous.
 
 ---
 
-## Stage 2 — Concentration
+## RQ2 — Concentration
 
-### Research Question
+Question:
 
-**Where is decoder computation actually useful?**
+> Is decoder benefit broadly distributed or spatially concentrated?
 
-Method
+Evidence:
 
-Construct oracle benefit maps.
+- Oracle benefit maps
+- Oracle coverage curves
+- Positive-benefit K80
+- Net-benefit K80
 
-Rank regions by decoder benefit.
+Claim:
 
-Evaluate
-
-- Oracle coverage curve
-- Top-k benefit
-- K80
-
-### Main Finding
-
-Most decoder benefit is concentrated in a small spatial fraction.
-
-The majority of image regions contribute little additional benefit.
-
-This reveals strong spatial concentration of decoder utility.
+> Decoder benefit is highly concentrated, providing direct evidence of structured decoder redundancy.
 
 ---
 
-## Stage 3 — Predictability
+## RQ3 — Predictability
 
-### Research Question
+Question:
 
-**Can useful decoder computation be predicted before executing the full decoder?**
+> Can inexpensive inference-time signals identify regions where additional decoder computation is beneficial?
 
-Method
+Signals:
 
-Compare
+- entropy
+- confidence
+- boundary cues
+- lightweight predictor
 
-- Entropy
-- Confidence
-- Lightweight predictor
-- Random
-- Oracle
+Metrics:
 
-Evaluate
+- AUROC
+- Benefit-retention curves
+- Predictor K80
+- Oracle gap
 
-- Any Flip AUROC
-- Positive Flip AUROC
-- Positive-vs-Negative AUROC
-- Region-selection curves
+Claim:
 
-### Main Finding
-
-Useful decoder regions are partially predictable.
-
-Prediction signals identify where decoder refinement is likely to matter, although improvement direction remains substantially harder than instability detection.
+> Useful decoder regions are partially predictable before executing the full decoder.
 
 ---
 
-# Overall Scientific Conclusion
+# 3. Unified Scientific Story
 
-Decoder computation is characterized by
+The paper demonstrates that decoder computation is:
+
+1. heterogeneous;
+2. concentrated;
+3. partially predictable.
+
+Together these findings indicate that decoder computation exhibits **structured redundancy** rather than uniform utility.
+
+---
+
+# 4. Contributions
+
+1. A characterization framework for decoder computation.
+2. Heterogeneity analysis beyond aggregate Dice.
+3. Concentration analysis using oracle coverage and K80.
+4. Predictability analysis using uncertainty and lightweight predictors.
+5. Cross-architecture and cross-dataset validation.
+
+---
+
+# 5. Related Work
+
+## 2.1 Decoder Design in 3D Medical Image Segmentation
+
+**Purpose**
+
+Explain why decoder computation is worth studying.
+
+Rather than reviewing individual architectures, present the historical trend.
+
+Suggested narrative:
+
+> U-Net established the encoder–decoder paradigm with dense multi-stage decoding and skip connections. Subsequent architectures—including UNETR, Swin UNETR, 3D UX-Net, and MedNeXt—substantially strengthened encoder representations while largely retaining dense multi-resolution decoder designs. More recent works such as Swin DER further enhance decoder capability through improved upsampling, feature fusion, and feature refinement.
+
+Key message:
+
+> Existing architectures consistently evolve toward increasingly expressive decoder computation.
+
+Gap:
+
+> Despite continuous advances in decoder design, prior work evaluates decoders almost exclusively through final segmentation accuracy, while little work investigates where additional decoder computation contributes or whether its contribution is spatially uniform.
+
+**Do not introduce each architecture individually.** Mention them collectively as examples supporting the trend.
+
+---
+
+## 2.2 Efficient Decoder Design
+
+This section should focus on decoder efficiency rather than general efficient segmentation.
+
+### Primary paper
+
+**EffiDec3D**
+
+Discuss in detail because it is the direct foundation of this work.
+
+Main ideas:
+
+- decoder channel reduction
+- removal of high-resolution decoder stages
+- architecture-level efficiency–accuracy tradeoff
+
+### Secondary paper
+
+**EfficientMedNeXt**
+
+Brief discussion.
+
+It adopts similar decoder simplifications before introducing its own convolution block.
+
+### Other efficient segmentation methods
+
+Mention only briefly:
+
+- UNETR++
+- Slim UNETR
+- SegFormer3D
+
+One sentence is sufficient:
+
+> Other lightweight segmentation architectures improve efficiency through architectural redesign, lightweight attention, or hybrid encoders rather than explicitly reducing or characterizing decoder computation.
+
+Gap:
+
+> Existing efficient decoder studies infer redundancy from end-point accuracy–efficiency trade-offs rather than directly characterizing where decoder computation contributes.
+
+---
+
+## 2.3 Characterization Studies
+
+This is the most important Related Work section.
+
+Representative references:
+
+- Jungo & Reyes
+- Mehrtash et al.
+- Evaluation of uncertainty estimation methods in medical image segmentation: Exploring the usage of uncertainty in clinical deployment (CMIG 2025)
+- Uncertainty-aware segmentation quality prediction via Deep Learning Bayesian Modeling (CMIG 2025)
+- One multi-dataset uncertainty benchmark
+- One uncertainty review
+
+Narrative:
+
+Existing characterization studies mainly investigate
+
+- uncertainty,
+- calibration,
+- prediction reliability,
+- failure detection,
+- segmentation quality prediction.
+
+Our work instead characterizes
+
+- decoder contribution heterogeneity,
+- decoder benefit concentration,
+- decoder benefit predictability.
+
+Novelty statement:
+
+> Prior work has reduced decoder computation or studied prediction uncertainty, but has not systematically characterized the marginal contribution of decoder computation through voxel-level heterogeneity, benefit concentration, and inference-time predictability.
+
+---
+
+# 6. Reference Strategy
+
+## Detailed discussion
+
+- EffiDec3D
+- EfficientMedNeXt
+- Jungo & Reyes
+- CMIG 2025 Clinical Deployment
+- CMIG 2025 Quality Prediction
+
+## Brief mention only
+
+Decoder evolution:
+
+- U-Net
+- UNETR
+- Swin UNETR
+- Swin-Unet
+- 3D UX-Net
+- MedNeXt
+- Swin DER
+
+Other efficient segmentation:
+
+- UNETR++
+- Slim UNETR
+- SegFormer3D
+
+---
+
+# Final Take-home Message
+
+Modern decoder computation is neither uniformly useful nor uniformly redundant.
+
+Instead, decoder computation exhibits a structured pattern:
 
 - heterogeneous contribution,
 - concentrated benefit,
-- partial predictability.
+- partially predictable usefulness.
 
-This characterization explains why decoder computation is an attractive target for adaptive computation, without proposing a new adaptive method.
+Understanding this structure provides the scientific basis for future adaptive decoder computation.
 
----
+# Paper Architecture
 
-# Contributions
+如果我们准备认真冲 CMIG，我建议整个工程直接按下面的目录搭：
 
-### Contribution 1
-
-We present the first systematic characterization of decoder computation in 3D medical image segmentation using matched Full/Efficient decoder pairs.
-
-### Contribution 2
-
-We demonstrate that decoder benefit is spatially heterogeneous rather than uniformly distributed.
-
-### Contribution 3
-
-We show that decoder benefit is highly concentrated, with most useful refinement arising from a small fraction of spatial locations.
-
-### Contribution 4
-
-We demonstrate that useful decoder computation is partially predictable using inexpensive inference-time uncertainty signals.
-
----
-
-# What This Paper Is NOT
-
-This paper does **not**
-
-- propose a new segmentation network;
-- propose adaptive decoding;
-- claim new state-of-the-art accuracy.
-
-Instead, it provides a scientific understanding of decoder behavior.
-
----
-
-# Why Controlled Reproduction Is Sufficient
-
-The paper studies the **relative effect** between Full and Efficient decoders.
-
-Therefore the essential requirement is
-
-- identical dataset,
-- identical optimization,
-- identical evaluation,
-
-rather than exact reproduction of the published Dice.
-
-The study depends on internally controlled comparisons rather than absolute benchmark performance.
-
----
-
-# Relation to Future Work
-
-This paper establishes a characterization framework.
-
-Future adaptive methods (e.g., AdaDec3D) may exploit these observations to reduce executed computation while preserving segmentation quality.
-
-The present paper intentionally stops at the observation level.
+elsarticle/
+│
+├── main.tex
+├── sections/
+│     introduction.tex
+│     related_work.tex
+│     methods.tex
+│     experiments.tex
+│     discussion.tex
+│     conclusion.tex
+│
+├── figures/
+│
+├── tables/
+│
+├── refs.bib
+│
+└── elsarticle.cls

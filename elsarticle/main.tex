@@ -1,0 +1,96 @@
+%% 
+%% CMIG formatted template for "Rethinking Decoder Redundancy in Efficient 3D Medical Image Segmentation: A Characterization Study"
+%%
+
+\documentclass[preprint,12pt]{elsarticle}
+
+%% The amssymb package provides various useful mathematical symbols
+\usepackage{amssymb}
+%% The amsmath package provides various useful equation environments.
+\usepackage{amsmath}
+%% For including figures
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{hyperref}
+
+%% Journal name
+\journal{Computerized Medical Imaging and Graphics}
+
+\begin{document}
+
+\begin{frontmatter}
+
+%% Title, authors and addresses
+\title{Rethinking Decoder Redundancy in Efficient 3D Medical Image Segmentation: A Characterization Study}
+
+%% Authors
+\author[inst1]{Author One\corref{cor1}}
+\ead{author1@institute.edu}
+\author[inst2]{Author Two}
+\author[inst1]{Author Three}
+
+%% Corresponding author
+\cortext[cor1]{Corresponding author}
+
+%% Affiliations
+\affiliation[inst1]{organization={Department Name, University Name},
+            addressline={Address Line}, 
+            city={City Name},
+            postcode={00000}, 
+            state={State},
+            country={Country}}
+
+\affiliation[inst2]{organization={Another Department, Another University},
+            addressline={Address Line}, 
+            city={City Name},
+            postcode={00000}, 
+            state={State},
+            country={Country}}
+
+%% Abstract
+\begin{abstract}
+Recent advancements in U-Net based 3D medical image segmentation have introduced increasingly computation-heavy decoders, particularly with the integration of attention and Transformer-based modules. In response, efficient models such as EffiDec3D simplify or remove these decoders based on empirical end-point tradeoffs and the assumption that static decoder capacity is globally redundant. However, these efficiency-focused approaches fail to answer a fundamental scientific question: where, how much, and under what conditions is this heavy decoder computation actually useful? To fill this gap, we present a systematic characterization study of decoder computation. By evaluating voxel-level disagreements between matched full and efficient decoders across representative architectures and datasets, we characterize decoder utility in terms of heterogeneity, concentration, and predictability. Our results demonstrate that decoder computation is spatially heterogeneous; the full decoder provides a statistically net-neutral benefit, with improvements counterbalanced by degradations. However, this net-neutral effect is highly concentrated in a thin boundary band, revealing structured redundancy rather than uniform irrelevance. Finally, we show that while cheap inference-time uncertainty signals reliably predict the location of prediction instability, they fail to predict the direction of improvement, rendering simple selective-allocation strategies ineffective. Ultimately, our findings reveal that modern decoder computation exhibits structured redundancy, providing the scientific constraints necessary for designing future adaptive and dynamic decoding architectures.
+\end{abstract}
+
+%% Highlights
+\begin{highlights}
+\item Decoder contribution is spatially heterogeneous and highly concentrated.
+\item Efficient decoders achieve net-neutral voxel correctness at matched parameters.
+\item Uncertainty signals predict where predictions flip, but not improvement direction.
+\item Decoder redundancy is structured, enabling future adaptive inference strategies.
+\end{highlights}
+
+%% Keywords
+\begin{keyword}
+%% keywords here, in the form: keyword \sep keyword
+3D Medical Image Segmentation \sep Efficient Deep Learning \sep Uncertainty \sep Decoder Redundancy \sep Model Characterization
+\end{keyword}
+
+\end{frontmatter}
+
+%% main text
+\input{sections/introduction}
+\input{sections/related_work}
+\input{sections/methods}
+\input{sections/experiments}
+\input{sections/discussion}
+\input{sections/conclusion}
+
+%% CRediT authorship contribution statement
+\section*{CRediT authorship contribution statement}
+\textbf{Author One}: Conceptualization, Methodology, Writing – original draft. \textbf{Author Two}: Data curation, Software. \textbf{Author Three}: Supervision, Writing – review \& editing.
+
+%% Declaration of competing interest
+\section*{Declaration of competing interest}
+The authors declare that they have no known competing financial interests or personal relationships that could have appeared to influence the work reported in this paper.
+
+%% Data availability
+\section*{Data availability}
+The data used in this study (BTCV/Synapse, FeTA 2021) are publicly available. 
+
+%% Bibliography
+\bibliographystyle{elsarticle-num} 
+\bibliography{refs}
+
+\end{document}

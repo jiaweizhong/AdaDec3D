@@ -1,0 +1,55 @@
+\section{Experiments and Results}
+\label{sec:experiments}
+
+\subsection{Experimental Setup}
+We evaluate matched decoder pairs across representative datasets to answer three core questions: (1) Is the full decoder's contribution spatially uniform or heterogeneous? (2) Is the benefit broadly distributed or concentrated in specific regions? (3) Can we predict where the full decoder will improve predictions using cheap inference-time signals?
+
+To ensure cross-architecture generality, our characterization study evaluates a large-kernel CNN (3D UX-Net) and a transformer-based architecture (SwinUNETR). Experiments are conducted on the BTCV multi-organ CT dataset (13 organs) and the FeTA 2021 fetal brain MRI dataset (7 structures). 
+
+\textbf{Hardware and Environment}: All models were trained on an AutoDL RTX 5090 (32 GB VRAM, Blackwell architecture) utilizing CUDA 12.8 and PyTorch 2.6. We employed BF16 mixed precision to accelerate training. 
+
+\textbf{Training Protocol}: Both the full decoder models ($E_0$) and the efficient baseline models ($E_1$) were trained for a total of 45,000 optimizer steps with identical data augmentations, learning rates (0.001), and a crop size of $96\times96\times96$. Model evaluation was performed every 250 steps.
+
+\textbf{Reproduction and Controlled Settings}: To serve as a rigorous controlled baseline, our efficient decoder implementation strictly utilizes canonical concatenation for skip aggregation, matching the exact published parameter count of EffiDec3D (e.g., 3.15M parameters for 3D UX-Net $E_1$, compared to 53.0M for the full $E_0$). On the BTCV dataset, our $E_1$ baseline achieves a mean Dice of 77.73\%. While this is slightly below the original paper's reported 79.25\% (primarily due to variations in the preprocessing pipeline and dataset splits), the tight control over the encoder weights, data split, and training regimen between our $E_0$ and $E_1$ pairs perfectly isolates the true spatial effect of the decoder computation for our observation study.
+
+\subsection{Heterogeneity: The Net-Neutral Boundary Band}
+We first evaluate the overall voxel-level net benefit of the full decoder. Surprisingly, with the parameter-matched efficient decoder configuration, we find that the full decoder's net benefit is statistically indistinguishable from zero. For 3D UX-Net on BTCV, the subject-mean net flip rate is $+0.046\%$ with a 95\% confidence interval spanning $[-0.0002\%, +0.0011\%]$. This indicates a ``net-neutral'' voxel correctness: the full decoder corrects some predictions but degrades an almost equal number of previously correct predictions.
+
+However, this net-neutral behavior is highly heterogeneous. The boundary error rate is $3.93\times$ higher than the interior error rate. When mapping the net flip rate as a function of distance to the organ boundary (Figure \ref{fig:heterogeneity}), the residual flip activity is sharply concentrated in a thin boundary band (0-1 voxels from the edge). 
+
+Furthermore, decoder activity is anatomically concentrated. Small and morphologically complex structures experience significantly higher flip rates than large organs. For example, the Left and Right Adrenal glands exhibit positive flip rates of 16.2\% and 16.9\% respectively, but equally severe negative flip rates, yielding highly turbulent, net-negative impacts (e.g., -7.1\% net benefit for the L.Adrenal). Conversely, large organs like the liver see minimal flip activity ($<3\%$). This demonstrates that while the full decoder provides negligible net voxel benefit globally, it remains influential specifically at critical organ boundaries and within difficult structures.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.32\textwidth]{figures/obs-uxnet-concat/H1_global_flips.png}
+\hfill
+\includegraphics[width=0.32\textwidth]{figures/obs-uxnet-concat/H2_boundary.png}
+\hfill
+\includegraphics[width=0.32\textwidth]{figures/obs-uxnet-concat/O_anatomy.png}
+\caption{Heterogeneity. Left: Global positive and negative flip rates demonstrating net-neutral behavior. Middle: Net flip rate distributed by distance to the boundary. Right: Organ-level flip rates showing high volatility in small structures (e.g., adrenal glands).}
+\label{fig:heterogeneity}
+\end{figure}
+
+\subsection{Concentration: Structured Redundancy}
+We investigate the spatial concentration of decoder benefit using an oracle block-selector. Figure \ref{fig:concentration} presents the oracle coverage curve. The curve is extremely steep: an oracle selecting only the top 5\% of blocks recovers 80\% of the full decoder's positive net mass ($K_{80} = 5\%$). By a 10\% budget, the oracle recovers 99.98\%, and near 100\% at 20\%. This stark concentration provides direct evidence of structured decoder redundancy, proving that the vast majority of the image volume derives no meaningful benefit from the heavy decoder layers.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.6\textwidth]{figures/obs-uxnet-concat/O_pareto.png}
+\caption{Concentration. Oracle coverage curve showing that 80\% of the full decoder's net benefit is concentrated in just 5\% of the image volume.}
+\label{fig:concentration}
+\end{figure}
+
+\subsection{Predictability: Instability vs. Improvement}
+Given the concentrated nature of decoder benefit, we evaluated whether lightweight inference-time signals (specifically, predictive entropy and confidence from the efficient decoder) could identify these regions prior to executing the full decoder.
+
+Our results reveal a stark dichotomy between predicting instability and predicting improvement. The entropy signal is highly predictive of flip \textit{locations} (instability), achieving a subject-mean AUROC of $0.903$ (95\% CI: $[0.876, 0.926]$). However, when tasked with predicting the \textit{direction} of the flip (positive vs. negative), the AUROC collapses to $0.592$ (95\% CI: $[0.560, 0.626]$), performing only marginally better than random chance. 
+
+Consequently, the deployable selection gap is zero. When we use entropy to allocate a 20\% computation budget to the most ``uncertain'' blocks, the net benefit recovered is $0.288$, which is statistically indistinguishable from a random allocation policy ($0.059$). The 95\% CI for the paired difference crosses zero ($[-0.059, 0.451]$). Confidence behaves identically. This proves that simple uncertainty thresholding cannot reliably recover the theoretical efficiency opportunity.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.6\textwidth]{figures/obs-uxnet-concat/O3_unc_error.png}
+\caption{Predictability. Entropy highly discriminates flip locations (instability, AUROC 0.903) but fails to distinguish positive corrections from negative degradations (AUROC 0.592).}
+\label{fig:predictability}
+\end{figure}

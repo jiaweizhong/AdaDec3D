@@ -1,0 +1,47 @@
+\section{Methods: A Characterization Framework}
+\label{sec:methods}
+
+To understand the spatial and functional utility of decoder computation, we design a controlled observation study. We treat a matched full decoder and an efficient decoder as experimental instruments, isolating the effect of decoder capacity on voxel-level predictions.
+
+\subsection{Experimental Setup}
+Let $v$ denote a voxel within a 3D medical image. We evaluate two decoder configurations sharing identical encoder features, training protocols, and data splits:
+\begin{itemize}
+    \item \textbf{Efficient Decoder ($E_1$)}: Parameter-matched efficient decoder based on the EffiDec3D configuration, utilizing concatenation for skip aggregation to strictly align with published parameter counts.
+    \item \textbf{Full Decoder ($E_0$)}: The standard dense, high-resolution decoder of the respective backbone architecture.
+\end{itemize}
+
+For a given voxel $v$, let $y(v)$ be the ground truth label, $\hat{y}_e(v)$ be the prediction from the efficient decoder, and $\hat{y}_f(v)$ be the prediction from the full decoder.
+
+\subsection{Voxel-level Flip Analysis}
+Rather than relying on aggregate metrics like Dice, which sum all errors indiscriminately, we track how the full decoder alters the prediction of the efficient baseline. We define three categories of prediction ``flips'' when transitioning from the efficient to the full decoder:
+\begin{itemize}
+    \item \textbf{Positive Flip ($P(v)$)}: The full decoder improves a previously incorrect prediction. $P(v) = 1[\hat{y}_e(v) \neq y(v) \wedge \hat{y}_f(v) = y(v)]$.
+    \item \textbf{Negative Flip ($N(v)$)}: The full decoder degrades a previously correct prediction. $N(v) = 1[\hat{y}_e(v) = y(v) \wedge \hat{y}_f(v) \neq y(v)]$.
+    \item \textbf{Net Benefit ($U(v)$)}: The voxel-wise difference between improvements and degradations. $U(v) = P(v) - N(v)$.
+\end{itemize}
+The global rates are defined as $R_{pos} = \text{mean}_v P(v)$, $R_{neg} = \text{mean}_v N(v)$, and $R_{net} = R_{pos} - R_{neg}$.
+
+\subsection{Core Metrics}
+We operationalize our investigation into structured redundancy through the following specific metrics:
+
+\textbf{1. Global Net Benefit}: This metric evaluates the macro-level necessity of the full decoder. The global net flip rate $R_{net}$ is computed as the expected voxel-wise net benefit over the volume $V$:
+\begin{equation}
+R_{net} = \frac{1}{|V|} \sum_{v \in V} U(v)
+\end{equation}
+Its physical meaning answers whether the full decoder provides a unidirectional advantage ($R_{net} > 0$) or if its positive corrections and negative degradations cancel each other out ($R_{net} \approx 0$).
+
+\textbf{2. Boundary and Anatomy Resolution}: To evaluate spatial heterogeneity, we analyze the net benefit $U(v)$ as a function of the Euclidean distance to the nearest organ boundary, as well as its distribution across different anatomical structures. This reveals \textit{where} the decoder is actually intervening. 
+
+\textbf{3. Oracle Concentration}: This metric measures the spatial sparsity of the decoder's utility. We divide the image into 3D blocks $b_r$ and compute the net benefit $B(r) = \sum_{v \in b_r} U(v)$ for each block. We rank the blocks by $B(r)$ and calculate the fraction of the total positive net mass recovered by the top $k\%$ of blocks:
+\begin{equation}
+Coverage(k) = \frac{\sum_{r=1}^{k\% \times |B|} \max(B(r), 0)}{\sum_{r=1}^{|B|} \max(B(r), 0)}
+\end{equation}
+We summarize this curve using the $K_{80}$ metric, which is the execution budget required to recover 80\% of the full decoder's positive benefit.
+
+\textbf{4. Flip Predictability}: This evaluates whether we can forecast the decoder's behavior before executing it. We use lightweight inference-time signals from the efficient decoder, such as predictive entropy:
+\begin{equation}
+H(v) = -\sum_{c=1}^{C} p_c(v) \log p_c(v)
+\end{equation}
+where $p_c(v)$ is the softmax probability for class $c$. We measure predictability using the Area Under the Receiver Operating Characteristic (AUROC) to predict the \textit{location} of flips (instability) and the \textit{direction} of flips (positive vs. negative).
+
+\textbf{5. Selection Gap}: This measures the practical, deployable opportunity for selective computation. We compare the net benefit recovered by an uncertainty-based block selector (e.g., selecting blocks with the highest mean entropy) against a random selection policy at a fixed computational budget (e.g., 20\%). A significant positive gap indicates a viable routing strategy.

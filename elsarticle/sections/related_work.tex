@@ -1,0 +1,17 @@
+\section{Related Work}
+\label{sec:related}
+
+\subsection{Decoder Design in 3D Medical Image Segmentation}
+U-Net established the dominant encoder-decoder paradigm for medical image segmentation, characterizing dense, multi-stage decoding and skip connections. Subsequent architectural advancements have consistently evolved toward increasingly expressive decoder computation. Modern networks, including UNETR, Swin UNETR, 3D UX-Net, and MedNeXt, have substantially strengthened encoder representations while largely retaining dense multi-resolution decoder designs. More recent architectures, such as Swin DER, further enhance decoder capability through improved upsampling, feature fusion, and feature refinement mechanisms. 
+
+Despite these continuous advances in decoder design, prior work evaluates decoders almost exclusively through final segmentation accuracy and aggregate computational cost. Little work investigates \textit{where} additional decoder computation contributes spatially, or whether its contribution is uniform across the target anatomy.
+
+\subsection{Efficient Decoder Design}
+In response to the computational bottleneck of 3D segmentation, recent works have begun to explicitly target decoder efficiency. The EffiDec3D framework \cite{effidec3d} introduced a systematic approach to decoder simplification through channel reduction and the removal of high-resolution decoder stages, establishing a strong architecture-level efficiency-accuracy tradeoff. Similarly, EfficientMedNeXt \cite{efficientmednext} adopted comparable decoder simplifications before introducing specialized convolution blocks. 
+
+Other lightweight segmentation architectures improve efficiency through general architectural redesign, lightweight attention mechanisms, or hybrid encoders (e.g., UNETR++, Slim UNETR, SegFormer3D) rather than explicitly reducing or characterizing decoder computation. Crucially, existing efficient decoder studies infer redundancy implicitly from end-point accuracy-efficiency trade-offs. They do not directly characterize where decoder computation contributes at the voxel level.
+
+\subsection{Characterization Studies}
+Existing characterization studies in medical image segmentation primarily investigate prediction uncertainty, calibration, prediction reliability, failure detection, and segmentation quality prediction \cite{jungoreyes, cmig2025clinical, cmig2025quality, uncertaintyreview}. These studies often evaluate how well uncertainty metrics correlate with overall error rates or how they can be used to flag uncertain cases for clinician review.
+
+Our work fundamentally diverges from this literature. Rather than characterizing general prediction uncertainty, we characterize the marginal contribution of decoder computation itself. Prior work has reduced decoder computation or studied prediction uncertainty, but has not systematically characterized the utility of decoder capacity through voxel-level heterogeneity, benefit concentration, and inference-time predictability.

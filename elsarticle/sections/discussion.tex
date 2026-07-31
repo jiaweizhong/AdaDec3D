@@ -1,0 +1,8 @@
+\section{Discussion}
+\label{sec:discussion}
+
+The results of our characterization study compel a re-evaluation of how decoder computation is allocated and assessed in 3D medical image segmentation. The central finding—that the marginal benefit of a full decoder is net-neutral at the voxel level and tightly clustered around organ boundaries—challenges the necessity of dense, uniform decoding for the entirety of an input volume. 
+
+Crucially, our study delineates the boundary between observation and action. The high AUROC for flip location confirms that the regions where predictions change are deterministic and easily identified by cheap uncertainty signals. We observe that high entropy strongly correlates with boundary regions, exactly where the decoder acts. However, the inability to predict the \textit{direction} of these flips (improvement versus degradation) represents a significant negative result for simple region-routing strategies. Because the baseline efficient decoder is already highly capable, deploying the full decoder on uncertain regions is just as likely to disturb a correct prediction as it is to fix an incorrect one. 
+
+This implies that we cannot realize the theoretical computational savings of structured redundancy merely by selectively gating the execution of existing static decoders using uncertainty thresholds. The predictability of instability (but not improvement) necessitates a shift from attempting to ``turn off'' decoder layers to developing genuinely adaptive architectures that dynamically allocate capacity based on feature complexity rather than simple confidence scores.

@@ -1,0 +1,51 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\emailauthor{author1@institute.edu}{Author One\corref {cor1}}
+\Newlabel{cor1}{1}
+\Newlabel{inst1}{a}
+\Newlabel{inst2}{b}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{2}{section.1}\protected@file@percent }
+\newlabel{sec:intro}{{1}{2}{Introduction}{section.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Related Work}{3}{section.2}\protected@file@percent }
+\newlabel{sec:related}{{2}{3}{Related Work}{section.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Decoder Design in 3D Medical Image Segmentation}{3}{subsection.2.1}\protected@file@percent }
+\citation{effidec3d}
+\citation{efficientmednext}
+\citation{jungoreyes,cmig2025clinical,cmig2025quality,uncertaintyreview}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Efficient Decoder Design}{4}{subsection.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Characterization Studies}{4}{subsection.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}Methods: A Characterization Framework}{5}{section.3}\protected@file@percent }
+\newlabel{sec:methods}{{3}{5}{Methods: A Characterization Framework}{section.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Experimental Setup}{5}{subsection.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Voxel-level Flip Analysis}{5}{subsection.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Core Metrics}{6}{subsection.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Experiments and Results}{7}{section.4}\protected@file@percent }
+\newlabel{sec:experiments}{{4}{7}{Experiments and Results}{section.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Experimental Setup}{7}{subsection.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Heterogeneity: The Net-Neutral Boundary Band}{8}{subsection.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Concentration: Structured Redundancy}{8}{subsection.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Predictability: Instability vs. Improvement}{8}{subsection.4.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Discussion}{9}{section.5}\protected@file@percent }
+\newlabel{sec:discussion}{{5}{9}{Discussion}{section.5}{}}
+\bibstyle{elsarticle-num}
+\bibdata{refs}
+\bibcite{effidec3d}{{1}{}{{}}{{}}}
+\@writefile{toc}{\contentsline {section}{\numberline {6}Conclusion}{10}{section.6}\protected@file@percent }
+\newlabel{sec:conclusion}{{6}{10}{Conclusion}{section.6}{}}
+\bibcite{efficientmednext}{{2}{}{{}}{{}}}
+\bibcite{jungoreyes}{{3}{}{{}}{{}}}
+\bibcite{cmig2025clinical}{{4}{}{{}}{{}}}
+\bibcite{cmig2025quality}{{5}{}{{}}{{}}}
+\bibcite{uncertaintyreview}{{6}{}{{}}{{}}}
+\providecommand\NAT@force@numbers{}\NAT@force@numbers
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Motivation: Decoder computation yields spatially localized flips. While the full decoder corrects some efficient decoder errors (positive flips), it simultaneously degrades other previously correct predictions (negative flips) at high-entropy boundaries. This illustrates that decoder computation is not uniformly beneficial.}}{12}{figure.1}\protected@file@percent }
+\newlabel{fig:motivation}{{1}{12}{Motivation: Decoder computation yields spatially localized flips. While the full decoder corrects some efficient decoder errors (positive flips), it simultaneously degrades other previously correct predictions (negative flips) at high-entropy boundaries. This illustrates that decoder computation is not uniformly beneficial}{figure.1}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Heterogeneity. Left: Global positive and negative flip rates demonstrating net-neutral behavior. Middle: Net flip rate distributed by distance to the boundary. Right: Organ-level flip rates showing high volatility in small structures (e.g., adrenal glands).}}{13}{figure.2}\protected@file@percent }
+\newlabel{fig:heterogeneity}{{2}{13}{Heterogeneity. Left: Global positive and negative flip rates demonstrating net-neutral behavior. Middle: Net flip rate distributed by distance to the boundary. Right: Organ-level flip rates showing high volatility in small structures (e.g., adrenal glands)}{figure.2}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Concentration. Oracle coverage curve showing that 80\% of the full decoder's net benefit is concentrated in just 5\% of the image volume.}}{13}{figure.3}\protected@file@percent }
+\newlabel{fig:concentration}{{3}{13}{Concentration. Oracle coverage curve showing that 80\% of the full decoder's net benefit is concentrated in just 5\% of the image volume}{figure.3}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Predictability. Entropy highly discriminates flip locations (instability, AUROC 0.903) but fails to distinguish positive corrections from negative degradations (AUROC 0.592).}}{14}{figure.4}\protected@file@percent }
+\newlabel{fig:predictability}{{4}{14}{Predictability. Entropy highly discriminates flip locations (instability, AUROC 0.903) but fails to distinguish positive corrections from negative degradations (AUROC 0.592)}{figure.4}{}}
+\gdef \@abspage@last{15}

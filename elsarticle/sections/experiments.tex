@@ -4,7 +4,7 @@
 \subsection{Experimental Setup}
 We evaluate matched decoder pairs across representative datasets to answer three core questions: (1) Is the full decoder's contribution spatially uniform or heterogeneous? (2) Is the benefit broadly distributed or concentrated in specific regions? (3) Can we predict where the full decoder will improve predictions using cheap inference-time signals?
 
-To ensure cross-architecture generality, our characterization study evaluates a large-kernel CNN (3D UX-Net) and a transformer-based architecture (SwinUNETR). Experiments are conducted on the BTCV multi-organ CT dataset (13 organs) and the FeTA 2021 fetal brain MRI dataset (7 structures). 
+To ensure cross-architecture generality, our characterization study evaluates a large-kernel CNN (3D UX-Net \cite{lee20233d}) and a transformer-based architecture (SwinUNETR \cite{hatamizadeh2022swin}). Experiments are conducted on the BTCV multi-organ CT dataset (13 organs) \cite{landman2015btcv} and the FeTA 2021 fetal brain MRI dataset (7 structures) \cite{payette2021feta}. 
 
 \textbf{Hardware and Environment}: All models were trained on an AutoDL RTX 5090 (32 GB VRAM, Blackwell architecture) utilizing CUDA 12.8 and PyTorch 2.6. We employed BF16 mixed precision to accelerate training. 
 

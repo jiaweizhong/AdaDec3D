@@ -50,21 +50,20 @@
 
 %% Abstract
 \begin{abstract}
-Recent advancements in U-Net based 3D medical image segmentation have introduced increasingly computation-heavy decoders, particularly with the integration of attention and Transformer-based modules. In response, efficient models such as EffiDec3D simplify or remove these decoders based on empirical end-point tradeoffs and the assumption that static decoder capacity is globally redundant. However, these efficiency-focused approaches fail to answer a fundamental scientific question: where, how much, and under what conditions is this heavy decoder computation actually useful? To fill this gap, we present a systematic characterization study of decoder computation. By evaluating voxel-level disagreements between matched full and efficient decoders across representative architectures and datasets, we characterize decoder utility in terms of heterogeneity, concentration, and predictability. Our results demonstrate that decoder computation is spatially heterogeneous; the full decoder provides a statistically net-neutral benefit, with improvements counterbalanced by degradations. However, this net-neutral effect is highly concentrated in a thin boundary band, revealing structured redundancy rather than uniform irrelevance. Finally, we show that while cheap inference-time uncertainty signals reliably predict the location of prediction instability, they fail to predict the direction of improvement, rendering simple selective-allocation strategies ineffective. Ultimately, our findings reveal that modern decoder computation exhibits structured redundancy, providing the scientific constraints necessary for designing future adaptive and dynamic decoding architectures.
+U-Net based 3D medical image segmentation models increasingly incorporate heavy decoders, including multi-scale attention and Transformer modules. Efficient alternatives simplify or remove these decoder stages based on global end-point metrics, assuming that static decoder capacity is uniformly redundant. However, where and under what spatial conditions decoder computation actually contributes remains uncharacterized. In this work, we present a systematic characterization study of decoder computation in 3D medical image segmentation. By evaluating voxel-level prediction changes between matched full and efficient decoders across representative architectures and datasets, we analyze decoder utility in terms of spatial heterogeneity, benefit concentration, and inference-time predictability. Our findings show that decoder contribution is spatially heterogeneous: full decoders yield a statistically net-neutral global benefit, as positive corrections are offset by negative degradations. This net-neutral effect is tightly localized within a thin boundary band, demonstrating structured redundancy rather than global irrelevance. Furthermore, while lightweight inference-time uncertainty signals reliably identify locations of prediction instability, they fail to predict the direction of improvement, rendering simple selective-allocation strategies ineffective. This study shifts the evaluation of decoder efficiency from architectural modification toward fine-grained computation characterization, establishing empirical constraints for future adaptive inference designs.
 \end{abstract}
 
 %% Highlights
 \begin{highlights}
-\item Decoder contribution is spatially heterogeneous and highly concentrated.
-\item Efficient decoders achieve net-neutral voxel correctness at matched parameters.
-\item Uncertainty signals predict where predictions flip, but not improvement direction.
-\item Decoder redundancy is structured, enabling future adaptive inference strategies.
+\item Decoder contribution in 3D medical image segmentation is spatially heterogeneous.
+\item Matched full and efficient decoders exhibit net-neutral global voxel correctness.
+\item Over 80\% of positive decoder benefit is concentrated within 5\% of the volume.
+\item Inference-time uncertainty predicts flip location but not improvement direction.
 \end{highlights}
 
 %% Keywords
 \begin{keyword}
-%% keywords here, in the form: keyword \sep keyword
-3D Medical Image Segmentation \sep Efficient Deep Learning \sep Uncertainty \sep Decoder Redundancy \sep Model Characterization
+3D Medical Image Segmentation \sep Efficient Deep Learning \sep Uncertainty Quantification \sep Decoder Redundancy \sep Model Characterization
 \end{keyword}
 
 \end{frontmatter}

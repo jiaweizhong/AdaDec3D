@@ -3,6 +3,8 @@
 
 To understand the spatial and functional utility of decoder computation, we design a controlled observation study. We treat a matched full decoder and an efficient decoder as experimental instruments, isolating the effect of decoder capacity on voxel-level predictions.
 
+We define decoder computation as the sequence of upsampling, skip-feature fusion, and post-fusion refinement operations that transform the bottleneck representation into dense high-resolution predictions. In our experimental design, the encoder feature extractor is held fixed, architecture-specific skip features are held fixed, and interventions occur strictly on decoder width (channel count) and depth (stage removal). For stage removal interventions, the associated skip-fusion operations are treated as part of the removed decoder pathway.
+
 \subsection{Experimental Setup}
 Let $v$ denote a voxel within a 3D medical image. We evaluate two decoder configurations sharing identical encoder features, training protocols, and data splits:
 \begin{itemize}

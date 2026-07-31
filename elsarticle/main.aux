@@ -44,21 +44,28 @@
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Core Metrics}{6}{subsection.3.3}\protected@file@percent }
 \citation{lee20233d}
 \citation{hatamizadeh2022swin}
+\citation{roy2023mednext}
 \citation{landman2015btcv}
 \citation{payette2021feta}
+\citation{effidec3d}
 \@writefile{toc}{\contentsline {section}{\numberline {4}Experiments and Results}{7}{section.4}\protected@file@percent }
 \newlabel{sec:experiments}{{4}{7}{Experiments and Results}{section.4}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Experimental Setup}{7}{subsection.4.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Heterogeneity: The Net-Neutral Boundary Band}{8}{subsection.4.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Concentration: Structured Redundancy}{8}{subsection.4.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Predictability: Instability vs. Improvement}{9}{subsection.4.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5}Discussion}{9}{section.5}\protected@file@percent }
-\newlabel{sec:discussion}{{5}{9}{Discussion}{section.5}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Main quantitative comparison of Full ($E_0$) vs. Efficient ($E_1$) decoders on the BTCV 13-organ dataset across three backbones.}}{8}{table.1}\protected@file@percent }
+\newlabel{tab:main_results}{{1}{8}{Main quantitative comparison of Full ($E_0$) vs. Efficient ($E_1$) decoders on the BTCV 13-organ dataset across three backbones}{table.1}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces $2\times 2$ Factorial decomposition of decoder channel reduction ($C_{dec}$) and resolution scaling ($RF$) on 3D UX-Net (BTCV dataset).}}{8}{table.2}\protected@file@percent }
+\newlabel{tab:factorial}{{2}{8}{$2\times 2$ Factorial decomposition of decoder channel reduction ($C_{dec}$) and resolution scaling ($RF$) on 3D UX-Net (BTCV dataset)}{table.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Factorial Factor Analysis}{8}{subsection.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Heterogeneity: The Net-Neutral Boundary Band}{8}{subsection.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Concentration: Structured Redundancy}{9}{subsection.4.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}Predictability: Instability vs. Improvement}{9}{subsection.4.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Discussion}{10}{section.5}\protected@file@percent }
+\newlabel{sec:discussion}{{5}{10}{Discussion}{section.5}{}}
 \bibstyle{elsarticle-num}
 \bibdata{refs}
-\@writefile{toc}{\contentsline {section}{\numberline {6}Conclusion}{10}{section.6}\protected@file@percent }
-\newlabel{sec:conclusion}{{6}{10}{Conclusion}{section.6}{}}
 \bibcite{ronneberger2015u}{{1}{}{{}}{{}}}
+\@writefile{toc}{\contentsline {section}{\numberline {6}Conclusion}{11}{section.6}\protected@file@percent }
+\newlabel{sec:conclusion}{{6}{11}{Conclusion}{section.6}{}}
 \bibcite{cicek20163d}{{2}{}{{}}{{}}}
 \bibcite{hatamizadeh2022unetr}{{3}{}{{}}{{}}}
 \bibcite{hatamizadeh2022swin}{{4}{}{{}}{{}}}
@@ -81,12 +88,14 @@
 \bibcite{landman2015btcv}{{21}{}{{}}{{}}}
 \bibcite{payette2021feta}{{22}{}{{}}{{}}}
 \providecommand\NAT@force@numbers{}\NAT@force@numbers
-\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Motivation: Decoder computation yields spatially localized flips. While the full decoder corrects some efficient decoder errors (positive flips), it simultaneously degrades other previously correct predictions (negative flips) at high-entropy boundaries. This illustrates that decoder computation is not uniformly beneficial.}}{14}{figure.1}\protected@file@percent }
-\newlabel{fig:motivation}{{1}{14}{Motivation: Decoder computation yields spatially localized flips. While the full decoder corrects some efficient decoder errors (positive flips), it simultaneously degrades other previously correct predictions (negative flips) at high-entropy boundaries. This illustrates that decoder computation is not uniformly beneficial}{figure.1}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Heterogeneity. Left: Global positive and negative flip rates demonstrating net-neutral behavior. Middle: Net flip rate distributed by distance to the boundary. Right: Organ-level flip rates showing high volatility in small structures (e.g., adrenal glands).}}{15}{figure.2}\protected@file@percent }
-\newlabel{fig:heterogeneity}{{2}{15}{Heterogeneity. Left: Global positive and negative flip rates demonstrating net-neutral behavior. Middle: Net flip rate distributed by distance to the boundary. Right: Organ-level flip rates showing high volatility in small structures (e.g., adrenal glands)}{figure.2}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Concentration. Oracle coverage curve showing that 80\% of the full decoder's net benefit is concentrated in just 5\% of the image volume.}}{15}{figure.3}\protected@file@percent }
-\newlabel{fig:concentration}{{3}{15}{Concentration. Oracle coverage curve showing that 80\% of the full decoder's net benefit is concentrated in just 5\% of the image volume}{figure.3}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Predictability. Entropy highly discriminates flip locations (instability, AUROC 0.903) but fails to distinguish positive corrections from negative degradations (AUROC 0.592).}}{16}{figure.4}\protected@file@percent }
-\newlabel{fig:predictability}{{4}{16}{Predictability. Entropy highly discriminates flip locations (instability, AUROC 0.903) but fails to distinguish positive corrections from negative degradations (AUROC 0.592)}{figure.4}{}}
-\gdef \@abspage@last{17}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Motivation: Decoder computation yields spatially localized flips. While the full decoder corrects some efficient decoder errors (positive flips), it simultaneously degrades other previously correct predictions (negative flips) at high-entropy boundaries. This illustrates that decoder computation is not uniformly beneficial.}}{15}{figure.1}\protected@file@percent }
+\newlabel{fig:motivation}{{1}{15}{Motivation: Decoder computation yields spatially localized flips. While the full decoder corrects some efficient decoder errors (positive flips), it simultaneously degrades other previously correct predictions (negative flips) at high-entropy boundaries. This illustrates that decoder computation is not uniformly beneficial}{figure.1}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Cross-architecture voxel-level net benefit and spatial boundary concentration. Left Column: Global positive, negative, and net flip rates for (a) 3D UX-Net, (c) SwinUNETR, and (e) MedNeXt\_M, demonstrating universal net-neutral behavior ($R_{net} \approx 0$). Right Column: Net flip rate by distance to organ boundaries for (b) 3D UX-Net, (d) SwinUNETR, and (f) MedNeXt\_M, showing consistent concentration at 0--1 voxel boundary bands.}}{16}{figure.2}\protected@file@percent }
+\newlabel{fig:heterogeneity}{{2}{16}{Cross-architecture voxel-level net benefit and spatial boundary concentration. Left Column: Global positive, negative, and net flip rates for (a) 3D UX-Net, (c) SwinUNETR, and (e) MedNeXt\_M, demonstrating universal net-neutral behavior ($R_{net} \approx 0$). Right Column: Net flip rate by distance to organ boundaries for (b) 3D UX-Net, (d) SwinUNETR, and (f) MedNeXt\_M, showing consistent concentration at 0--1 voxel boundary bands}{figure.2}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Organ-level heterogeneity comparison across all three backbones: (a) 3D UX-Net, (b) SwinUNETR, and (c) MedNeXt\_M. Stacked vertically in full-width resolution, each panel clearly demonstrates that small and complex structures (e.g., adrenal glands and veins) exhibit high flip volatility, whereas large organs (e.g., liver) remain highly stable.}}{17}{figure.3}\protected@file@percent }
+\newlabel{fig:heterogeneity_anatomy}{{3}{17}{Organ-level heterogeneity comparison across all three backbones: (a) 3D UX-Net, (b) SwinUNETR, and (c) MedNeXt\_M. Stacked vertically in full-width resolution, each panel clearly demonstrates that small and complex structures (e.g., adrenal glands and veins) exhibit high flip volatility, whereas large organs (e.g., liver) remain highly stable}{figure.3}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Oracle concentration curves across all three backbones: (a) 3D UX-Net, (b) SwinUNETR, and (c) MedNeXt\_M. Across all networks, 80\% of positive net benefit ($K_{80}$) is concentrated in just 5\% of the volume.}}{18}{figure.4}\protected@file@percent }
+\newlabel{fig:concentration}{{4}{18}{Oracle concentration curves across all three backbones: (a) 3D UX-Net, (b) SwinUNETR, and (c) MedNeXt\_M. Across all networks, 80\% of positive net benefit ($K_{80}$) is concentrated in just 5\% of the volume}{figure.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Inference-time flip predictability across all three backbones: (a) 3D UX-Net, (b) SwinUNETR, and (c) MedNeXt\_M. Across all networks, entropy highly discriminates flip locations (instability, AUROC $>0.90$) but fails to distinguish positive corrections from negative degradations (AUROC $\approx 0.55$).}}{19}{figure.5}\protected@file@percent }
+\newlabel{fig:predictability}{{5}{19}{Inference-time flip predictability across all three backbones: (a) 3D UX-Net, (b) SwinUNETR, and (c) MedNeXt\_M. Across all networks, entropy highly discriminates flip locations (instability, AUROC $>0.90$) but fails to distinguish positive corrections from negative degradations (AUROC $\approx 0.55$)}{figure.5}{}}
+\gdef \@abspage@last{20}

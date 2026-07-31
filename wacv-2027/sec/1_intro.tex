@@ -15,10 +15,11 @@ UX-Net, MedNeXt-M-K3, and Swin UNETR while losing little Dice~\cite{rahman2025ef
 Such results demonstrate that decoder computation is \emph{removable}: one can delete it
 and watch aggregate accuracy hold. They do not, however, explain \emph{why} it is
 removable, \emph{where} in the volume the full decoder still changes predictions, or
-whether those regions can be identified at test time. This gap matters for the field's
-next step. If the removed capacity were uniformly useless, efficient decoders could stop
-at a fixed reduction; if instead its benefit were concentrated and predictable, one could
-allocate decoder computation \emph{adaptively}, spending it only where it helps. Aggregate
+whether those regions can be identified at test time. This gap matters for how decoders
+are simplified. If the removed capacity were uniformly useless, aggregate accuracy would
+tell the whole story; if instead its benefit were spatially concentrated and predictable,
+the aggregate numbers would be hiding structure that determines \emph{where} and \emph{why}
+the computation is safe to remove. Aggregate
 Dice and FLOPs cannot distinguish these cases, because a metric that averages over
 millions of voxels hides both the spatial structure of the change and its direction.
 
@@ -64,9 +65,8 @@ one to two voxels of organ boundaries---exactly where Dice is most sensitive. Fi
 the efficient model's own uncertainty predicts \emph{where} a prediction will change
 (AUROC $\approx\!0.9$) but only weakly \emph{whether} the change is an improvement
 (direction AUROC $0.56$--$0.59$): predicting instability is much easier than predicting
-improvement. This
-last result is the central obstacle to turning decoder redundancy into a deployable,
-benefit-aware efficient decoder, and it holds consistently across the three architectures.
+improvement. In other words, a test-time signal flags where the decoder acts but not
+where it helps, and this pattern holds consistently across the three architectures.
 
 \smallskip\noindent\textbf{Contributions.}
 \begin{itemize}\setlength\itemsep{2pt}
@@ -80,5 +80,5 @@ benefit-aware efficient decoder, and it holds consistently across the three arch
   architectures and three datasets.
   \item We show that the beneficial flips are predictable in \emph{location} but not in
   \emph{direction}, quantify the resulting ceiling on test-time region selection, and draw
-  concrete implications for designing and auditing region-adaptive decoders.
+  concrete implications for how efficient decoders are simplified and evaluated.
 \end{itemize}

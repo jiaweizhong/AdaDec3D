@@ -193,8 +193,8 @@ to the flip voxels themselves, however, entropy barely separates an improvement 
 regression: the positive-vs-negative (direction) AUROC is only $0.593$ ($[0.560,0.627]$)
 on 3D UX-Net and $0.561$ ($[0.512,0.609]$) on Swin UNETR---weakly above chance and far
 below the $0.90$ location AUROC.  Predicting \emph{instability} is easy; predicting
-\emph{improvement} is close to uninformative---the central obstacle to turning this
-redundancy into a benefit-aware efficient decoder.  (Entropy is moderately calibrated,
+\emph{improvement} is close to uninformative---uncertainty flags where the decoder acts,
+not where it helps.  (Entropy is moderately calibrated,
 ECE $0.088$, $[0.065,0.115]$~\cite{guo2017calibration}; the pooled-bin entropy--error
 correlation $r=0.97$ is a descriptive diagnostic only.)
 

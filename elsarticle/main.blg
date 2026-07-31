@@ -6,45 +6,47 @@ Database file #1: refs.bib
 Warning--empty pages in lee20233d
 Warning--empty pages in effidec3d
 Warning--empty pages in lakshminarayanan2017simple
-You've used 22 entries,
+Warning--empty pages in geifman2017selective
+Warning--empty pages in hendrycks2017baseline
+You've used 28 entries,
             2952 wiz_defined-function locations,
-            787 strings with 9945 characters,
-and the built_in function-call counts, 8058 in all, are:
-= -- 701
-> -- 313
-< -- 13
-+ -- 119
-- -- 97
-* -- 497
-:= -- 1060
-add.period$ -- 22
-call.type$ -- 22
-change.case$ -- 22
+            817 strings with 10853 characters,
+and the built_in function-call counts, 9958 in all, are:
+= -- 871
+> -- 373
+< -- 15
++ -- 143
+- -- 115
+* -- 623
+:= -- 1301
+add.period$ -- 28
+call.type$ -- 28
+change.case$ -- 28
 chr.to.int$ -- 0
-cite$ -- 25
-duplicate$ -- 302
-empty$ -- 932
-format.name$ -- 117
-if$ -- 2126
+cite$ -- 33
+duplicate$ -- 369
+empty$ -- 1167
+format.name$ -- 140
+if$ -- 2630
 int.to.chr$ -- 0
-int.to.str$ -- 22
-missing$ -- 22
-newline$ -- 74
-num.names$ -- 22
-pop$ -- 188
+int.to.str$ -- 28
+missing$ -- 28
+newline$ -- 92
+num.names$ -- 28
+pop$ -- 233
 preamble$ -- 1
 purify$ -- 0
 quote$ -- 0
-skip$ -- 575
+skip$ -- 713
 stack$ -- 0
-substring$ -- 394
-swap$ -- 100
-text.length$ -- 13
+substring$ -- 490
+swap$ -- 115
+text.length$ -- 15
 text.prefix$ -- 0
 top$ -- 0
 type$ -- 0
-warning$ -- 3
-while$ -- 56
-width$ -- 24
-write$ -- 196
-(There were 3 warnings)
+warning$ -- 5
+while$ -- 70
+width$ -- 30
+write$ -- 246
+(There were 5 warnings)

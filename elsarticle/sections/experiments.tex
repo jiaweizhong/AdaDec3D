@@ -98,10 +98,13 @@ While the full decoder modifies predictions across broad spatial regions, net ac
 \begin{tabular}{cc}
 \includegraphics[width=0.45\textwidth]{figures/obs-uxnet-concat/O_pareto.png} &
 \includegraphics[width=0.45\textwidth]{figures/obs-swin-concat/O_pareto.png} \\
-(a) 3D UX-Net Concentration Curve & (b) SwinUNETR Concentration Curve \\[4pt]
-\multicolumn{2}{c}{\includegraphics[width=0.45\textwidth]{figures/obs-mednext/O_pareto.png}} \\
-\multicolumn{2}{c}{(c) MedNeXt-M-K3 Concentration Curve} \\
+(a) 3D UX-Net Concentration Curve & (b) SwinUNETR Concentration Curve
 \end{tabular}
+
+\vspace{4pt}
+\includegraphics[width=0.45\textwidth]{figures/obs-mednext/O_pareto.png}
+
+{\small (c) MedNeXt-M-K3 Concentration Curve}
 \caption{Oracle concentration curves for (a) 3D UX-Net, (b) SwinUNETR, and (c) MedNeXt-M-K3, showing that 80\% of positive net benefit ($K_{80}$) is concentrated in 5\% of spatial blocks.}
 \label{fig:concentration}
 \end{figure}
@@ -123,10 +126,13 @@ Because uncertainty fails to discriminate flip direction, the deployable selecti
 \begin{tabular}{cc}
 \includegraphics[width=0.45\textwidth]{figures/obs-uxnet-concat/O3_unc_error.png} &
 \includegraphics[width=0.45\textwidth]{figures/obs-swin-concat/O3_unc_error.png} \\
-(a) 3D UX-Net Predictability & (b) SwinUNETR Predictability \\[4pt]
-\multicolumn{2}{c}{\includegraphics[width=0.45\textwidth]{figures/obs-mednext/O3_unc_error.png}} \\
-\multicolumn{2}{c}{(c) MedNeXt-M-K3 Predictability} \\
+(a) 3D UX-Net Predictability & (b) SwinUNETR Predictability
 \end{tabular}
+
+\vspace{4pt}
+\includegraphics[width=0.45\textwidth]{figures/obs-mednext/O3_unc_error.png}
+
+{\small (c) MedNeXt-M-K3 Predictability}
 \caption{Inference-time flip predictability across (a) 3D UX-Net, (b) SwinUNETR, and (c) MedNeXt-M-K3. Predictive entropy reliably identifies flip locations (AUROC $>0.90$) but cannot distinguish positive corrections from negative degradations (AUROC $\approx 0.55$).}
 \label{fig:predictability}
 \end{figure}

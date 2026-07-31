@@ -1,7 +1,14 @@
 \section{Methods: A Characterization Framework}
 \label{sec:methods}
 
-To understand the spatial and functional contribution of decoder computation, we establish a controlled observation framework. We evaluate matched pairs of full and efficient decoders as experimental probes under two complementary regimes: (i) \textit{end-to-end model comparison} across independently trained networks to assess real-world generalization, and (ii) \textit{decoder-isolated attribution analysis} using frozen shared encoders to isolate decoder capacity interventions.
+To understand the spatial and functional contribution of decoder computation, we establish a controlled observation framework (Figure \ref{fig:framework}). We evaluate matched pairs of full and efficient decoders as experimental probes under two complementary regimes: (i) \textit{end-to-end model comparison} across independently trained networks to assess real-world generalization, and (ii) \textit{decoder-isolated attribution analysis} using frozen shared encoders to isolate decoder capacity interventions.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.98\textwidth]{figures/figure1_framework}
+\caption{Overview of the decoder-computation characterization framework. Step 1 (Controlled Decoder Comparisons): Full and efficient decoder pairs are evaluated under two complementary regimes (independently trained end-to-end pairs for cross-architecture consistency, and frozen shared-encoder factorials for decoder-isolated causal attribution). Step 2 (Voxel Activity and Net Gain): Voxel-level corrections and degradations establish the fundamental dichotomy between Decoder Activity (where the decoder acts) and Net Gain (where it helps). Step 3 (Three Characterization Axes): Probes spatial heterogeneity, benefit concentration, and predictability. Step 4 (Design Implications): Translates empirical insights into evidence-backed directions for adaptive decoder design.}
+\label{fig:framework}
+\end{figure*}
 
 \subsection{Controlled Decoder Comparison}
 Let $v$ denote a voxel within a 3D medical image volume $V$. We compare two decoder configurations:
@@ -31,7 +38,7 @@ Practical recovery & Routing Gain & Does selective execution improve segmentatio
 \end{table*}
 
 \subsection{Decoder-Induced Corrections and Degradations}
-Comparing predictions between the efficient and full decoders at each voxel yields three possible outcomes: the full decoder corrects an error, introduces an error, or leaves prediction correctness unchanged:
+Comparing predictions between the efficient and full decoders at each voxel yields three possible outcomes: the full decoder corrects an error, introduces an error, or leaves prediction correctness unchanged (Figure \ref{fig:motivation}; see Supplementary Figures S1 and S2 for SwinUNETR and MedNeXt-M-K3 qualitative visualizations):
 \begin{itemize}
     \item \textbf{Positive Correction ($P(v)$)}: $P(v) = 1[\hat{y}_e(v) \neq y(v) \wedge \hat{y}_f(v) = y(v)]$.
     \item \textbf{Negative Degradation ($N(v)$)}: $N(v) = 1[\hat{y}_e(v) = y(v) \wedge \hat{y}_f(v) \neq y(v)]$.
@@ -42,6 +49,13 @@ We define two fundamental analytical quantities:
     \item \textbf{Decoder Net Gain ($G(v) = P(v) - N(v)$)}: Distinguishes beneficial corrections from harmful degradations.
 \end{itemize}
 \textit{Decoder activity measures where the decoder acts, whereas decoder gain measures whether those changes are beneficial or harmful.}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/obs-uxnet-concat/figure1_motivation}
+\caption{Qualitative illustration of decoder activity and directional gain (3D UX-Net on BTCV CT multi-organ dataset). While the full decoder corrects certain errors of the efficient baseline (positive flips), it also alters previously correct predictions (negative flips) near high-entropy organ boundaries, demonstrating non-uniform spatial contribution (see Supplementary Figures S1 and S2 for SwinUNETR and MedNeXt-M-K3).}
+\label{fig:motivation}
+\end{figure*}
 
 \subsection{Spatial Characterization of Decoder Effects}
 We analyze Activity $A(v)$ and Net Gain $G(v)$ across two spatial dimensions:

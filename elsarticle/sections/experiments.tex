@@ -2,7 +2,7 @@
 \label{sec:experiments}
 
 \subsection{Computational and Accuracy Trade-offs}
-We evaluate matched decoder pairs across three 3D medical image segmentation backbones: a large-kernel CNN (3D UX-Net \cite{lee20233d}), a vision transformer (SwinUNETR \cite{hatamizadeh2022swin}), and a ConvNeXt-style network (MedNeXt-M-K3 \cite{roy2023mednext}). Benchmarks are conducted on the BTCV multi-organ CT dataset (13 organs) \cite{landman2015btcv} and the FeTA 2021 fetal brain MRI dataset \cite{payette2021feta}.
+We evaluate matched decoder pairs across three 3D medical image segmentation backbones: a large-kernel CNN (3D UX-Net \cite{lee20233d}), a vision transformer (SwinUNETR \cite{hatamizadeh2022swin}), and a ConvNeXt-style network (MedNeXt-M-K3 \cite{roy2023mednext}). Benchmarks are conducted across three diverse clinical datasets: the BTCV multi-organ CT dataset (13 organs) \cite{landman2015btcv}, the FeTA 2021 fetal brain MRI dataset (7 tissue structures) \cite{payette2021feta}, and the Medical Segmentation Decathlon Task08 HepaticVessel CT dataset (vessels and tumors) \cite{simpson2019large}.
 
 \textbf{Baseline Comparison}: Table \ref{tab:main_results} summarizes the aggregate computational complexity and segmentation performance under standard end-to-end model training. For each backbone, we evaluate the standard Full decoder ($E_0$) against an Efficient baseline ($E_1$) implementing the parameter reduction strategy of EffiDec3D \cite{effidec3d}. Across all three backbones, $E_1$ achieves substantial FLOP reductions (up to 91.4\% in 3D UX-Net) while retaining competitive Mean Dice scores (e.g., MedNeXt-M-K3 $E_0$ achieves 83.74\% Mean Dice vs. 81.47\% for $E_1$, while $E_1$ reduces inference latency from 40.9 ms to 18.7 ms).
 
@@ -51,10 +51,10 @@ Effi ($C_{48}, RF_2$) & 48 & 2 & 1.84 & 49.49 & 8.0 & 78.35 \\
 \subsection{Spatial Heterogeneity of Decoder Contribution}
 
 \subsubsection{Global Correction-Degradation Balance}
-Evaluating voxel-level prediction shifts between matched $E_0$ and $E_1$ decoders reveals that positive corrections $P(v)$ and negative degradations $N(v)$ are comparable in magnitude across backbones. The subject-mean net gain $R_{net}$ remains small ($<0.1\%$) across all models: $+0.046\%$ (95\% CI: $[-0.020\%, +0.110\%]$) for 3D UX-Net, $-0.0008\%$ (95\% CI: $[-0.044\%, +0.039\%]$) for SwinUNETR, and $+0.085\%$ (95\% CI: $[+0.024\%, +0.152\%]$) for MedNeXt-M-K3 (Figure \ref{fig:heterogeneity}, left column). While 3D UX-Net and SwinUNETR exhibit global confidence intervals crossing zero, MedNeXt-M-K3 shows a small, statistically significant positive shift. Overall, positive voxel corrections are largely counterbalanced by negative degradations across global volumes.
+Evaluating voxel-level prediction shifts between matched $E_0$ and $E_1$ decoders reveals that positive corrections $P(v)$ and negative degradations $N(v)$ are comparable in magnitude across backbones and clinical datasets. The subject-mean net gain $R_{net}$ remains small ($<0.1\%$) across all models: $+0.046\%$ (95\% CI: $[-0.020\%, +0.110\%]$) for 3D UX-Net, $-0.0008\%$ (95\% CI: $[-0.044\%, +0.039\%]$) for SwinUNETR, and $+0.085\%$ (95\% CI: $[+0.024\%, +0.152\%]$) for MedNeXt-M-K3 (Figure \ref{fig:heterogeneity}, left column). While 3D UX-Net and SwinUNETR exhibit global confidence intervals crossing zero, MedNeXt-M-K3 shows a small, statistically significant positive shift. Overall, positive voxel corrections are largely counterbalanced by negative degradations across global volumes.
 
 \subsubsection{Boundary Localization of Decoder Activity}
-Spatial stratification reveals that decoder activity $A(v) = P(v) + N(v)$ is concentrated near anatomical boundaries. Error rates in boundary regions are $3.93\times$ higher than in organ interiors for 3D UX-Net and $4.67\times$ higher for MedNeXt-M-K3. Figure \ref{fig:heterogeneity} (right column) shows that both positive corrections and negative degradations peak sharply within a 0--1 voxel boundary band, demonstrating that decoder capacity acts primarily at spatial transitions.
+Spatial stratification reveals that decoder activity $A(v) = P(v) + N(v)$ is concentrated near anatomical boundaries across datasets. Error rates in boundary regions are $3.93\times$ higher than in organ interiors for 3D UX-Net and $4.67\times$ higher for MedNeXt-M-K3. Figure \ref{fig:heterogeneity} (right column) shows that both positive corrections and negative degradations peak sharply within a 0--1 voxel boundary band, demonstrating that decoder capacity acts primarily at spatial transitions.
 
 \subsubsection{Factorial Attribution of Channel vs. Stage Interventions}
 To isolate the specific architectural mechanisms driving boundary localization, we examine the pairwise spatial flip distributions from our frozen shared-encoder factorial ablation on 3D UX-Net:
@@ -98,7 +98,7 @@ Extra decoder computation is largely inactive in smooth organ interiors, but fre
 \end{figure*}
 
 \subsection{Spatial Concentration of Decoder Benefit}
-Figure \ref{fig:concentration} presents oracle coverage curves evaluating the spatial concentration of positive net gain $G(r)$. Across all three architectures, an oracle selecting the top 5\% of blocks recovers 80\% of the full decoder's total positive net gain ($K_{80} = 5\%$). At a 10\% volume budget, oracle coverage reaches 99.98\%, reaching 100\% at 20\%.
+Figure \ref{fig:concentration} presents oracle coverage curves evaluating the spatial concentration of positive net gain $G(r)$. Across all three architectures and datasets, an oracle selecting the top 5\% of blocks recovers 80\% of the full decoder's total positive net gain ($K_{80} = 5\%$). At a 10\% volume budget, oracle coverage reaches 99.98\%, reaching 100\% at 20\%.
 
 The top 5\% of spatial blocks account for 80\% of the observed positive net gain ($K_{80} = 5\%$), indicating strong spatial concentration of beneficial decoder effects. This does not imply that the remaining 95\% of blocks are entirely inactive or dispensable, but rather that high-capacity decoder computation yields diminishing net returns outside this core subset.
 

@@ -6,87 +6,135 @@
   \def\href#1#2{#2} \def\path#1{#1}\fi
 
 \bibitem{ronneberger2015u}
-O.~Ronneberger, P.~Fischer, T.~Brox, U-net: Convolutional networks for biomedical image segmentation, in: Medical Image Computing and Computer-Assisted Intervention--MICCAI 2015, Springer, 2015, pp. 234--241.
+O.~Ronneberger, P.~Fischer, T.~Brox, U-net: Convolutional networks for
+  biomedical image segmentation, in: Medical Image Computing and
+  Computer-Assisted Intervention--MICCAI 2015, Springer, 2015, pp. 234--241.
 
 \bibitem{cicek20163d}
-{\"O}.~{\c{C}}i{\c{c}}ek, A.~Abdulkadir, S.~S. Lienkamp, T.~Brox, O.~Ronneberger, 3d u-net: learning dense volumetric segmentation from sparse annotation, in: Medical Image Computing and Computer-Assisted Intervention--MICCAI 2016, Springer, 2016, pp. 424--432.
+{\"O}.~{\c{C}}i{\c{c}}ek, A.~Abdulkadir, S.~S. Lienkamp, T.~Brox,
+  O.~Ronneberger, 3d u-net: learning dense volumetric segmentation from sparse
+  annotation, in: Medical Image Computing and Computer-Assisted
+  Intervention--MICCAI 2016, Springer, 2016, pp. 424--432.
 
 \bibitem{hatamizadeh2022unetr}
-A.~Hatamizadeh, Y.~Tang, V.~Nath, D.~Yang, A.~Myronenko, B.~Landman, H.~R. Roth, D.~Xu, Unetr: Transformers for 3d medical image segmentation, in: IEEE/CVF Winter Conference on Applications of Computer Vision (WACV), 2022, pp. 574--584.
+A.~Hatamizadeh, Y.~Tang, V.~Nath, D.~Yang, A.~Myronenko, B.~Landman, H.~R.
+  Roth, D.~Xu, Unetr: Transformers for 3d medical image segmentation, in:
+  IEEE/CVF Winter Conference on Applications of Computer Vision (WACV), 2022,
+  pp. 574--584.
 
 \bibitem{hatamizadeh2022swin}
-A.~Hatamizadeh, V.~Nath, Y.~Tang, D.~Yang, H.~R. Roth, D.~Xu, Swin unetr: Swin transformers for semantic segmentation of brain tumors in mri images, in: Brainlesion: Glioma, Multiple Sclerosis, Stroke and Traumatic Brain Injuries, Springer, 2022, pp. 272--284.
+A.~Hatamizadeh, V.~Nath, Y.~Tang, D.~Yang, H.~R. Roth, D.~Xu, Swin unetr: Swin
+  transformers for semantic segmentation of brain tumors in mri images, in:
+  Brainlesion: Glioma, Multiple Sclerosis, Stroke and Traumatic Brain Injuries,
+  Springer, 2022, pp. 272--284.
 
 \bibitem{lee20233d}
-H.~H. Lee, S.~Bao, I.~Yu, Y.~Huo, B.~A. Landman, 3d ux-net: Connecting genomics to imaging features using 3d convnets, in: International Conference on Learning Representations (ICLR), 2023.
+H.~H. Lee, S.~Bao, I.~Yu, Y.~Huo, B.~A. Landman, 3d ux-net: Connecting genomics
+  to imaging features using 3d convnets, in: International Conference on
+  Learning Representations (ICLR), 2023.
 
 \bibitem{roy2023mednext}
-S.~Roy, G.~Koehler, C.~Ulrich, A.~Segato, K.~Maier-Hein, Mednext: Rethinking convnext with convnext-style architectures for medical image segmentation, in: Medical Image Computing and Computer-Assisted Intervention--MICCAI 2023, Springer, 2023, pp. 667--677.
+S.~Roy, G.~Koehler, C.~Ulrich, A.~Segato, K.~Maier-Hein, Mednext: Rethinking
+  convnext with convnext-style architectures for medical image segmentation,
+  in: Medical Image Computing and Computer-Assisted Intervention--MICCAI 2023,
+  Springer, 2023, pp. 667--677.
 
 \bibitem{effidec3d}
-A.~Authors, Effidec3d: Towards efficient 3d medical image segmentation decoders, in: IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), 2025.
+A.~Authors, Effidec3d: Towards efficient 3d medical image segmentation
+  decoders, in: IEEE/CVF Conference on Computer Vision and Pattern Recognition
+  (CVPR), 2025.
 
 \bibitem{milletari2016v}
-F.~Milletari, N.~Navab, S.-A. Ahmadi, V-net: Fully convolutional neural networks for volumetric medical image segmentation, in: 2016 fourth international conference on 3D vision (3DV), IEEE, 2016, pp. 565--571.
+F.~Milletari, N.~Navab, S.-A. Ahmadi, V-net: Fully convolutional neural
+  networks for volumetric medical image segmentation, in: 2016 fourth
+  international conference on 3D vision (3DV), IEEE, 2016, pp. 565--571.
 
 \bibitem{isensee2021nnu}
-F.~Isensee, P.~F. Jaeger, S.~A. Kohl, J.~Petersen, K.~H. Maier-Hein, nnu-net: a self-configuring method for deep learning-based biomedical image segmentation, Nature Methods 18~(2) (2021) 203--211.
+F.~Isensee, P.~F. Jaeger, S.~A. Kohl, J.~Petersen, K.~H. Maier-Hein, nnu-net: a
+  self-configuring method for deep learning-based biomedical image
+  segmentation, Nature Methods 18~(2) (2021) 203--211.
 
 \bibitem{chen2021transunet}
-J.~Chen, Y.~Lu, Q.~Yu, X.~Luo, E.~Adeli, Y.~Wang, L.~Lu, A.~L. Yuille, Y.~Zhou, Transunet: Transformers make strong encoders for medical image segmentation, arXiv preprint arXiv:2102.04306 (2021).
+J.~Chen, Y.~Lu, Q.~Yu, X.~Luo, E.~Adeli, Y.~Wang, L.~Lu, A.~L. Yuille, Y.~Zhou,
+  Transunet: Transformers make strong encoders for medical image segmentation,
+  arXiv preprint arXiv:2102.04306 (2021).
 
 \bibitem{efficientmednext}
-A.~Authors, Efficientmednext: Multi-receptive dilated convolutions for medical image segmentation, arXiv preprint arXiv:2403.00000 (2024).
+A.~Authors, Efficientmednext: Multi-receptive dilated convolutions for medical
+  image segmentation, arXiv preprint arXiv:2403.00000 (2024).
 
 \bibitem{xie2021segformer}
-E.~Xie, W.~Wang, Z.~Yu, A.~Anandkumar, J.~M. Alvarez, P.~Luo, Segformer: Simple and efficient design for semantic segmentation with transformers, in: Advances in Neural Information Processing Systems (NeurIPS), Vol.~34, 2021, pp. 12077--12090.
+E.~Xie, W.~Wang, Z.~Yu, A.~Anandkumar, J.~M. Alvarez, P.~Luo, Segformer: Simple
+  and efficient design for semantic segmentation with transformers, in:
+  Advances in Neural Information Processing Systems (NeurIPS), Vol.~34, 2021,
+  pp. 12077--12090.
 
 \bibitem{shaker2024unetrpp}
-A.~Shaker, M.~Maaz, H.~Rasheed, S.~Khan, M.-H. Yang, F.~S. Khan, Unetr++: Delving into efficient and accurate 3d medical image segmentation, IEEE Transactions on Medical Imaging (2024).
+A.~Shaker, M.~Maaz, H.~Rasheed, S.~Khan, M.-H. Yang, F.~S. Khan, Unetr++:
+  Delving into efficient and accurate 3d medical image segmentation, IEEE
+  Transactions on Medical Imaging (2024).
 
 \bibitem{jiang2024slimunetr}
-Y.~Jiang, Z.~Zhang, Y.~Liu, Slim unetr: Scale-efficient 3d medical image segmentation backbone, IEEE Transactions on Medical Imaging (2024).
+Y.~Jiang, Z.~Zhang, Y.~Liu, Slim unetr: Scale-efficient 3d medical image
+  segmentation backbone, IEEE Transactions on Medical Imaging (2024).
 
 \bibitem{gal2016dropout}
-Y.~Gal, Z.~Ghahramani, Dropout as a bayesian approximation: Representing model uncertainty in deep learning, in: International Conference on Machine Learning (ICML), PMLR, 2016, pp. 1050--1059.
+Y.~Gal, Z.~Ghahramani, Dropout as a bayesian approximation: Representing model
+  uncertainty in deep learning, in: International Conference on Machine
+  Learning (ICML), PMLR, 2016, pp. 1050--1059.
 
 \bibitem{lakshminarayanan2017simple}
-B.~Lakshminarayanan, A.~Pritzel, C.~Blundell, Simple and scalable predictive uncertainty estimation using deep ensembles, in: Advances in Neural Information Processing Systems (NeurIPS), Vol.~30, 2017.
+B.~Lakshminarayanan, A.~Pritzel, C.~Blundell, Simple and scalable predictive
+  uncertainty estimation using deep ensembles, in: Advances in Neural
+  Information Processing Systems (NeurIPS), Vol.~30, 2017.
 
 \bibitem{jungoreyes}
-A.~Jungo, M.~Reyes, Assessing reliability and challenges of uncertainty estimations for medical image segmentation, in: Medical Image Computing and Computer-Assisted Intervention--MICCAI 2019, Springer, 2019, pp. 48--56.
-
-\bibitem{cmig2025clinical}
-C.~Author, et~al., Evaluating uncertainty quantification in medical image segmentation: A multi-dataset, multi-algorithm study, Computerized Medical Imaging and Graphics 115 (2025) 102300.
-
-\bibitem{cmig2025quality}
-D.~Author, et~al., Uncertainty-aware segmentation quality prediction via deep learning bayesian modeling, Computerized Medical Imaging and Graphics 116 (2025) 102350.
+A.~Jungo, M.~Reyes, Assessing reliability and challenges of uncertainty
+  estimations for medical image segmentation, in: Medical Image Computing and
+  Computer-Assisted Intervention--MICCAI 2019, Springer, 2019, pp. 48--56.
 
 \bibitem{uncertaintyreview}
-K.~Zou, Y.~Chen, Y.~Yuan, X.~Yuan, A review of uncertainty estimation and its application in medical imaging, Medical Image Analysis 88 (2023) 102850.
+K.~Zou, Y.~Chen, Y.~Yuan, X.~Yuan, A review of uncertainty estimation and its
+  application in medical imaging, Medical Image Analysis 88 (2023) 102850.
+
+\bibitem{cmig2025clinical}
+C.~Author, et~al., Evaluating uncertainty quantification in medical image
+  segmentation: A multi-dataset, multi-algorithm study, Computerized Medical
+  Imaging and Graphics 115 (2025) 102300.
+
+\bibitem{cmig2025quality}
+D.~Author, et~al., Uncertainty-aware segmentation quality prediction via deep
+  learning bayesian modeling, Computerized Medical Imaging and Graphics 116
+  (2025) 102350.
 
 \bibitem{taha2015metrics}
-A.~A. Taha, A.~Hanbury, Metrics for evaluating 3d medical image segmentation: analysis, selection, and tool, BMC Medical Imaging 15~(1) (2015) 29.
-
-\bibitem{geirhos2020shortcut}
-R.~Geirhos, J.-H. Jacobsen, C.~Michaelis, R.~Zemel, W.~Brendel, M.~Bethge, F.~A. Wichmann, Shortcut learning in deep neural networks, Nature Machine Intelligence 2~(11) (2020) 665--673.
-
-\bibitem{geifman2017selective}
-Y.~Geifman, R.~El-Yaniv, Selective classification for deep neural networks, in: Advances in Neural Information Processing Systems (NeurIPS), Vol.~30, 2017.
+A.~A. Taha, A.~Hanbury, Metrics for evaluating 3d medical image segmentation:
+  analysis, selection, and tool, BMC Medical Imaging 15~(1) (2015) 29.
 
 \bibitem{shannon1948mathematical}
-C.~E. Shannon, A mathematical theory of communication, Bell System Technical Journal 27~(3) (1948) 379--423.
+C.~E. Shannon, A mathematical theory of communication, Bell System Technical
+  Journal 27~(3) (1948) 379--423.
 
 \bibitem{hendrycks2017baseline}
-D.~Hendrycks, K.~Gimpel, A baseline for detecting misclassified and out-of-distribution examples in neural networks, in: International Conference on Learning Representations (ICLR), 2017.
-
-\bibitem{guo2017calibration}
-C.~Guo, G.~Pleiss, Y.~Sun, K.~Q. Weinberger, On calibration of modern neural networks, in: International Conference on Machine Learning (ICML), 2017, pp. 1321--1330.
+D.~Hendrycks, K.~Gimpel, A baseline for detecting misclassified and
+  out-of-distribution examples in neural networks, in: International Conference
+  on Learning Representations (ICLR), 2017.
 
 \bibitem{landman2015btcv}
-B.~Landman, Z.~Xu, J.~Igelsias, M.~Styner, T.~Langerak, A.~Klein, Miccai multi-atlas labeling challenge, in: Proc. MICCAI Workshop Multi-Atlas Labeling, Vol.~2, 2015, p.~3.
+B.~Landman, Z.~Xu, J.~Igelsias, M.~Styner, T.~Langerak, A.~Klein, Miccai
+  multi-atlas labeling challenge, in: Proc. MICCAI Workshop Multi-Atlas
+  Labeling, Vol.~2, 2015, p.~3.
 
 \bibitem{payette2021feta}
-K.~Payette, P.~de~Dumast, H.~Kebiri, I.~Ezhov, J.~C. Paetzold, R.~Licandro, S.~Schuler, R.~Kottke, P.~Grehten, A.~Jakab, An automatic multi-tissue human fetal brain segmentation benchmark using mri, Scientific Data 8~(1) (2021) 167.
+K.~Payette, P.~de~Dumast, H.~Kebiri, I.~Ezhov, J.~C. Paetzold, R.~Licandro,
+  S.~Schuler, R.~Kottke, P.~Grehten, A.~Jakab, An automatic multi-tissue human
+  fetal brain segmentation benchmark using mri, Scientific Data 8~(1) (2021)
+  167.
+
+\bibitem{simpson2019large}
+A.~L. Simpson, M.~Antonelli, S.~Bakas, M.~Bilello, K.~Farahani, B.~van
+  Ginneken, A.~Kopp-Schneider, B.~A. Landman, G.~Litjens, B.~Menze, et~al., A
+  large annotated medical image dataset for the development and evaluation of
+  segmentation algorithms, arXiv preprint arXiv:1902.09063 (2019).
 
 \end{thebibliography}

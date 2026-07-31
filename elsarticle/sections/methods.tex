@@ -11,7 +11,7 @@ Let $v$ denote a voxel within a 3D medical image volume $V$. We compare two deco
 \end{itemize}
 Let $y(v)$ be the ground truth label, $\hat{y}_e(v)$ be the prediction from the efficient decoder, and $\hat{y}_f(v)$ be the prediction from the full decoder. Interventions occur strictly within the decoder pathway (upsampling, skip fusion, and refinement).
 
-\begin{table}[t]
+\begin{table*}[t]
 \centering
 \caption{Overview of characterization objectives and evaluation measures.}
 \label{tab:framework_summary}
@@ -29,7 +29,7 @@ Practical recovery & Routing Gain / Recovery & Does selective execution improve 
 \bottomrule
 \end{tabular}%
 }
-\end{table}
+\end{table*}
 
 \subsection{Decoder-Induced Corrections and Degradations}
 Comparing predictions between the efficient and full decoders at each voxel yields three possible outcomes: the full decoder corrects an error, introduces an error, or leaves prediction correctness unchanged:

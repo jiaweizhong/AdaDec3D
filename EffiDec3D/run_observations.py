@@ -494,16 +494,23 @@ def O5_decoder_gain(val_loader, effi, full):
           f"GAIN(R_net)={float(net_rate.mean()):.5f} CI[{nr_ci[0]:.5f},{nr_ci[1]:.5f}] "
           f"{'net-neutral' if net_neutral else 'directional'}  "
           f"ACTIVITY(R_act)={float(act_rate.mean()):.5f} CI[{ar_ci[0]:.5f},{ar_ci[1]:.5f}]")
-    plt.figure(figsize=(5, 4))
-    plt.bar([0, 1, 2], [mean_pos, mean_neg, float(net_rate.mean())],
-            color=["seagreen", "firebrick", "steelblue"], alpha=.8)
-    plt.errorbar([2], [float(net_rate.mean())],
-                 yerr=[[float(net_rate.mean()) - nr_ci[0]], [nr_ci[1] - float(net_rate.mean())]],
-                 fmt="none", ecolor="k", capsize=5)
-    plt.axhline(0, color="k", lw=.6, ls=":")
-    plt.xticks([0, 1, 2], ["$R_{pos}$", "$R_{neg}$", "$R_{net}$"])
-    plt.ylabel("flip rate"); plt.title("H1: global decoder flip rates")
-    plt.tight_layout(); plt.savefig(f"{OBS_DIR}/H1_global_flips.png", dpi=150); plt.close()
+    import matplotlib.ticker as mticker
+    net_mean = float(net_rate.mean())
+    fig, ax = plt.subplots(figsize=(4.6, 3.6))
+    ax.yaxis.grid(True, ls=":", lw=.5, alpha=.6, zorder=0)
+    ax.bar([0, 1, 2], [mean_pos, mean_neg, net_mean], width=0.5,
+           color=["#2e8b57", "#b22222", "#4682b4"], alpha=.9,
+           edgecolor="black", linewidth=0.6, zorder=3)
+    ax.errorbar([2], [net_mean],
+                yerr=[[net_mean - nr_ci[0]], [nr_ci[1] - net_mean]],
+                fmt="none", ecolor="black", capsize=4, lw=1.2, zorder=4)
+    ax.axhline(0, color="black", lw=.7, ls=":")
+    ax.set_xticks([0, 1, 2]); ax.set_xticklabels(["$R_{pos}$", "$R_{neg}$", "$R_{net}$"])
+    ax.set_xlim(-0.6, 2.6)
+    ax.set_ylabel("flip rate"); ax.set_title("H1: global decoder flip rates")
+    fmt = mticker.ScalarFormatter(useMathText=True); fmt.set_powerlimits((0, 0))
+    ax.yaxis.set_major_formatter(fmt)                 # scientific notation (shared x10^-3 offset)
+    fig.tight_layout(); fig.savefig(f"{OBS_DIR}/H1_global_flips.png", dpi=150); plt.close(fig)
     save_obs("O5", {"mean_positive_rate": mean_pos, "mean_negative_rate": mean_neg,
                     "subject_pos_rate_mean": mean_pos, "subject_neg_rate_mean": mean_neg,
                     "subject_net_rate_mean": float(net_rate.mean()),      # GAIN = P - N

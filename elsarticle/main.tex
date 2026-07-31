@@ -2,7 +2,7 @@
 %% CMIG formatted template for "Rethinking Decoder Redundancy in Efficient 3D Medical Image Segmentation: A Characterization Study"
 %%
 
-\documentclass[preprint,12pt]{elsarticle}
+\documentclass[final,5p,times,twocolumn]{elsarticle}
 
 %% The amssymb package provides various useful mathematical symbols
 \usepackage{amssymb}
@@ -13,6 +13,20 @@
 \usepackage{booktabs}
 \usepackage{multirow}
 \usepackage{hyperref}
+\usepackage{dblfloatfix} %% Enables bottom floats and flexible float placement in 2-column mode
+\usepackage{placeins}    %% Provides \FloatBarrier to prevent figures from leaking into References
+
+%% Relax float placement limits to allow multi-panel figures inline
+\setcounter{topnumber}{4}
+\setcounter{bottomnumber}{4}
+\setcounter{totalnumber}{10}
+\setcounter{dbltopnumber}{4}
+\renewcommand{\topfraction}{0.95}
+\renewcommand{\bottomfraction}{0.95}
+\renewcommand{\dbltopfraction}{0.95}
+\renewcommand{\textfraction}{0.05}
+\renewcommand{\floatpagefraction}{0.8}
+\renewcommand{\dblfloatpagefraction}{0.8}
 
 %% Journal name
 \journal{Computerized Medical Imaging and Graphics}
@@ -73,8 +87,10 @@ Modern 3D medical image segmentation architectures increasingly incorporate heav
 \input{sections/related_work}
 \input{sections/methods}
 \input{sections/experiments}
+\FloatBarrier %% Force all figures to output before Discussion & Conclusion
 \input{sections/discussion}
 \input{sections/conclusion}
+\FloatBarrier
 
 %% CRediT authorship contribution statement
 \section*{CRediT authorship contribution statement}

@@ -27,14 +27,10 @@ Based on these observational insights, we distill three evidence-backed directio
 \subsection{Limitations}
 \label{sec:limitations}
 
-To ensure rigorous interpretation, we explicitly highlight the scope boundaries and limitations of this characterization study:
-\begin{enumerate}
-    \item \textbf{Intervention Scope}: Controlled decoder interventions follow the channel-reduction and stage-omission strategies of EffiDec3D \cite{effidec3d}; they do not cover all conceivable decoder simplifications (e.g., pruning or neural architecture search).
-    \item \textbf{Factorial Scope}: Factorial factor attribution was conducted specifically on 3D UX-Net and BTCV CT; while end-to-end trends generalize across SwinUNETR and MedNeXt, factor-level interaction may vary across network families.
-    \item \textbf{Training Trajectory Control}: End-to-end models were independently trained under identical hyperparameters. While frozen shared encoders eliminate feature variation, independent optimizer trajectories still contribute minor weight noise.
-    \item \textbf{Hybridization Protocol}: Evaluation of selective routing relies on retrospective output-space hybridization rather than an active, real-time dynamic hardware execution engine.
-    \item \textbf{FLOP Realization}: Retrospective hybrid recovery ($R_{\text{recovery}}$) represents an output-space ceiling bound and does not demonstrate realized runtime latency savings or hardware kernel speedups.
-    \item \textbf{Dataset Sample Sizes}: Clinical evaluations were conducted on established benchmarks (BTCV, MSD01, MSD08), but total subject counts remain bounded by public dataset sizes.
-    \item \textbf{Boundary Formulation}: Primary spatial distance analysis relies on ground-truth anatomical boundaries; while preventing prediction circularity, boundary definitions depend on spatial distance transform thresholds.
-    \item \textbf{Predictor Scope}: Inference-time predictability focused on predictive entropy and TTA mutual information; non-uncertainty signals (e.g., feature norm metrics) were not evaluated.
-\end{enumerate}
+This study has several limitations. First, the controlled interventions follow the channel-reduction and high-resolution stage-omission principles of EffiDec3D, and factor-level attribution is performed only on 3D UX-Net and BTCV. Although the end-to-end observations are evaluated across multiple architectures and datasets, the factorial effects may differ under other decoder designs or efficiency interventions.
+
+Second, the end-to-end full and efficient models are trained independently under matched protocols. The frozen shared-encoder experiment controls variation in feature representations, but independent decoder initialization and optimization trajectories may still contribute to prediction differences.
+
+Third, the routing analysis is based on retrospective output-space hybridization. It therefore provides an opportunity bound on selective decoder allocation rather than demonstrating a deployable dynamic execution system or proportional reductions in runtime latency and hardware-level computation.
+
+Finally, predictability is evaluated primarily using predictive entropy and TTA mutual information on three public benchmarks. Broader clinical cohorts and learned or feature-based utility predictors may reveal additional information about directional decoder gain.

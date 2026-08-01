@@ -1,14 +1,14 @@
 # Fdb version 4
-["bibtex main"] 1785561986.45346 "main.aux" "main.bbl" "main" 1785561991.88352 0
+["bibtex main"] 1785569036.39974 "main.aux" "main.bbl" "main" 1785569041.78325 0
   "./elsarticle-num.bst" 1785466574 29462 d2b5b1799e10c2334c188d78937e1ac9 ""
-  "./refs.bib" 1785557605 9596 4e02ae4f5ce41fabbf0f92a587614a91 ""
-  "main.aux" 1785561990 17171 bbaab6c6a6c04af997c2372bd53a540f "pdflatex"
+  "./refs.bib" 1785568740 10430 29d66e5ba5e466a19f87aeebc8d2e7db ""
+  "main.aux" 1785569040 17306 560e5543db2e3bf02f49071c82a24305 "pdflatex"
   (generated)
   "main.bbl"
   "main.blg"
   (rewritten before read)
-["pdflatex"] 1785561987.11869 "c:/Users/jiawe/Repos/AdaDec3D/elsarticle/main.tex" "main.pdf" "main" 1785561991.88418 0
-  "c:/Users/jiawe/Repos/AdaDec3D/elsarticle/main.tex" 1785561979 7432 e53f78b7c3174b4c857dca8d896fea3e ""
+["pdflatex"] 1785569037.01253 "c:/Users/jiawe/Repos/AdaDec3D/elsarticle/main.tex" "main.pdf" "main" 1785569041.78401 0
+  "c:/Users/jiawe/Repos/AdaDec3D/elsarticle/main.tex" 1785569034 7431 ba2e2b3d9960c30e270e43e20e936623 ""
   "c:/texlive/2025/texmf-dist/fonts/enc/dvips/base/8r.enc" 1748311205 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "c:/texlive/2025/texmf-dist/fonts/enc/dvips/cm-super/cm-super-t1.enc" 1748310488 2971 def0b6c1f0b107b3b936def894055589 ""
   "c:/texlive/2025/texmf-dist/fonts/map/fontname/texfonts.map" 1748311790 3524 cb3e574dea2d1052e39280babc910dc8 ""
@@ -150,7 +150,7 @@
   "figures/obs-swin-concat/O_anatomy.png" 1785553205 118991 10fb6b207cb36c4fd50cdb59b4526ac7 ""
   "figures/obs-swin-concat/O_pareto.png" 1785553207 73264 17e07e556f49611edfc6ac92071c0f20 ""
   "figures/obs-swin-concat/R_recovery.png" 1785553216 72397 3e92642c1f5de2452a90b9166690801f ""
-  "figures/obs-swin-concat/figure1_motivation.png" 1785556305 773684 8521d9e64e0cedbbcc2b8e989acfad84 ""
+  "figures/obs-swin-concat/figure1_motivation.png" 1785553213 694459 00310cb7b3afafb91ce23eb0f10ff4de ""
   "figures/obs-uxnet-concat/H1_global_flips.png" 1785553082 28073 fe68b91fdd305ba92582e4097966f631 ""
   "figures/obs-uxnet-concat/H2_boundary.png" 1785553083 70851 98a09afcfcf580f19e303a10406ad213 ""
   "figures/obs-uxnet-concat/O3_entropy_by_flip.png" 1785553090 33263 922e20af017d145bf297248515276213 ""
@@ -158,12 +158,12 @@
   "figures/obs-uxnet-concat/O_anatomy.png" 1785553085 119820 7443ce7d0891fb1bd7b388cb377d3a6f ""
   "figures/obs-uxnet-concat/O_pareto.png" 1785553086 72063 9c66c57e3350b9667a6d376d4268d64d ""
   "figures/obs-uxnet-concat/R_recovery.png" 1785553092 73089 512d384dd5e688ed122c1d1a7788b127 ""
-  "figures/obs-uxnet-concat/figure1_motivation.png" 1785556213 828603 4004edb49b880936e4e7036658e59184 ""
-  "main.aux" 1785561990 17171 bbaab6c6a6c04af997c2372bd53a540f "pdflatex"
-  "main.bbl" 1785561986 5788 991e5f969c7f4eb1477a64c9a271549c "bibtex main"
-  "main.out" 1785561990 9757 d038bbbc5a704bed48df79fa6e942d72 "pdflatex"
-  "main.spl" 1785561987 0 d41d8cd98f00b204e9800998ecf8427e "pdflatex"
-  "main.tex" 1785561979 7432 e53f78b7c3174b4c857dca8d896fea3e ""
+  "figures/obs-uxnet-concat/figure1_motivation.png" 1785553089 713990 4646d8b013b3e057711781276a7a1971 ""
+  "main.aux" 1785569040 17306 560e5543db2e3bf02f49071c82a24305 "pdflatex"
+  "main.bbl" 1785569036 6384 885141e1709e5f82c12c21e431362efc "bibtex main"
+  "main.out" 1785569040 9757 d038bbbc5a704bed48df79fa6e942d72 "pdflatex"
+  "main.spl" 1785569037 0 d41d8cd98f00b204e9800998ecf8427e "pdflatex"
+  "main.tex" 1785569034 7431 ba2e2b3d9960c30e270e43e20e936623 ""
   "sections/conclusion.tex" 1785560538 1052 71c9cd0579b30482a3f4fe0c290f637f ""
   "sections/discussion.tex" 1785561628 5371 51a95b57067b6068a133b197e1409de8 ""
   "sections/experiments.tex" 1785561616 5642 d253ce20474e2c16f0762dd3d7b7d3ce ""

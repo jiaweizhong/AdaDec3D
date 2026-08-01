@@ -3,52 +3,51 @@ Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
 The top-level auxiliary file: main.aux
 The style file: elsarticle-num.bst
 Database file #1: refs.bib
-Warning--I didn't find a database entry for "yu2018slimmable"
-Warning--I didn't find a database entry for "wang2021adaptive"
-Warning--I didn't find a database entry for "kendall2017uncertainties"
 Warning--empty pages in lee20233d
 Warning--empty pages in effidec3d
+Warning--empty pages in yu2018slimmable
 Warning--empty pages in lakshminarayanan2017simple
+Warning--empty pages in kendall2017uncertainties
 Warning--empty pages in geifman2017selective
-You've used 23 entries,
+You've used 26 entries,
             2952 wiz_defined-function locations,
-            792 strings with 10538 characters,
-and the built_in function-call counts, 8507 in all, are:
-= -- 726
-> -- 359
-< -- 14
-+ -- 135
-- -- 112
-* -- 523
-:= -- 1132
-add.period$ -- 23
-call.type$ -- 23
-change.case$ -- 23
+            802 strings with 11064 characters,
+and the built_in function-call counts, 9639 in all, are:
+= -- 819
+> -- 401
+< -- 16
++ -- 151
+- -- 125
+* -- 591
+:= -- 1268
+add.period$ -- 26
+call.type$ -- 26
+change.case$ -- 26
 chr.to.int$ -- 0
-cite$ -- 27
-duplicate$ -- 316
-empty$ -- 974
-format.name$ -- 132
-if$ -- 2235
+cite$ -- 32
+duplicate$ -- 362
+empty$ -- 1118
+format.name$ -- 148
+if$ -- 2540
 int.to.chr$ -- 0
-int.to.str$ -- 23
-missing$ -- 23
-newline$ -- 77
-num.names$ -- 23
-pop$ -- 200
+int.to.str$ -- 26
+missing$ -- 26
+newline$ -- 86
+num.names$ -- 26
+pop$ -- 231
 preamble$ -- 1
 purify$ -- 0
 quote$ -- 0
-skip$ -- 607
+skip$ -- 694
 stack$ -- 0
-substring$ -- 390
-swap$ -- 105
-text.length$ -- 14
+substring$ -- 438
+swap$ -- 119
+text.length$ -- 16
 text.prefix$ -- 0
 top$ -- 0
 type$ -- 0
-warning$ -- 4
-while$ -- 56
-width$ -- 25
-write$ -- 205
-(There were 7 warnings)
+warning$ -- 6
+while$ -- 62
+width$ -- 28
+write$ -- 231
+(There were 6 warnings)

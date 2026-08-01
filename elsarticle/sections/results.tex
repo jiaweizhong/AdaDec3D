@@ -54,7 +54,7 @@ To evaluate consistency across imaging modalities and anatomical targets, Table 
 \subsection{Gross Activity and Net Correctness Gain}
 \label{sec:results_activity}
 
-Evaluating voxel-level prediction shifts between matched $E_0$ and $E_1$ decoders reveals substantial gross correctness activity $R_{\text{act}} = R_{\text{pos}} + R_{\text{neg}}$, whereas the net directional gain $R_{\text{net}} = R_{\text{pos}} - R_{\text{neg}}$ remains substantially smaller due to bidirectional cancellation (Figure \ref{fig:heterogeneity}, left column).
+Evaluating voxel-level prediction shifts between matched $E_0$ and $E_1$ decoders reveals substantial gross correctness activity $R_{\text{act}} = R_{\text{pos}} + R_{\text{neg}}$, whereas the net directional gain $R_{\text{net}} = R_{\text{pos}} - R_{\text{neg}}$ remains substantially smaller due to bidirectional cancellation (Figure \ref{fig:global_flips}).
 
 Subject-mean All-Volume net gain rates $R_{\text{net}}^{\text{all}}$ across models are: $+0.046\%$ (95\% CI: $[-0.020\%, +0.110\%]$) for 3D UX-Net, $-0.001\%$ (95\% CI: $[-0.045\%, +0.040\%]$) for SwinUNETR, and $+0.085\%$ (95\% CI: $[+0.024\%, +0.152\%]$) for MedNeXt-M-K3. Evaluated over the Foreground-Union domain $\Omega_{\text{fg}}$, net gain rates are $R_{\text{net}}^{\text{fg}} = +0.381\%$ for 3D UX-Net, $-0.008\%$ for SwinUNETR, and $+0.684\%$ for MedNeXt-M-K3. While 3D UX-Net and SwinUNETR exhibit 95\% confidence intervals spanning zero, MedNeXt-M-K3 exhibits a small, statistically positive net shift. Across all models, positive voxel corrections $P(v)$ are largely offset by negative degradations $N(v)$.
 
@@ -62,35 +62,44 @@ Subject-mean All-Volume net gain rates $R_{\text{net}}^{\text{all}}$ across mode
 \label{sec:results_heterogeneity}
 
 \subsubsection{Physical Ground-Truth Boundary Concentration}
-Stratifying correctness activity $A_{\text{corr}}(v)$ by physical Euclidean distance $d_{GT}(v)$ to true ground-truth anatomical boundaries shows that correctness changes peak sharply within a 0--2 mm physical distance band (Figure \ref{fig:heterogeneity}, right column). Both positive corrections and negative degradations decrease rapidly in organ interiors ($d_{GT} > 8\text{ mm}$).
+Stratifying correctness activity $A_{\text{corr}}(v)$ by physical Euclidean distance $d_{GT}(v)$ to true ground-truth anatomical boundaries shows that correctness changes peak sharply within a 0--2 mm physical distance band (Figure \ref{fig:boundary_flips}). Both positive corrections and negative degradations decrease rapidly in organ interiors ($d_{GT} > 8\text{ mm}$).
 
 \begin{figure*}[tb]
 \centering
-\begin{tabular}{cc}
-\includegraphics[width=0.42\textwidth]{figures/obs-uxnet-concat/H1_global_flips.png} &
-\includegraphics[width=0.42\textwidth]{figures/obs-uxnet-concat/H2_boundary.png} \\
-(a) 3D UX-Net Global Flips & (b) 3D UX-Net Boundary Flips \\[4pt]
-\includegraphics[width=0.42\textwidth]{figures/obs-swin-concat/H1_global_flips.png} &
-\includegraphics[width=0.42\textwidth]{figures/obs-swin-concat/H2_boundary.png} \\
-(c) SwinUNETR Global Flips & (d) SwinUNETR Boundary Flips \\[4pt]
-\includegraphics[width=0.42\textwidth]{figures/obs-mednext/O5_decoder_gain.png} &
-\includegraphics[width=0.42\textwidth]{figures/obs-mednext/O_boundary_flips.png} \\
-(e) MedNeXt-M-K3 Global Flips & (f) MedNeXt-M-K3 Boundary Flips \\
+\begin{tabular}{ccc}
+\includegraphics[width=0.32\textwidth]{figures/obs-uxnet-concat/H1_global_flips.png} &
+\includegraphics[width=0.32\textwidth]{figures/obs-swin-concat/H1_global_flips.png} &
+\includegraphics[width=0.32\textwidth]{figures/obs-mednext/O5_decoder_gain.png} \\
+(a) 3D UX-Net Global Flips & (b) SwinUNETR Global Flips & (c) MedNeXt-M-K3 Global Flips \\
 \end{tabular}
-\caption{Voxel-level net gain (left column) and spatial ground-truth boundary concentration (right column) across 3D UX-Net, SwinUNETR, and MedNeXt-M-K3 backbones under Full ($E_0$) vs. Efficient ($E_1$) decoders.}
-\label{fig:heterogeneity}
+\caption{Voxel-level net gain rates across 3D UX-Net, SwinUNETR, and MedNeXt-M-K3 backbones under Full ($E_0$) vs. Efficient ($E_1$) decoders.}
+\label{fig:global_flips}
 \end{figure*}
+
+\begin{figure}[tb]
+\centering
+\begin{tabular}{c}
+\includegraphics[width=1.0\columnwidth]{figures/obs-uxnet-concat/H2_boundary.png} \\
+(a) 3D UX-Net Boundary Flips \\[4pt]
+\includegraphics[width=1.0\columnwidth]{figures/obs-swin-concat/H2_boundary.png} \\
+(b) SwinUNETR Boundary Flips \\[4pt]
+\includegraphics[width=1.0\columnwidth]{figures/obs-mednext/O_boundary_flips.png} \\
+(c) MedNeXt-M-K3 Boundary Flips \\
+\end{tabular}
+\caption{Spatial ground-truth boundary concentration of prediction flips across the three evaluated backbones.}
+\label{fig:boundary_flips}
+\end{figure}
 
 \subsubsection{Anatomical Structure Volatility}
 Anatomical analysis (Figure \ref{fig:heterogeneity_anatomy}) demonstrates that small, morphologically complex organs exhibit high flip volatility. The left and right adrenal glands show positive correction rates of 16.2\%/16.9\% in 3D UX-Net, 14.4\%/14.8\% in SwinUNETR, and 18.3\%/10.4\% in MedNeXt-M-K3. Conversely, large structures like the liver remain highly stable ($<3\%$ correctness activity).
 
 \begin{figure*}[tb]
 \centering
-\includegraphics[width=0.85\textwidth]{figures/obs-uxnet-concat/O_anatomy.png} \\
+\includegraphics[width=1.0\textwidth]{figures/obs-uxnet-concat/O_anatomy.png} \\
 \vspace{-2pt}{\small (a) 3D UX-Net Organ-Level Flips} \\[4pt]
-\includegraphics[width=0.85\textwidth]{figures/obs-swin-concat/O_anatomy.png} \\
+\includegraphics[width=1.0\textwidth]{figures/obs-swin-concat/O_anatomy.png} \\
 \vspace{-2pt}{\small (b) SwinUNETR Organ-Level Flips} \\[4pt]
-\includegraphics[width=0.85\textwidth]{figures/obs-mednext/O_anatomy.png} \\
+\includegraphics[width=1.0\textwidth]{figures/obs-mednext/O_anatomy.png} \\
 \vspace{-2pt}{\small (c) MedNeXt-M-K3 Organ-Level Flips} \\
 \caption{Organ-level flip breakdown across backbones on the BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders.}
 \label{fig:heterogeneity_anatomy}
@@ -126,7 +135,7 @@ Effi ($C_{48}, RF_2$) & 48 & 2 & 1.84 & 49.49 & 8.0 & 78.35 \\
 \centering
 \caption{Factor main effects ($\Delta_C, \Delta_{RF}$) and interaction ($\Delta_{C \times RF}$) across metrics on 3D UX-Net (BTCV CT).}
 \label{tab:factorial_effects}
-\small
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{@{}l c c c@{}}
 \toprule
 \textbf{Outcome Metric} & \textbf{Channel $\Delta_C$} & \textbf{Stage $\Delta_{RF}$} & \textbf{Interaction $\Delta_{C \times RF}$} \\
@@ -136,7 +145,8 @@ Params (M) & $-44.48$ & $-0.40$ & $+0.00$ \\
 FLOPs (GMac) & $-269.61$ & $-338.66$ & $+0.00$ \\
 Boundary Net Gain (\%) & $-0.020$ & $+0.033$ & $-0.004$ \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 \subsection{Positive-Gain Concentration ($K_{80}$)}
@@ -146,11 +156,11 @@ Figure \ref{fig:concentration} presents oracle benefit concentration curves. Acr
 
 \begin{figure}[tb]
 \centering
-\includegraphics[width=0.82\columnwidth]{figures/obs-uxnet-concat/O_pareto.png} \\
+\includegraphics[width=1.0\columnwidth]{figures/obs-uxnet-concat/O_pareto.png} \\
 \vspace{-2pt}{\small (a) 3D UX-Net Concentration Curve} \\[4pt]
-\includegraphics[width=0.82\columnwidth]{figures/obs-swin-concat/O_pareto.png} \\
+\includegraphics[width=1.0\columnwidth]{figures/obs-swin-concat/O_pareto.png} \\
 \vspace{-2pt}{\small (b) SwinUNETR Concentration Curve} \\[4pt]
-\includegraphics[width=0.82\columnwidth]{figures/obs-mednext/O_pareto.png} \\
+\includegraphics[width=1.0\columnwidth]{figures/obs-mednext/O_pareto.png} \\
 \vspace{-2pt}{\small (c) MedNeXt-M-K3 Concentration Curve}
 \caption{Oracle benefit concentration curves ($K_{80}$) across 3D UX-Net, SwinUNETR, and MedNeXt-M-K3.}
 \label{fig:concentration}
@@ -169,9 +179,9 @@ We evaluate whether cheap inference-time signals can locate regions where decode
 
 \begin{figure}[tb]
 \centering
-\includegraphics[width=0.82\columnwidth]{figures/obs-uxnet-concat/O3_entropy_by_flip.png} \\
+\includegraphics[width=1.0\columnwidth]{figures/obs-uxnet-concat/O3_entropy_by_flip.png} \\
 \vspace{-2pt}{\small (a) 3D UX-Net Flip Entropy Density} \\[4pt]
-\includegraphics[width=0.82\columnwidth]{figures/obs-swin-concat/O3_entropy_by_flip.png} \\
+\includegraphics[width=1.0\columnwidth]{figures/obs-swin-concat/O3_entropy_by_flip.png} \\
 \vspace{-2pt}{\small (b) SwinUNETR Flip Entropy Density}
 \caption{Conditional entropy density distributions for positive corrections ($P$) and negative degradations ($N$).}
 \label{fig:flip_density}
@@ -179,11 +189,11 @@ We evaluate whether cheap inference-time signals can locate regions where decode
 
 \begin{figure}[tb]
 \centering
-\includegraphics[width=0.82\columnwidth]{figures/obs-uxnet-concat/O3_unc_error.png} \\
+\includegraphics[width=1.0\columnwidth]{figures/obs-uxnet-concat/O3_unc_error.png} \\
 \vspace{-2pt}{\small (a) 3D UX-Net Predictability} \\[4pt]
-\includegraphics[width=0.82\columnwidth]{figures/obs-swin-concat/O3_unc_error.png} \\
+\includegraphics[width=1.0\columnwidth]{figures/obs-swin-concat/O3_unc_error.png} \\
 \vspace{-2pt}{\small (b) SwinUNETR Predictability} \\[4pt]
-\includegraphics[width=0.82\columnwidth]{figures/obs-mednext/O3_unc_error.png} \\
+\includegraphics[width=1.0\columnwidth]{figures/obs-mednext/O3_unc_error.png} \\
 \vspace{-2pt}{\small (c) MedNeXt-M-K3 Predictability}
 \caption{Inference-time block predictability (Location AUROC vs. Direction AUROC) across backbones.}
 \label{fig:predictability}
@@ -198,9 +208,9 @@ Figure \ref{fig:macro_recovery} presents retrospective hybrid prediction recover
 
 \begin{figure}[tb]
 \centering
-\includegraphics[width=0.82\columnwidth]{figures/obs-uxnet-concat/R_recovery.png} \\
+\includegraphics[width=1.0\columnwidth]{figures/obs-uxnet-concat/R_recovery.png} \\
 \vspace{-2pt}{\small (a) 3D UX-Net Macro Dice Recovery} \\[4pt]
-\includegraphics[width=0.82\columnwidth]{figures/obs-swin-concat/R_recovery.png} \\
+\includegraphics[width=1.0\columnwidth]{figures/obs-swin-concat/R_recovery.png} \\
 \vspace{-2pt}{\small (b) SwinUNETR Macro Dice Recovery}
 \caption{Macro-metric Dice recovery curves ($R_{\text{recovery}}$) under retrospective entropy-guided output hybridization vs. random selection.}
 \label{fig:macro_recovery}

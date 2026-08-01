@@ -129,13 +129,20 @@ where $I(v) = H(\bar{p}(v)) - \frac{1}{K}\sum_{k=1}^K H(p_k(v))$ over $K=8$ spat
 \subsubsection{Factorial Main Effects and Interaction Analysis}
 In our $2\times2$ decoder configuration grid, we quantify the channel main effect $\Delta_C$, stage main effect $\Delta_{RF}$, and channel-stage interaction $\Delta_{C \times RF}$ for any outcome metric $M$:
 \begin{equation}
-\Delta_C = \frac{1}{2} \big( M(C_{48}, RF_1) + M(C_{48}, RF_2) - M(C_{384}, RF_1) - M(C_{384}, RF_2) \big)
+\begin{split}
+\Delta_C = \frac{1}{2} \big( &M(C_{48}, RF_1) + M(C_{48}, RF_2) \\
+&- M(C_{384}, RF_1) - M(C_{384}, RF_2) \big)
+\end{split}
 \end{equation}
 \begin{equation}
-\Delta_{RF} = \frac{1}{2} \big( M(C_{384}, RF_2) + M(C_{48}, RF_2) - M(C_{384}, RF_1) - M(C_{48}, RF_1) \big)
+\begin{split}
+\Delta_{RF} = \frac{1}{2} \big( &M(C_{384}, RF_2) + M(C_{48}, RF_2) \\
+&- M(C_{384}, RF_1) - M(C_{48}, RF_1) \big)
+\end{split}
 \end{equation}
-\begin{small}
 \begin{equation}
-\Delta_{C \times RF} = M(C_{48}, RF_2) - M(C_{48}, RF_1) - M(C_{384}, RF_2) + M(C_{384}, RF_1)
+\begin{split}
+\Delta_{C \times RF} = &M(C_{48}, RF_2) - M(C_{48}, RF_1) \\
+&- M(C_{384}, RF_2) + M(C_{384}, RF_1)
+\end{split}
 \end{equation}
-\end{small}

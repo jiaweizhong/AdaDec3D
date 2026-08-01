@@ -47,11 +47,20 @@ A.~Shaker, M.~Maaz, H.~Rasheed, S.~Khan, M.-H. Yang, F.~S. Khan, Unetr++: Delvin
 \bibitem{jiang2024slimunetr}
 Y.~Jiang, Z.~Zhang, Y.~Liu, Slim unetr: Scale-efficient 3d medical image segmentation backbone, IEEE Transactions on Medical Imaging (2024).
 
+\bibitem{yu2018slimmable}
+J.~Yu, L.~Yang, N.~Xu, J.~Yang, T.~Huang, Slimmable neural networks, in: International Conference on Learning Representations, 2019.
+
+\bibitem{wang2021adaptive}
+Y.~Wang, Z.~Chen, H.~Jiang, S.~Song, Y.~Han, G.~Huang, Adaptive focus for efficient video recognition, in: Proceedings of the IEEE/CVF International Conference on Computer Vision, 2021, pp. 16249--16258.
+
 \bibitem{gal2016dropout}
 Y.~Gal, Z.~Ghahramani, Dropout as a bayesian approximation: Representing model uncertainty in deep learning, in: International Conference on Machine Learning (ICML), PMLR, 2016, pp. 1050--1059.
 
 \bibitem{lakshminarayanan2017simple}
 B.~Lakshminarayanan, A.~Pritzel, C.~Blundell, Simple and scalable predictive uncertainty estimation using deep ensembles, in: Advances in Neural Information Processing Systems (NeurIPS), Vol.~30, 2017.
+
+\bibitem{kendall2017uncertainties}
+A.~Kendall, Y.~Gal, What uncertainties do we need in bayesian deep learning for computer vision?, in: Advances in neural information processing systems, Vol.~30, 2017.
 
 \bibitem{geifman2017selective}
 Y.~Geifman, R.~El-Yaniv, Selective classification for deep neural networks, in: Advances in Neural Information Processing Systems (NeurIPS), Vol.~30, 2017.

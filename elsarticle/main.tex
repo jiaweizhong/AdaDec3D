@@ -1,5 +1,5 @@
 %% 
-%% CMIG formatted template for "Rethinking Decoder Redundancy in Efficient 3D Medical Image Segmentation: A Characterization Study"
+%% CMIG formatted template for "Rethinking Decoder Computation in 3D Medical Image Segmentation: A Characterization Study"
 %%
 
 \documentclass[final,5p,times,twocolumn]{elsarticle}
@@ -36,7 +36,7 @@
 \begin{frontmatter}
 
 %% Title, authors and addresses
-\title{Rethinking Decoder Redundancy in Efficient 3D Medical Image Segmentation: A Characterization Study}
+\title{Rethinking Decoder Computation in 3D Medical Image Segmentation: A Characterization Study}
 
 %% Authors
 \author[inst1]{Author One\corref{cor1}}
@@ -64,20 +64,21 @@
 
 %% Abstract
 \begin{abstract}
-Modern 3D medical image segmentation networks (e.g., vision transformers and large-kernel CNNs) increasingly incorporate heavy multi-resolution decoders, assuming that dense decoding is universally necessary across the volumetric grid. Conversely, efficient alternatives simplify these decoding pathways based on macroscopic metrics, assuming static capacity is uniformly redundant. However, where, under what spatial conditions, and to what extent additional decoder computation actually contributes to segmentation correctness remain uncharacterized. In this work, we present a systematic characterization study of decoder computation in 3D medical image segmentation. We establish an observation framework evaluating matched full ($E_0$) and efficient ($E_1$) decoder pairs under two complementary regimes: (i) end-to-end model comparison across 3D UX-Net, SwinUNETR, and MedNeXt-M-K3 backbones on three diverse clinical datasets—BTCV multi-organ CT, MSD Task01 BrainTumour MRI, and MSD Task08 HepaticVessel CT—to test real-world generalization, and (ii) decoder-isolated attribution analysis using frozen shared encoders to causally isolate channel reduction from stage removal interventions. Our findings establish a core conceptual distinction: \textit{decoder activity} measures where the decoder acts (prediction-changing locations), whereas \textit{decoder net gain} measures whether those changes are beneficial. Globally, additional decoder computation yields a net-neutral benefit ($R_{net} < 0.1\%$) as positive voxel corrections are counterbalanced by negative degradations. Spatially, positive net gain is highly concentrated near anatomical boundaries, with an oracle selecting the top 5\% of spatial blocks recovering 80\% of the total positive decoder benefit ($K_{80} = 5\%$). Furthermore, while inference-time predictive entropy reliably locates active regions (Location AUROC $>0.90$), it fails to distinguish positive corrections from negative degradations (Direction AUROC $\approx 0.55$). This demonstrates that prediction difficulty and computational utility are related but fundamentally distinct quantities, providing essential empirical constraints and design directions for future utility-aware adaptive decoders.
+Modern 3D medical image segmentation networks (e.g., vision transformers and large-kernel CNNs) increasingly incorporate heavy multi-resolution decoders, assuming that dense decoding is universally necessary across the volumetric grid. Conversely, efficient alternatives (e.g. EffiDec3D and EfficientMedNeXt) simplify these decoding pathways based on macroscopic metrics. However, where, under what spatial conditions, and to what extent additional decoder computation actually contributes to segmentation correctness remain uncharacterized. In this work, we present a systematic characterization study of decoder computation in 3D medical image segmentation. We evaluate end-to-end full–efficient decoder pairs across three representative backbones on BTCV CT, examine cross-dataset consistency using 3D UX-Net across BTCV CT, MSD01 BrainTumour MRI, and MSD08 HepaticVessel CT, and perform controlled factor attribution using a frozen shared-encoder $2\times2$ factorial design on 3D UX-Net. Our findings establish a core conceptual distinction: \textit{correctness activity} measures where the decoder alters prediction correctness (gross activity), whereas \textit{decoder net gain} measures the directional balance between positive voxel corrections and negative degradations. We demonstrate that additional decoder capacity produces substantial gross correctness activity that is largely offset by bidirectional cancellation, resulting in small global net gain. Spatially, positive net gain is highly concentrated near ground-truth anatomical boundaries, with an oracle selector containing 80\% of positive decoder gain on a 5\% spatial block budget ($K_{80} \le 5\%$). Furthermore, while inference-time predictive entropy reliably locates active regions (Location AUROC $>0.90$), it provides weak directional discrimination (Direction AUROC $\approx 0.545$--$0.591$). Retrospectively substituting full-decoder outputs within a 20\% entropy-selected block budget recovers 100\% of the macro-metric Dice gap across evaluated backbones. This demonstrates that prediction difficulty and computational utility are related but fundamentally distinct quantities, providing essential characterization insights, opportunity bounds, and design directions for future utility-aware adaptive decoders.
 \end{abstract}
 
 %% Highlights
 \begin{highlights}
 \item Characterizes the spatial contribution of additional decoder computation in 3D segmentation.
-\item Establishes the distinction between decoder activity (where it acts) and net gain (whether it helps).
-\item Demonstrates net-neutral global voxel correctness alongside extreme boundary concentration ($K_{80}=5\%$).
-\item Proves predictive uncertainty signals activity but fails to predict directional decoder utility.
+\item Establishes the distinction between correctness activity (gross changes) and net gain (directional benefit).
+\item Demonstrates substantial bidirectional correctness changes with small net gain alongside extreme boundary concentration ($K_{80}\le5\%$).
+\item Demonstrates predictive uncertainty signals activity but provides weak directional discrimination.
+\item Evaluates retrospective output-space hybridization to recover macro Dice gaps without over-extrapolating runtime speedups.
 \end{highlights}
 
 %% Keywords
 \begin{keyword}
-3D Medical Image Segmentation \sep Efficient Deep Learning \sep Uncertainty Quantification \sep Decoder Redundancy \sep Model Characterization
+3D Medical Image Segmentation \sep Efficient Deep Learning \sep Uncertainty Quantification \sep Decoder Computation \sep Model Characterization
 \end{keyword}
 
 \end{frontmatter}
@@ -87,8 +88,9 @@ Modern 3D medical image segmentation networks (e.g., vision transformers and lar
 \input{sections/related_work}
 \input{sections/methods}
 \input{sections/experiments}
-\FloatBarrier %% Force all figures to output before Discussion & Conclusion
+\input{sections/results}
 \input{sections/discussion}
+\FloatBarrier %% Force all figures to output before Conclusion
 \input{sections/conclusion}
 \FloatBarrier
 
@@ -102,7 +104,7 @@ The authors declare that they have no known competing financial interests or per
 
 %% Data availability
 \section*{Data availability}
-The data used in this study (BTCV/Synapse, MSD Task01 BrainTumour, and MSD Task08 HepaticVessel) are publicly available.
+The data used in this study (BTCV/Synapse, MSD01 BrainTumour, and MSD08 HepaticVessel) are publicly available.
 
 %% Bibliography
 \bibliographystyle{elsarticle-num} 
@@ -116,22 +118,22 @@ The data used in this study (BTCV/Synapse, MSD Task01 BrainTumour, and MSD Task0
 \setcounter{figure}{0}
 \setcounter{table}{0}
 
-\section*{Supplementary Material: Qualitative Visualizations for SwinUNETR and MedNeXt-M-K3}
+\section*{Supplementary Material: Qualitative Visualizations for 3D UX-Net and MedNeXt-M-K3}
 
-This section provides supplementary qualitative visualizations for SwinUNETR and MedNeXt-M-K3 backbones, complementing the 3D UX-Net qualitative motivation example in Figure 1 of the main manuscript.
+This section provides supplementary qualitative visualizations for 3D UX-Net and MedNeXt-M-K3 backbones, complementing the SwinUNETR qualitative motivation example in Figure 2 of the main manuscript.
 
-\begin{figure*}[htbp]
+\begin{figure}[htbp]
 \centering
-\includegraphics[width=0.9\textwidth]{figures/obs-swin-concat/figure1_motivation.png}
-\caption{Supplementary Figure S1: Qualitative motivation visualization for SwinUNETR ($E_0$ vs. $E_1$) on BTCV CT multi-organ segmentation. Voxel-level prediction flips (positive corrections and negative degradations) are tightly localized to high-entropy organ boundaries.}
-\label{fig:supp_swin}
-\end{figure*}
+\includegraphics[width=0.95\columnwidth]{figures/obs-uxnet-concat/figure1_motivation.png}
+\caption{Supplementary Figure S1: Qualitative motivation visualization for 3D UX-Net on BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders.}
+\label{fig:supp_uxnet}
+\end{figure}
 
-\begin{figure*}[htbp]
+\begin{figure}[htbp]
 \centering
-\includegraphics[width=0.9\textwidth]{figures/obs-mednext/figure1_motivation.png}
-\caption{Supplementary Figure S2: Qualitative motivation visualization for MedNeXt-M-K3 ($E_0$ vs. $E_1$) on BTCV CT multi-organ segmentation. Consistent with 3D UX-Net and SwinUNETR, decoder-induced flips are concentrated within narrow boundary bands.}
+\includegraphics[width=0.95\columnwidth]{figures/obs-mednext/figure1_motivation.png}
+\caption{Supplementary Figure S2: Qualitative motivation visualization for MedNeXt-M-K3 on BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders.}
 \label{fig:supp_mednext}
-\end{figure*}
+\end{figure}
 
 \end{document}

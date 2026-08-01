@@ -1,28 +1,17 @@
-%% 
-%% Supplementary Material for "Rethinking Decoder Redundancy in Efficient 3D Medical Image Segmentation: A Characterization Study"
-%%
-
 \documentclass[final,5p,times,twocolumn]{elsarticle}
-
 \usepackage{amssymb}
 \usepackage{amsmath}
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{multirow}
 \usepackage{hyperref}
-
-%% Configure Supplementary Figure / Table numbering (Figure S1, S2...)
-\renewcommand{\thefigure}{S\arabic{figure}}
-\renewcommand{\thetable}{S\arabic{table}}
-\setcounter{figure}{0}
-\setcounter{table}{0}
+\usepackage{dblfloatfix}
 
 \journal{Computerized Medical Imaging and Graphics}
 
 \begin{document}
 
 \begin{frontmatter}
-
 \title{Supplementary Material: Rethinking Decoder Redundancy in Efficient 3D Medical Image Segmentation: A Characterization Study}
 
 \author[inst1]{Author One\corref{cor1}}
@@ -45,25 +34,30 @@
             postcode={00000}, 
             state={State},
             country={Country}}
-
 \end{frontmatter}
+
+\appendix
+\renewcommand{\thefigure}{S\arabic{figure}}
+\renewcommand{\thetable}{S\arabic{table}}
+\setcounter{figure}{0}
+\setcounter{table}{0}
 
 \section*{Supplementary Qualitative Visualizations}
 
-This document provides supplementary qualitative visualizations for SwinUNETR and MedNeXt-M-K3 backbones, complementing the 3D UX-Net qualitative motivation example in Figure 1 of the main manuscript.
+This supplementary document provides additional qualitative visualizations for 3D UX-Net and MedNeXt-M-K3 backbones, complementing the SwinUNETR qualitative motivation example in Figure 2 of the main manuscript.
 
-\begin{figure*}[htbp]
+\begin{figure}[htbp]
 \centering
-\includegraphics[width=0.9\textwidth]{figures/obs-swin-concat/figure1_motivation.png}
-\caption{Supplementary Figure S1: Qualitative motivation visualization for SwinUNETR ($E_0$ vs. $E_1$) on BTCV CT multi-organ segmentation. Voxel-level prediction flips (positive corrections and negative degradations) are tightly localized to high-entropy organ boundaries.}
-\label{fig:supp_swin}
-\end{figure*}
+\includegraphics[width=0.95\columnwidth]{figures/obs-uxnet-concat/figure1_motivation.png}
+\caption{Supplementary Figure S1: Qualitative motivation visualization for 3D UX-Net on BTCV CT multi-organ dataset.}
+\label{fig:supp_uxnet}
+\end{figure}
 
-\begin{figure*}[htbp]
+\begin{figure}[htbp]
 \centering
-\includegraphics[width=0.9\textwidth]{figures/obs-mednext/figure1_motivation.png}
-\caption{Supplementary Figure S2: Qualitative motivation visualization for MedNeXt-M-K3 ($E_0$ vs. $E_1$) on BTCV CT multi-organ segmentation. Consistent with 3D UX-Net and SwinUNETR, decoder-induced flips are concentrated within narrow boundary bands.}
+\includegraphics[width=0.95\columnwidth]{figures/obs-mednext/figure1_motivation.png}
+\caption{Supplementary Figure S2: Qualitative motivation visualization for MedNeXt-M-K3 on BTCV CT multi-organ dataset.}
 \label{fig:supp_mednext}
-\end{figure*}
+\end{figure}
 
 \end{document}

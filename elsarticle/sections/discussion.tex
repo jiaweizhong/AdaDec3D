@@ -1,21 +1,40 @@
 \section{Discussion}
 \label{sec:discussion}
 
-This characterization study shifts the evaluation of decoder efficiency from empirical FLOPs reduction toward understanding spatial computation dynamics. This section synthesizes the underlying mechanisms and distills design directions for future adaptive 3D segmentation decoders.
+This characterization study shifts the evaluation of decoder efficiency from macroscopic FLOPs reduction toward understanding spatial computation dynamics. This section synthesizes the underlying mechanisms, addresses metric paradoxes, outlines architectural implications, and details study limitations.
 
-\subsection{Why Aggregate Metrics Hide Decoder Behavior}
-Standard evaluation paradigms assess segmentation models using global metrics like Dice or Hausdorff distance. These macroscopic metrics average positive corrections and negative degradations across the entire volume, concealing localized micro-dynamics. Furthermore, because homogeneous organ interiors dominate the voxel count, net boundary improvements are diluted by large inactive regions. This explains why conventional evaluation frameworks have historically encouraged uniform decoder expansion despite underlying spatial redundancy.
+\subsection{Decoder Activity versus Net Benefit}
+Our observational findings demonstrate that additional decoder capacity does not simply act as a monotonic accuracy enhancer. Instead, it generates substantial gross correctness activity $A_{\text{corr}}(v) = P(v) + N(v)$, which is largely offset by bidirectional cancellation ($P(v) \approx N(v)$). Positive corrections and negative degradations coexist within ambiguous boundary regions, producing substantial local activity but much smaller aggregate net gain. Rather than systematically fixing errors volume-wide, high-capacity decoders reallocate predictions near ambiguous boundaries.
 
-\subsection{Spatial Concentration Creates an Opportunity, Not a Solution}
-Our findings demonstrate that positive decoder net gain is strongly concentrated ($K_{80} = 5\%$). However, it is essential to distinguish \textit{intrinsic spatial concentration} from \textit{practical deployable recoverability}. Oracle concentration proves that selective decoding is theoretically worthwhile under an ideal selector. But realizing these computational savings requires identifying beneficial regions prior to executing the full decoder. Concentration illustrates the theoretical opportunity; it does not solve the routing problem.
+\subsection{Coexistence of Small Voxel Net Gain and Macro Dice Improvement}
+A key question arises: \textit{How can additional decoder computation yield a small global net voxel gain ($R_{\text{net}} < 0.1\%$) while still improving macroscopic Dice by 1--2 percentage points?}
 
-\subsection{Uncertainty Is an Activity Signal, Not a Utility Signal}
-Why does predictive entropy predict flip locations ($>0.90$ AUROC) but fail to predict directional improvement ($\approx 0.55$ AUROC)? Entropy measures epistemic task difficulty and spatial ambiguity, effectively locating boundary regions where predictions are unstable. However, entropy indicates region difficulty rather than whether a static full decoder possesses the correct inductive bias to fix the error. Because efficient baseline decoders are already competitive, executing additional decoder capacity on uncertain voxels is susceptible to shortcut learning dynamics \cite{geirhos2020shortcut} and equally likely to degrade a correct prediction as it is to fix an error. \textit{Prediction difficulty and computational utility are related but fundamentally distinct quantities.}
-
-\subsection{Design Directions for Adaptive Decoders}
-Based on these empirical findings, we distill three evidence-backed directions for designing future adaptive decoders:
+This coexistence stems from the fundamental difference in metric weighting:
 \begin{enumerate}
-    \item \textbf{Explore Spatially Selective Refinement}: The concentration results motivate sparse or region-specific high-resolution decoding rather than uniformly allocating maximum decoder capacity across the entire volumetric grid.
-    \item \textbf{Predict Expected Gain Rather Than Uncertainty Alone}: Difficulty signals identify where predictions are unstable, but predicting directional improvement requires routing modules designed to estimate expected net gain from extra computation.
-    \item \textbf{Couple Routing More Closely with Refinement}: The limited performance of scalar post-hoc signals motivates exploring learned utility predictors or jointly optimized routing and refinement modules trained end-to-end with directional supervision.
+    \item \textbf{Voxel Accuracy Weighting}: Global voxel correctness is heavily dominated by vast background regions and large organ interiors, where predictions are stable under both full and efficient decoders.
+    \item \textbf{Macro Dice Sensitivity}: The macro-averaged Mean Dice used in our evaluation assigns equal weight to anatomical classes and is foreground-sensitive. Positive voxel corrections $P(v)$ occurring at thin anatomical boundaries or small, morphologically volatile organs (such as the adrenal glands) exert a disproportionately large impact on macroscopic Dice scores.
+\end{enumerate}
+Therefore, a small global net voxel gain does not imply that additional decoder capacity lacks segmentation value; rather, its value is concentrated at Dice-sensitive boundary regions.
+
+\subsection{Implications for Adaptive Decoder Design}
+Based on these observational insights, we distill three evidence-backed directions for designing future adaptive decoders:
+\begin{enumerate}
+    \item \textbf{Predict Expected Gain Rather Than Uncertainty}: Predictive entropy measures task difficulty and spatial ambiguity ($>0.90$ Location AUROC), but provides weak directional discrimination ($\approx 0.545$--$0.591$ Direction AUROC). Future routing policies should train auxiliary heads to directly predict net accuracy gain rather than reusing task uncertainty signals.
+    \item \textbf{Decouple Spatial Resolution from Channel Capacity}: High-resolution decoding stages specifically drive boundary refinement, whereas channel capacity provides diffuse representation. Adaptive decoders should selectively allocate high-resolution upsampling paths near boundaries while maintaining narrow channel widths volume-wide.
+    \item \textbf{Exploit Boundary Concentration for Retrospective Opportunity Bounds}: Positive gain is spatially concentrated in 5\% of spatial blocks ($K_{80} \le 5\%$), establishing a high-ceiling opportunity for future dynamic compute allocation engines.
+\end{enumerate}
+
+\subsection{Limitations}
+\label{sec:limitations}
+
+To ensure rigorous interpretation, we explicitly highlight the scope boundaries and limitations of this characterization study:
+\begin{enumerate}
+    \item \textbf{Intervention Scope}: Controlled decoder interventions follow the channel-reduction and stage-omission strategies of EffiDec3D \cite{effidec3d}; they do not cover all conceivable decoder simplifications (e.g., pruning or neural architecture search).
+    \item \textbf{Factorial Scope}: Factorial factor attribution was conducted specifically on 3D UX-Net and BTCV CT; while end-to-end trends generalize across SwinUNETR and MedNeXt, factor-level interaction may vary across network families.
+    \item \textbf{Training Trajectory Control}: End-to-end models were independently trained under identical hyperparameters. While frozen shared encoders eliminate feature variation, independent optimizer trajectories still contribute minor weight noise.
+    \item \textbf{Hybridization Protocol}: Evaluation of selective routing relies on retrospective output-space hybridization rather than an active, real-time dynamic hardware execution engine.
+    \item \textbf{FLOP Realization}: Retrospective hybrid recovery ($R_{\text{recovery}}$) represents an output-space ceiling bound and does not demonstrate realized runtime latency savings or hardware kernel speedups.
+    \item \textbf{Dataset Sample Sizes}: Clinical evaluations were conducted on established benchmarks (BTCV, MSD01, MSD08), but total subject counts remain bounded by public dataset sizes.
+    \item \textbf{Boundary Formulation}: Primary spatial distance analysis relies on ground-truth anatomical boundaries; while preventing prediction circularity, boundary definitions depend on spatial distance transform thresholds.
+    \item \textbf{Predictor Scope}: Inference-time predictability focused on predictive entropy and TTA mutual information; non-uncertainty signals (e.g., feature norm metrics) were not evaluated.
 \end{enumerate}

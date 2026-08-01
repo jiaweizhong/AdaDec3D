@@ -1,22 +1,67 @@
 \section{Methods: A Characterization Framework}
 \label{sec:methods}
 
-To understand the spatial and functional contribution of decoder computation, we establish a controlled observation framework (Figure \ref{fig:framework}). We evaluate matched pairs of full and efficient decoders as experimental probes under two complementary regimes: (i) \textit{end-to-end model comparison} across independently trained networks to assess real-world generalization, and (ii) \textit{decoder-isolated attribution analysis} using frozen shared encoders to isolate decoder capacity interventions.
+To understand the spatial and functional contribution of decoder computation, we establish a controlled observation framework (Figure \ref{fig:framework}). This section outlines the controlled decoder interventions, voxel-level correctness framework, rate definitions, spatial block partitioning, and characterization metrics.
 
 \begin{figure*}[t]
 \centering
 \includegraphics[width=0.98\textwidth]{figures/figure1_framework}
-\caption{Overview of the decoder-computation characterization framework. Step 1 (Controlled Decoder Comparisons): Full and efficient decoder pairs are evaluated under two complementary regimes (independently trained end-to-end pairs for cross-architecture consistency, and frozen shared-encoder factorials for decoder-isolated causal attribution). Step 2 (Voxel Activity and Net Gain): Voxel-level corrections and degradations establish the fundamental dichotomy between Decoder Activity (where the decoder acts) and Net Gain (where it helps). Step 3 (Three Characterization Axes): Probes spatial heterogeneity, benefit concentration, and predictability. Step 4 (Design Implications): Translates empirical insights into evidence-backed directions for adaptive decoder design.}
+\caption{Overview of the decoder computation characterization framework across Step 1 (Controlled Interventions), Step 2 (Voxel Correctness Activity $A_{\text{corr}}(v)$ and Net Gain $G(v)$), and Step 3 (Three Characterization Axes).}
 \label{fig:framework}
 \end{figure*}
 
-\subsection{Controlled Decoder Comparison}
-Let $v$ denote a voxel within a 3D medical image volume $V$. We compare two decoder configurations:
+\subsection{Controlled Decoder Interventions}
+\label{sec:interventions}
+
+We analyze decoder capacity by isolating two generic architectural factors that govern volumetric decoding computation:
+\begin{enumerate}
+    \item \textbf{Channel Capacity ($C_{\text{dec}}$)}: The feature channel dimension across upsampling layers, controlling feature representation width ($C_{\text{full}} \rightarrow C_{\text{reduced}}$).
+    \item \textbf{High-Resolution Decoder Stages ($RF$)}: The resolution scaling factor, controlling whether high-resolution upsampling stages (e.g., full resolution $1\times$) are retained ($RF_1$) or omitted ($RF_2$).
+\end{enumerate}
+
+Crossing these two experimental factors forms a $2\times2$ factorial intervention design (Full $E_0$, Channel-reduced, Stage-reduced, and Combined-efficient $E_1$). The specific channel-reduction ratios and stage-removal configurations follow the architecture-preserving decoder simplification strategy introduced by EffiDec3D \cite{effidec3d}. Interventions occur strictly within the decoder pathway (upsampling, skip fusion, and refinement) while keeping the feature encoder architecture untouched.
+
+\textbf{Choice of Intervention Template}: We adopt the reduction principles of EffiDec3D as a controlled intervention template rather than treating EffiDec3D itself as the primary object of evaluation. Its decoder-localized and architecture-preserving modifications provide matched configurations in which channel capacity and high-resolution stage retention can be independently controlled. This enables spatial characterization of decoder contribution while minimizing confounding changes to the encoder family, prediction task, or training objective.
+
+\subsection{Voxel-Level Correctness Activity Framework}
+\label{sec:framework}
+
+Let $v$ denote a voxel within a 3D medical image volume $V$, with ground truth label $y(v)$, full decoder prediction $\hat{y}_f(v)$, and efficient decoder prediction $\hat{y}_e(v)$. Comparing predictions between matched $E_0$ and $E_1$ decoders yields two correctness-changing outcomes per voxel (Figure \ref{fig:motivation}; see Supplementary Figures S1 and S2 for 3D UX-Net and MedNeXt-M-K3 visualizations):
 \begin{itemize}
-    \item \textbf{Full Decoder ($E_0$)}: The standard dense, multi-stage high-resolution decoder of the respective backbone architecture.
-    \item \textbf{Efficient Decoder ($E_1$)}: A parameter-matched efficient decoder following the EffiDec3D specification \cite{effidec3d}, utilizing channel reduction and stage removal with concatenation skip aggregation.
+    \item \textbf{Positive Correction ($P(v)$)}: $P(v) = \mathbf{1}[\hat{y}_e(v) \neq y(v) \wedge \hat{y}_f(v) = y(v)]$, where the full decoder corrects an efficient baseline error.
+    \item \textbf{Negative Degradation ($N(v)$)}: $N(v) = \mathbf{1}[\hat{y}_e(v) = y(v) \wedge \hat{y}_f(v) \neq y(v)]$, where the full decoder alters a previously correct efficient prediction.
 \end{itemize}
-Let $y(v)$ be the ground truth label, $\hat{y}_f(v)$ be the prediction from the full decoder, and $\hat{y}_e(v)$ be the prediction from the efficient decoder. Interventions occur strictly within the decoder pathway (upsampling, skip fusion, and refinement).
+
+Defining voxel correctness indicators $C_f(v) = \mathbf{1}[\hat{y}_f(v) = y(v)]$ and $C_e(v) = \mathbf{1}[\hat{y}_e(v) = y(v)]$, we formalize two fundamental voxel indicators:
+\begin{itemize}
+    \item \textbf{Decoder Net Gain ($G(v) = C_f(v) - C_e(v) = P(v) - N(v)$)}: Measures the net directional balance ($G(v) = +1$ for correction, $-1$ for degradation, $0$ for unchanged).
+    \item \textbf{Correctness Activity ($A_{\text{corr}}(v) = P(v) + N(v) = |G(v)|$)}: Measures where additional decoder capacity alters prediction correctness (gross activity).
+\end{itemize}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.70\textwidth]{figures/obs-swin-concat/figure1_motivation}
+\caption{Qualitative illustration of correctness activity and directional gain for SwinUNETR on BTCV CT dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders (see Supplementary Figures S1 and S2 for 3D UX-Net and MedNeXt-M-K3).}
+\label{fig:motivation}
+\end{figure*}
+
+\subsection{Subject-Level Rate Formulations and Evaluated Domains}
+\label{sec:rates}
+
+To aggregate voxel-level indicators into global rates for subject $i$, we define the subject-level positive correction rate $R_{\text{pos}}^{(i)}$, negative degradation rate $R_{\text{neg}}^{(i)}$, gross correctness activity rate $R_{\text{act}}^{(i)}$, and net gain rate $R_{\text{net}}^{(i)}$ over an evaluation domain $\Omega_i$:
+\begin{equation}
+R_{\text{pos}}^{(i)} = \frac{1}{|\Omega_i|} \sum_{v \in \Omega_i} P_i(v), \quad R_{\text{neg}}^{(i)} = \frac{1}{|\Omega_i|} \sum_{v \in \Omega_i} N_i(v)
+\end{equation}
+\begin{equation}
+R_{\text{act}}^{(i)} = R_{\text{pos}}^{(i)} + R_{\text{neg}}^{(i)}, \quad R_{\text{net}}^{(i)} = R_{\text{pos}}^{(i)} - R_{\text{neg}}^{(i)}
+\end{equation}
+
+We evaluate rates across two explicit spatial domains $\Omega_i$:
+\begin{enumerate}
+    \item \textbf{All-Volume Domain ($\Omega_{\text{all}}$)}: All voxels within the 3D bounding volume grid $V_i$, denoted by $R_{\text{act}}^{\text{all}}$ and $R_{\text{net}}^{\text{all}}$.
+    \item \textbf{Foreground-Union Domain ($\Omega_{\text{fg}}$)}: The subset of voxels belonging to ground-truth or predicted foreground structures: $\Omega_{\text{fg}} = \{v \in V_i \mid y_i(v) > 0 \lor \hat{y}_{e,i}(v) > 0 \lor \hat{y}_{f,i}(v) > 0\}$, denoted by $R_{\text{act}}^{\text{fg}}$ and $R_{\text{net}}^{\text{fg}}$.
+\end{enumerate}
+Global metrics are reported as subject-level population means with 95\% confidence intervals computed via 1000-resample paired bootstrapping across subjects.
 
 \begin{table*}[t]
 \centering
@@ -27,82 +72,70 @@ Let $y(v)$ be the ground truth label, $\hat{y}_f(v)$ be the prediction from the 
 \toprule
 \textbf{Analysis Objective} & \textbf{Evaluation Measure} & \textbf{Question Answered} \\
 \midrule
-Spatial effect & Activity $A(v)$ & Where does additional decoder computation change predictions? \\
+Gross spatial effect & Correctness Activity $A_{\text{corr}}(v)$ & Where does additional decoder computation change prediction correctness? \\
 Directional effect & Net Gain $G(v)$ & Where does the decoder improve correctness overall? \\
-Concentration & Oracle $K_{80}$ & How spatially concentrated is positive net gain? \\
-Activity predictability & Location AUROC & Can cheap signals detect where the decoder acts? \\
+Benefit concentration & Oracle $K_{80}$ & How spatially concentrated is positive net gain? \\
+Activity predictability & Location AUROC & Can cheap signals detect where correctness changes occur? \\
 Gain predictability & Direction AUROC & Can cheap signals distinguish beneficial from harmful changes? \\
-Macro recovery & Macro Recovery $R_{\text{recovery}}(k)$ & How much of the full decoder's Dice gap is recovered by boundary routing? \\
+Retrospective recovery & Retrospective Hybrid $R_{\text{recovery}}(k)$ & How much of the full decoder's Dice gap is recovered by output hybridization? \\
 Multi-sample uncertainty & TTA Mutual Info $I(v)$ & Does multi-view epistemic disagreement resolve direction predictability? \\
 \bottomrule
 \end{tabular*}
 \end{table*}
 
-\subsection{Decoder-Induced Corrections and Degradations}
-Comparing predictions between the efficient and full decoders at each voxel yields three possible outcomes: the full decoder corrects an error, introduces an error, or leaves prediction correctness unchanged (Figure \ref{fig:motivation}; see Supplementary Figures S1 and S2 for SwinUNETR and MedNeXt-M-K3 qualitative visualizations):
-\begin{itemize}
-    \item \textbf{Positive Correction ($P(v)$)}: $P(v) = 1[\hat{y}_e(v) \neq y(v) \wedge \hat{y}_f(v) = y(v)]$.
-    \item \textbf{Negative Degradation ($N(v)$)}: $N(v) = 1[\hat{y}_e(v) = y(v) \wedge \hat{y}_f(v) \neq y(v)]$.
-\end{itemize}
-We define two fundamental analytical quantities:
-\begin{itemize}
-    \item \textbf{Decoder Activity ($A(v) = P(v) + N(v)$)}: Indicates where additional decoder capacity alters prediction correctness, regardless of direction.
-    \item \textbf{Decoder Net Gain ($G(v) = P(v) - N(v)$)}: Distinguishes beneficial corrections from harmful degradations.
-\end{itemize}
-\textit{Decoder activity measures where the decoder acts, whereas decoder gain measures whether those changes are beneficial or harmful.}
+\subsection{Characterization Metrics and Spatial Partitioning}
+\label{sec:formulations}
 
-\begin{figure*}[t]
-\centering
-\includegraphics[width=0.9\textwidth]{figures/obs-uxnet-concat/figure1_motivation}
-\caption{Qualitative illustration of decoder activity and directional gain (3D UX-Net on BTCV CT multi-organ dataset). While the full decoder corrects certain errors of the efficient baseline (positive flips), it also alters previously correct predictions (negative flips) near high-entropy organ boundaries, demonstrating non-uniform spatial contribution (see Supplementary Figures S1 and S2 for SwinUNETR and MedNeXt-M-K3).}
-\label{fig:motivation}
-\end{figure*}
+We evaluate decoder contribution across three core analytical axes (Table \ref{tab:framework_summary}):
 
-\subsection{Spatial Characterization of Decoder Effects}
-We analyze Activity $A(v)$ and Net Gain $G(v)$ across two spatial dimensions:
-\begin{enumerate}
-    \item \textbf{Boundary-Distance Stratification}: Distance to the nearest organ boundary using a multi-class union foreground mask $\bigcup_{c} (y(v)=c \cup \hat{y}_e(v)=c \cup \hat{y}_f(v)=c)$ \cite{taha2015metrics}.
-    \item \textbf{Anatomical Structure Breakdown}: Aggregated $A(v)$ and $G(v)$ across individual organ structures.
-\end{enumerate}
-
-\subsection{Spatial Concentration and Macro-Metric Recovery}
-We partition the 3D volume into spatial sub-blocks $b_r$ and compute block net gain:
+\subsubsection{Physical Ground-Truth Anatomical Boundary Distance}
+To prevent circularity from model prediction boundaries, spatial distance analysis is anchored strictly to the \textbf{Ground-Truth Anatomical Boundary} using physical Euclidean distances. Incorporating dataset voxel spacings $\mathbf{D} = \text{diag}(s_x, s_y, s_z)$, physical distance $d_{GT}(v)$ is defined by:
 \begin{equation}
-G(r) = \sum_{v \in b_r} G(v)
+d_{GT}(v) = \min_{u \in \partial S_{GT}} \| \mathbf{D} (x_v - x_u) \|_2
 \end{equation}
-Sorting blocks by $G(r)$, the fraction of positive gain recovered by the top $k\%$ of blocks is defined by the coverage curve:
+where $\partial S_{GT}$ represents the boundary voxel set of ground-truth annotations $\bigcup_{c} (y(v)=c)$. Correctness activity $A_{\text{corr}}(v)$ and net gain $G(v)$ are stratified across physical distance bands ($0\text{--}2\text{ mm}, 2\text{--}4\text{ mm}, 4\text{--}8\text{ mm}, >8\text{ mm}$).
+
+\subsubsection{Spatial Block Construction and Physical Scale}
+For block-level spatial analysis, volumes are resampled to dataset-specific target spacings (BTCV: $1.5 \times 1.5 \times 2.0\text{ mm}^3$; MSD01: $1.0 \times 1.0 \times 1.0\text{ mm}^3$; MSD08: $0.8 \times 0.8 \times 1.5\text{ mm}^3$). To ensure cross-dataset comparability, block dimensions are constructed to match physical dimensions of approximately $24 \times 24 \times 24\text{ mm}$ (BTCV: $16 \times 16 \times 12$ voxels; MSD01: $24 \times 24 \times 24$ voxels; MSD08: $30 \times 30 \times 16$ voxels). Block activity $A_{\text{corr}}(r) = \mathbf{1}[\sum_{v \in b_r} A_{\text{corr}}(v) > 0]$ detects active blocks. For directional utility classification, blocks with non-zero net gain $G(r) = \sum_{v \in b_r} G(v) \neq 0$ are evaluated for direction AUROC, excluding zero-gain blocks. Block-level metrics ($K_{80}$, Location AUROC, Direction AUROC) were computed within each subject and summarized across subjects, with confidence intervals estimated using clustered bootstrap resampling at the subject level.
+
+\subsubsection{Positive Gain Concentration ($K_{80}$)}
+Sorting blocks by $G(r)$, oracle coverage is defined by:
 \begin{equation}
-Coverage(k) = \frac{\sum_{r=1}^{k\% \cdot |B|} \max(G(r), 0)}{\sum_{r=1}^{|B|} \max(G(r), 0)}
+Coverage(k) = \frac{\sum_{r=1}^{\lfloor (k/100) \cdot |B| \rfloor} \max(G(r), 0)}{\sum_{r=1}^{|B|} \max(G(r), 0)}
 \end{equation}
-We record $K_{80}$, defined as the smallest fraction of spatial blocks required by a perfect selector to recover 80\% of the total positive decoder gain, establishing an empirical limit under selective prediction \cite{geifman2017selective}. A selective hybrid prediction $\hat{y}_k(v)$ executes the full decoder on selected blocks $S_k$ and the efficient baseline elsewhere:
+We record $K_{80}$, defined as the minimum percentage of spatial blocks required by an oracle selector to contain 80\% of the total positive decoder gain \cite{geifman2017selective}.
+
+\subsubsection{Retrospective Output-Space Hybridization ($R_{\text{recovery}}$)}
+To evaluate whether boundary-localized decoder improvements account for macro-metric gains, we evaluate a retrospective output-space hybrid prediction $\hat{y}_k(v)$, which substitutes full decoder predictions $\hat{y}_f(v)$ into selected blocks $S_k$ while retaining efficient baseline predictions $\hat{y}_e(v)$ elsewhere:
 \begin{equation}
 \hat{y}_k(v) = \begin{cases}
 \hat{y}_f(v), & \text{if } v \in S_k \\
 \hat{y}_e(v), & \text{otherwise}
 \end{cases}
 \end{equation}
-To evaluate macro-metric impact, we compute the macro Dice recovery fraction $R_{\text{recovery}}(k)$:
+When $\text{Dice}(\hat{y}_f) - \text{Dice}(\hat{y}_e) > 0$, we measure retrospective Dice gap recovery fraction $R_{\text{recovery}}(k)$:
 \begin{equation}
 R_{\text{recovery}}(k) = \frac{\text{Dice}(\hat{y}_k) - \text{Dice}(\hat{y}_e)}{\text{Dice}(\hat{y}_f) - \text{Dice}(\hat{y}_e)}
 \end{equation}
-which quantifies the proportion of the full decoder's macro Dice advantage recovered by executing the full decoder on a $k\%$ spatial block budget.
+If the full decoder gap is non-positive ($\text{Dice}(\hat{y}_f) \le \text{Dice}(\hat{y}_e)$), absolute Dice difference $\Delta \text{Dice}(k) = \text{Dice}(\hat{y}_k) - \text{Dice}(\hat{y}_e)$ is reported instead. Values $R_{\text{recovery}}(k) > 1.0$ indicate over-recovery and are retained unclipped.
 
-\subsection{Predictability, Uncertainty Signals, and TTA Mutual Information}
-We compute predictive Shannon entropy $H(v)$ from the efficient baseline outputs \cite{shannon1948mathematical,gal2016dropout}:
+\subsubsection{Uncertainty Signals and Predictability Scores}
+We compute predictive Shannon entropy $H(v) = -\sum_{c=1}^{C} p_c(v) \log p_c(v)$ from efficient baseline probabilities \cite{shannon1948mathematical,gal2016dropout,guo2017calibration}. Block-level predictor scores $H(r)$ and Test-Time Augmentation Mutual Information (TTA-MI) $I(r)$ are defined by block volume means:
 \begin{equation}
-H(v) = -\sum_{c=1}^{C} p_c(v) \log p_c(v)
+H(r) = \frac{1}{|b_r|} \sum_{v \in b_r} H(v), \quad I(r) = \frac{1}{|b_r|} \sum_{v \in b_r} I(v)
 \end{equation}
-where $p_c(v)$ represents the softmax probability for class $c$ at voxel $v$. 
+where $I(v) = H(\bar{p}(v)) - \frac{1}{K}\sum_{k=1}^K H(p_k(v))$ over $K=8$ spatial view transformations. All TTA probability maps were inverse-warped to the original image coordinate system before computing ensemble means and mutual information. Predictability is benchmarked across: (i) \textbf{Location AUROC/AUPRC} ($H(r)$ predicting $A_{\text{corr}}(r) > 0$), (ii) \textbf{Direction AUROC/AUPRC} ($H(r)$ predicting $G(r) > 0$ on non-zero gain blocks) \cite{cmig2025quality}, and (iii) \textbf{Conditional Density Overlap} $p(H \mid P(v)=1)$ vs. $p(H \mid N(v)=1)$.
 
-To test whether richer multi-sample epistemic uncertainty can resolve directional predictability, we evaluate Test-Time Augmentation Mutual Information (TTA-MI) $I(v)$ over $K=8$ spatial view transformations:
+\subsubsection{Factorial Main Effects and Interaction Analysis}
+In our $2\times2$ decoder configuration grid, we quantify the channel main effect $\Delta_C$, stage main effect $\Delta_{RF}$, and channel-stage interaction $\Delta_{C \times RF}$ for any outcome metric $M$:
 \begin{equation}
-I(v) = H(\bar{p}(v)) - \frac{1}{K}\sum_{k=1}^K H(p_k(v))
+\Delta_C = \frac{1}{2} \big( M(C_{48}, RF_1) + M(C_{48}, RF_2) - M(C_{384}, RF_1) - M(C_{384}, RF_2) \big)
 \end{equation}
-where $p_k(v)$ is the softmax prediction under the $k$-th spatial transformation and $\bar{p}(v) = \frac{1}{K}\sum_{k=1}^K p_k(v)$ is the ensemble mean. Physically, $I(v)$ measures multi-view epistemic disagreement.
-
-We evaluate predictability across three measures:
-\begin{enumerate}
-    \item \textbf{Location AUROC/AUPRC}: Discrimination of active blocks ($A(r) > 0$) vs. inactive blocks ($A(r) = 0$) \cite{hendrycks2017baseline}.
-    \item \textbf{Direction AUROC/AUPRC}: Discrimination of net positive blocks ($G(r) > 0$) vs. net negative blocks ($G(r) < 0$) \cite{cmig2025quality}. We further inspect the conditional entropy density distributions $p(H \mid P(v)=1)$ and $p(H \mid N(v)=1)$ to visualize flip class overlap.
-    \item \textbf{Macro-Metric Recovery ($R_{\text{recovery}}$)}: Practical Dice recovery achieved by entropy-guided block selection vs. random selection under identical spatial budgets.
-\end{enumerate}
+\begin{equation}
+\Delta_{RF} = \frac{1}{2} \big( M(C_{384}, RF_2) + M(C_{48}, RF_2) - M(C_{384}, RF_1) - M(C_{48}, RF_1) \big)
+\end{equation}
+\begin{small}
+\begin{equation}
+\Delta_{C \times RF} = M(C_{48}, RF_2) - M(C_{48}, RF_1) - M(C_{384}, RF_2) + M(C_{384}, RF_1)
+\end{equation}
+\end{small}

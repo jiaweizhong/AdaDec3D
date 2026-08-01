@@ -111,9 +111,18 @@ D.~Author, et~al., Uncertainty-aware segmentation quality prediction via deep
 A.~A. Taha, A.~Hanbury, Metrics for evaluating 3d medical image segmentation:
   analysis, selection, and tool, BMC Medical Imaging 15~(1) (2015) 29.
 
+\bibitem{geifman2017selective}
+Y.~Geifman, R.~El-Yaniv, Selective classification for deep neural networks, in:
+  Advances in Neural Information Processing Systems (NeurIPS), Vol.~30, 2017.
+
 \bibitem{shannon1948mathematical}
 C.~E. Shannon, A mathematical theory of communication, Bell System Technical
   Journal 27~(3) (1948) 379--423.
+
+\bibitem{guo2017calibration}
+C.~Guo, G.~Pleiss, Y.~Sun, K.~Q. Weinberger, On calibration of modern neural
+  networks, in: International Conference on Machine Learning (ICML), 2017, pp.
+  1321--1330.
 
 \bibitem{hendrycks2017baseline}
 D.~Hendrycks, K.~Gimpel, A baseline for detecting misclassified and
@@ -136,5 +145,10 @@ A.~L. Simpson, M.~Antonelli, S.~Bakas, M.~Bilello, K.~Farahani, B.~van
   Ginneken, A.~Kopp-Schneider, B.~A. Landman, G.~Litjens, B.~Menze, et~al., A
   large annotated medical image dataset for the development and evaluation of
   segmentation algorithms, arXiv preprint arXiv:1902.09063 (2019).
+
+\bibitem{geirhos2020shortcut}
+R.~Geirhos, J.-H. Jacobsen, C.~Michaelis, R.~Zemel, W.~Brendel, M.~Bethge,
+  F.~A. Wichmann, Shortcut learning in deep neural networks, Nature Machine
+  Intelligence 2~(11) (2020) 665--673.
 
 \end{thebibliography}

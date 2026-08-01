@@ -32,7 +32,8 @@ Directional effect & Net Gain $G(v)$ & Where does the decoder improve correctnes
 Concentration & Oracle $K_{80}$ & How spatially concentrated is positive net gain? \\
 Activity predictability & Location AUROC & Can cheap signals detect where the decoder acts? \\
 Gain predictability & Direction AUROC & Can cheap signals distinguish beneficial from harmful changes? \\
-Practical recovery & Routing Gain & Does selective execution improve segmentation metrics? \\
+Macro recovery & Macro Recovery $R_{\text{recovery}}(k)$ & How much of the full decoder's Dice gap is recovered by boundary routing? \\
+Multi-sample uncertainty & TTA Mutual Info $I(v)$ & Does multi-view epistemic disagreement resolve direction predictability? \\
 \bottomrule
 \end{tabular*}
 \end{table*}
@@ -64,7 +65,7 @@ We analyze Activity $A(v)$ and Net Gain $G(v)$ across two spatial dimensions:
     \item \textbf{Anatomical Structure Breakdown}: Aggregated $A(v)$ and $G(v)$ across individual organ structures.
 \end{enumerate}
 
-\subsection{Spatial Concentration and Oracle Opportunity}
+\subsection{Spatial Concentration and Macro-Metric Recovery}
 We partition the 3D volume into spatial sub-blocks $b_r$ and compute block net gain:
 \begin{equation}
 G(r) = \sum_{v \in b_r} G(v)
@@ -73,22 +74,35 @@ Sorting blocks by $G(r)$, the fraction of positive gain recovered by the top $k\
 \begin{equation}
 Coverage(k) = \frac{\sum_{r=1}^{k\% \cdot |B|} \max(G(r), 0)}{\sum_{r=1}^{|B|} \max(G(r), 0)}
 \end{equation}
-We record $K_{80}$, defined as the smallest fraction of spatial blocks required by a perfect selector to recover 80\% of the total positive decoder gain. A selective hybrid prediction $\hat{y}_k(v)$ executes the full decoder on selected blocks $S_k$ and the efficient baseline elsewhere:
+We record $K_{80}$, defined as the smallest fraction of spatial blocks required by a perfect selector to recover 80\% of the total positive decoder gain, establishing an empirical limit under selective prediction \cite{geifman2017selective}. A selective hybrid prediction $\hat{y}_k(v)$ executes the full decoder on selected blocks $S_k$ and the efficient baseline elsewhere:
 \begin{equation}
 \hat{y}_k(v) = \begin{cases}
 \hat{y}_f(v), & \text{if } v \in S_k \\
 \hat{y}_e(v), & \text{otherwise}
 \end{cases}
 \end{equation}
+To evaluate macro-metric impact, we compute the macro Dice recovery fraction $R_{\text{recovery}}(k)$:
+\begin{equation}
+R_{\text{recovery}}(k) = \frac{\text{Dice}(\hat{y}_k) - \text{Dice}(\hat{y}_e)}{\text{Dice}(\hat{y}_f) - \text{Dice}(\hat{y}_e)}
+\end{equation}
+which quantifies the proportion of the full decoder's macro Dice advantage recovered by executing the full decoder on a $k\%$ spatial block budget.
 
-\subsection{Predictability and Practical Routing Gain}
+\subsection{Predictability, Uncertainty Signals, and TTA Mutual Information}
 We compute predictive Shannon entropy $H(v)$ from the efficient baseline outputs \cite{shannon1948mathematical,gal2016dropout}:
 \begin{equation}
 H(v) = -\sum_{c=1}^{C} p_c(v) \log p_c(v)
 \end{equation}
-where $p_c(v)$ represents the softmax probability for class $c$ at voxel $v$. Using $H(v)$, we evaluate three predictability measures:
+where $p_c(v)$ represents the softmax probability for class $c$ at voxel $v$. 
+
+To test whether richer multi-sample epistemic uncertainty can resolve directional predictability, we evaluate Test-Time Augmentation Mutual Information (TTA-MI) $I(v)$ over $K=8$ spatial view transformations:
+\begin{equation}
+I(v) = H(\bar{p}(v)) - \frac{1}{K}\sum_{k=1}^K H(p_k(v))
+\end{equation}
+where $p_k(v)$ is the softmax prediction under the $k$-th spatial transformation and $\bar{p}(v) = \frac{1}{K}\sum_{k=1}^K p_k(v)$ is the ensemble mean. Physically, $I(v)$ measures multi-view epistemic disagreement.
+
+We evaluate predictability across three measures:
 \begin{enumerate}
-    \item \textbf{Location AUROC}: Discrimination of active blocks ($A(r) > 0$) vs. inactive blocks ($A(r) = 0$) \cite{hendrycks2017baseline}.
-    \item \textbf{Direction AUROC}: Discrimination of net positive blocks ($G(r) > 0$) vs. net negative blocks ($G(r) < 0$) \cite{cmig2025quality}.
-    \item \textbf{Practical Routing Gain}: Segmentation metric recovery (Dice/HD95) achieved by entropy-guided selection over the efficient baseline $E_1$, compared against a random selection baseline under identical spatial budgets.
+    \item \textbf{Location AUROC/AUPRC}: Discrimination of active blocks ($A(r) > 0$) vs. inactive blocks ($A(r) = 0$) \cite{hendrycks2017baseline}.
+    \item \textbf{Direction AUROC/AUPRC}: Discrimination of net positive blocks ($G(r) > 0$) vs. net negative blocks ($G(r) < 0$) \cite{cmig2025quality}. We further inspect the conditional entropy density distributions $p(H \mid P(v)=1)$ and $p(H \mid N(v)=1)$ to visualize flip class overlap.
+    \item \textbf{Macro-Metric Recovery ($R_{\text{recovery}}$)}: Practical Dice recovery achieved by entropy-guided block selection vs. random selection under identical spatial budgets.
 \end{enumerate}

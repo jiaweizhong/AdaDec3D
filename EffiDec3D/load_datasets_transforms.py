@@ -1183,7 +1183,7 @@ def data_transforms(args):
         	    ),
                 CropForegroundd(keys=["image", "label"], source_key="image"),
                 Orientationd(keys=["image", "label"], axcodes="RAS"),
-                #Spacingd(keys=["image", "label"], pixdim=(1.0, 1.0, 1.0), mode=("bilinear", "nearest")),
+                Spacingd(keys=["image", "label"], pixdim=(1.0, 1.0, 1.0), mode=("bilinear", "nearest")),
                 RandCropByPosNegLabeld(
                     keys=["image", "label"],
                     label_key="label",
@@ -1226,7 +1226,7 @@ def data_transforms(args):
         	),
         	CropForegroundd(keys=["image", "label"], source_key="image"),
         	Orientationd(keys=["image", "label"], axcodes="RAS"),
-        	#Spacingd(keys=["image", "label"], pixdim=(1.0, 1.0, 1.0), mode=("bilinear", "nearest")),
+        	Spacingd(keys=["image", "label"], pixdim=(1.0, 1.0, 1.0), mode=("bilinear", "nearest")),
             ]
         )
         test_transforms = Compose(
@@ -1243,7 +1243,7 @@ def data_transforms(args):
         	),
         	CropForegroundd(keys=["image"], source_key="image"),
         	Orientationd(keys=["image"], axcodes="RAS"),
-        	#Spacingd(keys=["image"], pixdim=(1.0, 1.0, 1.0), mode=("bilinear")),
+        	Spacingd(keys=["image"], pixdim=(1.0, 1.0, 1.0), mode=("bilinear")),
             ]
         )
     

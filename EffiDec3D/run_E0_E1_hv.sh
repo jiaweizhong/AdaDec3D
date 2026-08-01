@@ -15,6 +15,8 @@ OUT=${OUT:-/root/output}
 OBS=${OBS:-/root/obs-hv-concat}
 DS=Task08_HepaticVessel
 CACHE=${CACHE:-0.25}          # 243 train volumes -> cache_rate 1.0 risks RAM OOM
+EVAL=${EVAL:-2500}            # 60 val cases @ ~9min each -> validate rarely (250 wastes ~27h)
+TAG=${TAG:-hv_sp}            # output prefix; _sp = Spacingd resampling on (distinct from old no-spacing run)
 NW=${NW:-8}
 STAGE=${1:-all}
 
@@ -33,29 +35,29 @@ check_data(){
 }
 
 train_e0(){
-  if ls "$OUT"/E0_hv*/3DUXNET/$DS/best_metric_model.pth >/dev/null 2>&1; then
+  if ls "$OUT"/E0_${TAG}*/3DUXNET/$DS/best_metric_model.pth >/dev/null 2>&1; then
     log "E0 checkpoint already exists — skipping full-UX training"; return; fi
-  log "training E0 (full 3D UX-Net) ..."
-  run python main_train_BTCV_TU.py --root "$ROOT" --output "$OUT/E0_hv" \
+  log "training E0 (full 3D UX-Net, Spacingd on) ..."
+  run python main_train_BTCV_TU.py --root "$ROOT" --output "$OUT/E0_${TAG}" \
     --dataset $DS --network 3DUXNET \
-    --lr 0.001 --overlap 0.7 --crop_sample 4 --max_iter 45000 --eval_step 250 \
+    --lr 0.001 --overlap 0.7 --crop_sample 4 --max_iter 45000 --eval_step "$EVAL" \
     --cache_rate "$CACHE" --num_workers "$NW" --gpu 0
 }
 
 train_e1(){
-  if ls "$OUT"/E1_hv_concat*/3DUXNET_EffiDec3D/$DS/best_metric_model.pth >/dev/null 2>&1; then
+  if ls "$OUT"/E1_${TAG}*/3DUXNET_EffiDec3D/$DS/best_metric_model.pth >/dev/null 2>&1; then
     log "E1 checkpoint already exists — skipping EffiDec3D training"; return; fi
-  log "training E1 (EffiDec3D, concatenation) ..."
-  run python main_train_BTCV_TU.py --root "$ROOT" --output "$OUT/E1_hv_concat" \
+  log "training E1 (EffiDec3D, concatenation, Spacingd on) ..."
+  run python main_train_BTCV_TU.py --root "$ROOT" --output "$OUT/E1_${TAG}" \
     --dataset $DS --network 3DUXNET_EffiDec3D --ds False --skip_aggregation concatenation \
-    --lr 0.001 --overlap 0.7 --crop_sample 4 --max_iter 45000 --eval_step 250 \
+    --lr 0.001 --overlap 0.7 --crop_sample 4 --max_iter 45000 --eval_step "$EVAL" \
     --cache_rate "$CACHE" --num_workers "$NW" --gpu 0
 }
 
 run_obs(){
   local E0 E1
-  E0=$(ls "$OUT"/E0_hv*/3DUXNET/$DS/best_metric_model.pth 2>/dev/null | head -1 || true)
-  E1=$(ls "$OUT"/E1_hv_concat*/3DUXNET_EffiDec3D/$DS/best_metric_model.pth 2>/dev/null | head -1 || true)
+  E0=$(ls "$OUT"/E0_${TAG}*/3DUXNET/$DS/best_metric_model.pth 2>/dev/null | head -1 || true)
+  E1=$(ls "$OUT"/E1_${TAG}*/3DUXNET_EffiDec3D/$DS/best_metric_model.pth 2>/dev/null | head -1 || true)
   [ -n "$E0" ] && [ -n "$E1" ] || { log "ERROR: missing checkpoint (E0='$E0' E1='$E1'); train first"; exit 1; }
   log "obs E0 = $E0"
   log "obs E1 = $E1"

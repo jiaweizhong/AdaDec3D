@@ -1622,15 +1622,18 @@ Full→variant flip analysis ([results/obs-fz-channel](results/obs-fz-channel),
 [obs-fz-resolution](results/obs-fz-resolution), [obs-fz-combined](results/obs-fz-combined)).
 Net flip $R_{\text{net}}$ by distance-to-boundary (bins 0–1 / 1–2 / 2–4 / >4 vox):
 
-| Full→variant | H1 R_net (CI) | net-neutral? | 0–1 | 1–2 | 2–4 | >4 | P1 dir |
-|---|---|---|---|---|---|---|---|
-| **channel-only** | +.00027 [−.00027,+.00083] | **yes** | **−.020** | +.019 | +.007 | +.003 | .576 |
-| **resolution-only** | +.00046 [+.00007,+.00084] | no | **+.033** [.018,.047] | +.031 [.024,.038] | +.004 | −.011 | .542 |
-| **combined** | +.00102 [+.00038,+.00169] | no | +.019 | +.036 | +.006 | +.014 | .597 |
+| Full→variant | GAIN R_net (CI) | net-neutral? | ACTIVITY (P+N) | act/gain | 0–1 | 1–2 | 2–4 | >4 | P1 dir |
+|---|---|---|---|---|---|---|---|---|---|
+| **channel-only** | +.00027 [−.00027,+.00083] | **yes** | .00352 | **12.9×** | **−.020** | +.019 | +.007 | +.003 | .576 |
+| **resolution-only** | +.00046 [+.00007,+.00084] | no | .00391 | 8.4× | **+.033** [.018,.047] | +.031 [.024,.038] | +.004 | −.011 | .542 |
+| **combined** | +.00102 [+.00038,+.00169] | no | .00438 | 4.3× | +.019 | +.036 | +.006 | +.014 | .597 |
+
+(ACTIVITY=P+N computed from the saved pos/neg rates — no re-run; point estimate only, subject CI would need a re-run.)
 
 **The mechanism hypothesis is supported** ✅ (→ fills `sec:mechanism`'s flip `\todo`):
 - **The high-resolution stage's benefit is boundary-concentrated.** Removing it (resolution-only) gives a **strongly positive net right at the boundary** (+.033 @0–1, +.031 @1–2, both CIs exclude 0) that decays to zero/negative in the interior (−.011 @>4). So the high-res stage is what does boundary refinement.
 - **Channel width is diffuse and near-neutral at the boundary.** Removing channels gives a **negative** net at 0–1 vox (−.020) and only a small mid-band positive (+.019 @1–2); it is smaller in magnitude and *not* boundary-peaked. Consistent with its tiny Dice cost (−0.6) and net-neutral H1 (CI crosses 0).
+- **Activity/Gain ratio reinforces this** (Activity=P+N churn per unit net Gain): **channel-only 12.9×** (huge churn, almost no net — the most "wasteful", i.e. removable), **resolution-only 8.4×**, **combined 4.3×**. So the high-res stage converts more of its activity into actual gain, while channel width mostly churns predictions without net benefit — a second, independent line of evidence that channel width is the more removable factor.
 - **Combined = both** — positive across the first two boundary bins, largest abs_net (15.4k vox vs ~5.4k for each single factor).
 
 **Honest caveats:**

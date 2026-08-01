@@ -1179,27 +1179,39 @@ Six-metric numbers below are from the **converged-code re-run** (2026-07-30,
 |---|---|---|---|
 | Full → Effi Dice | .792 → .777 (−1.5%) | .805 → .795 (−1.0%) | .837 → .815 (−2.3%) |
 | GMac (× reduction) | 579 → 49 (11.7×) | 308 → 56 (5.5×) | 231 → 107 (2.2×) |
-| **H1** R_net (subject CI) | **+0.047% [−.020,+.109]** | **−0.001% [−.045,+.040]** | pending fs=32 |
+| **H1** GAIN R_net (subject CI) | **+0.047% [−.020,+.109]** | **−0.001% [−.045,+.040]** | pending fs=32 |
+| **H1** ACTIVITY P+N (act/gain) | .510% [.42,.61] (~11×) | .402% [.33,.48] (≫; net≈0) | pending |
 | **H2** boundary net peak | +0.085 @0–1 vox [.070,.101] | +0.015/+0.021 @0–2 vox | pending |
 | **H2** size↔net ρ (union fg) | +0.02 | −0.58 | pending |
-| **P1** any / positive / **direction** AUROC | .901 / .903 / **.593** [.560,.627] | .912 / .910 / **.561** [.512,.609] | pending |
+| **P1** any / positive / **direction** AUROC | .900 / .902 / **.591** [.558,.624] | .913 / .910 / **.560** [.514,.609] | pending |
+| **P1** any / direction AUPRC | .371 / .776† | .351 / .703† | pending |
 | **C1** oracle cov @10% / K80 / abs_net | >99% / 5% / **+6.1k vox** | 100% / 5% / **−1.3k vox** | pending |
-| **P2** entropy−random @20% | +0.23 [−.06,+.45] | −0.06 [−.37,+.22] | pending |
+| **P2** entropy−random **net-flip** @20% | +0.23 [−.06,+.45] | −0.06 [−.37,+.22] | pending |
+| **R** entropy **Dice** recovery @20% (of gap) | **100%** (5%→60%); random 17% | **100%**; random 20% | pending |
+| **TTA** direction AUROC (MI, K=8) | .539 [.50,.58] | .570 [.53,.61] | pending |
 
 \* MedNeXt has no addition/concat decoder knob; listed at its native config but over-sized
 (fs=48), so it is **not** a canonical result until re-trained at fs=32.
+† direction AUPRC is **prevalence-inflated** — positive flips are the majority among flip
+voxels (~54%), so the AUPRC baseline is already ~0.54; the AUROC (~0.57) is the honest
+discrimination measure. Reporting both is the point.
 
-**Two honesty corrections from the re-run** (vs earlier drafts):
-1. **Direction AUROC is ~0.56–0.59, NOT ≈0.5** — weakly but significantly above chance (CIs exclude 0.5). Thesis still holds strongly (location ~0.90 ≫ direction ~0.57): *predicting instability is much easier than predicting improvement*, but we no longer say direction is "at chance."
-2. **No robust size→benefit law** — with union foreground the organ-size/net Spearman flips sign across backbones (+0.02 UX, −0.58 Swin). Report per-organ *heterogeneity* (some organs gain, e.g. UX L.Kidney +0.061; some lose, UX L.Adrenal −0.071) without claiming smaller structures systematically gain (the old GT-only ρ=−0.37 did not survive).
-3. **C1 nuance confirmed** — oracle coverage is extremely steep (K80=5%) yet abs_net is tiny/negative (+6.1k UX, −1.3k Swin voxels): steep concentration over a ≈0 absolute total. **P2** deployable gaps cross zero on both → no recoverable opportunity (negative result holds).
+**Findings from the re-run** (vs earlier drafts):
+1. **Direction AUROC is ~0.56–0.59, NOT ≈0.5** — weakly but significantly above chance (CIs exclude 0.5). Thesis still holds strongly (location ~0.90 ≫ direction ~0.57): *predicting instability is much easier than predicting improvement*.
+2. **No robust size→benefit law** — union-fg organ-size/net Spearman flips sign across backbones (+0.02 UX, −0.58 Swin). Report per-organ *heterogeneity* (UX L.Kidney +0.061 gains, L.Adrenal −0.071 loses), not a size law (old GT-only ρ=−0.37 did not survive).
+3. **★ R vs P2 — the key nuance (NEW; affects the paper's "no opportunity" claim).** In **net-flip** terms P2 shows entropy ≈ random (gap CI crosses 0) → no *net-flip* opportunity, over a ≈0 abs_net (C1). **But in Dice terms (R), entropy-routed hybrid recovers 100% of the Full−Effi Dice gap at a 20% block budget** (UX & Swin), ~60% already at 5% (UX), vs ~17–20% for random; the oracle hybrid *exceeds* Full (cherry-picks per block). Not a contradiction: net voxel flips cancel, but **Dice rewards boundary refinement**, so routing high-entropy *boundary* blocks to Full recovers the (small, 1–1.5 pt) gap. → The opportunity is **Dice-recoverable but net-flip-neutral**; the paper's P2 "no opportunity" must be nuanced to *"no net-flip opportunity; the small Dice gap IS recoverable via boundary routing"* (still offline characterization, not a deployed method).
+4. **TTA confirms direction is unpredictable** — multi-sample TTA mutual-information direction AUROC is *even lower* (UX .539, Swin .570) than entropy (~.57): richer uncertainty **still** can't tell better-from-worse → upgrade to *"even multi-sample predictive uncertainty predicts instability, not gain."* (TTA-MI is also a weaker flip *locator*: any-AUROC .81/.79 vs entropy .90.)
+5. **Activity ≫ Gain** — P+N activity is ~11× the net gain on UX (.510% vs .047%) and ≫ on Swin (net≈0): the decoder churns many predictions with almost no net correctness change.
 
 The **consistent** finding on the two parameter-matched backbones is a **voxel-level net
-flip indistinguishable from zero** (both CIs cross zero), with boundary-localized,
-entropy-predictable flips (AUROC ~0.90) and correspondingly **no reliable region-level
-opportunity** (O9 marginal/negative). The honest architecture-axis statement is therefore:
-*the decoder's voxel-level net benefit is ≈ 0 across matched backbones* — not a positive
-benefit that "still holds." (MedNeXt's apparent net>0 comes from the addition + over-sized
+flip indistinguishable from zero** (both CIs cross zero), with boundary-localized flips whose
+*location* is entropy-predictable (AUROC ~0.90) but whose *direction* is not (~0.57, even
+with TTA). Correspondingly there is **no reliable net-flip opportunity** (P2 gaps cross zero)
+— **but** the small **Dice** gap *is* recoverable by routing high-entropy boundary blocks to
+Full (R: ~100% of the gap at a 20% budget), because Dice rewards boundary refinement that the
+net-flip count cancels. The honest architecture-axis statement is therefore: *the decoder's
+voxel-level net benefit is ≈ 0 across matched backbones, net-neutral but Dice-relevant via a
+thin boundary band that a selective decoder can recover* — not a positive net-flip benefit. (MedNeXt's apparent net>0 comes from the addition + over-sized
 model and is excluded from the headline.) **Caveat:** the MedNeXt-Effi
 cell was only valid after fixing two inherited-code bugs (Part 0b Errata); all pre-fix
 MedNeXt-Effi numbers (~0.02 Dice) are void.

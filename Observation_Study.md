@@ -70,8 +70,9 @@ The training script saves `last_model.pth` after every eval step and auto-resume
 /root/
   AdaDec3D/           EffiDec3D/ networks/ ...   (code, cloned from repo)
   autodl-tmp/
-    btcv-synapse/     imagesTr/ labelsTr/ imagesVal/ labelsVal/
-    feta-processed/   imagesTr/ labelsTr/ imagesVal/ labelsVal/
+    btcv-synapse/          imagesTr/ labelsTr/ imagesVal/ labelsVal/
+    Task08_HepaticVessel/  imagesTr/ labelsTr/ imagesVal/ labelsVal/
+    Task01_BrainTumour/    imagesTr/ labelsTr/ imagesVal/ labelsVal/   (4-channel MRI)
   output/             training checkpoints
   obs/                observation study figures
 ```
@@ -89,7 +90,7 @@ cd /root && git clone https://github.com/<your-repo>/AdaDec3D.git
 # 2. Install dependencies
 pip install -r requirements.txt
 
-# 3. Upload datasets to /root/autodl-tmp/btcv-synapse/ and /root/autodl-tmp/feta-processed/
+# 3. Upload datasets to /root/autodl-tmp/{btcv-synapse,Task08_HepaticVessel,Task01_BrainTumour}/
 #    (use AutoDL file upload, scp, or wget)
 ```
 
@@ -237,43 +238,35 @@ emitted by `main_train_BTCV_TU.py`.
 python -c "import argparse; from load_datasets_transforms import data_loader; args = argparse.Namespace(root='/root/autodl-tmp/btcv-synapse', dataset='BTCV13', mode='train'); tr, val, nc = data_loader(args); print('Train:', len(tr['images']), 'Val:', len(val['images']), 'Classes:', nc)"
 ```
 
-### 1.2 FeTA 2021 (for O7 — MRI, fetal brain, 7 structures)
+### 1.2 MSD Task01 BrainTumour (for O7 — MRI, brain, heterogeneous lesions)
 
-**Source**: Check Kaggle first (search "FeTA 2021 fetal brain MRI"); if available download with:
+**FeTA 2021 was dropped** (could not be obtained). Replaced by **MSD Task01 BrainTumour**
+(BraTS), which covers the same axis we needed — **MRI modality + brain heterogeneous
+lesions** — and is freely available.
 
-```bash
-kaggle datasets download -d <feta-dataset-slug> -p /root/autodl-tmp/ --unzip
-```
+**Source**: [medicaldecathlon.com](http://medicaldecathlon.com) → `Task01_BrainTumour.tar`
+(~7 GB, 484 training cases, 4 MRI modalities: FLAIR/T1/T1ce/T2). Extract to
+`/root/autodl-tmp/Task01_BrainTumour/` and split into `imagesTr/labelsTr` +
+`imagesVal/labelsVal` (the loader validates on `imagesVal/labelsVal`, same as Task08).
 
-Otherwise download directly: [fetachallenge.github.io](https://fetachallenge.github.io), `feta_2.2.tar.gz` (~2 GB, 80 subjects).
+**⚠️ Two things make Task01 different from the CT datasets (BTCV/Task08) — must be handled:**
 
-```bash
-wget -O /root/autodl-tmp/feta_2.2.tar.gz \
-    https://zenodo.org/record/xxxxxx/files/feta_2.2.tar.gz   # use link from site
-tar -xzf /root/autodl-tmp/feta_2.2.tar.gz -C /root/autodl-tmp/
-```
+1. **4-channel input.** BrainTumour images are 4 stacked MRI modalities → the network needs
+   `in_channels=4` (CT datasets are 1). Confirm the training script passes `--n_channels 4`
+   (or derives it) before training.
+2. **Single-label softmax, NOT BraTS multi-label.** The current `load_datasets_transforms.py`
+   Task01 branch is wired **BraTS-style**: `out_classes=3` "for sigmoid" +
+   `ConvertToMultiChannelBasedOnBratsClassesd` → 3 *overlapping* regions (WT/TC/ET). Our whole
+   flip framework (`P/N/U`, H1/H2, C1, R) assumes **single-label argmax** (one class per voxel),
+   which multi-label overlapping regions break. **Decision: run Task01 as 4-class softmax**
+   (bg + edema=1 + non-enhancing=2 + enhancing=3) — the raw MSD labels are single-label 0/1/2/3,
+   so this is natural and makes it argmax-compatible like BTCV/Task08. Code change required:
+   `out_classes=4`, drop `ConvertToMultiChannelBasedOnBratsClassesd`, softmax (not sigmoid),
+   `in_channels=4`; register `Task01_BrainTumour` class names in `run_observations.py`
+   (`["Edema","NonEnh","Enh"]`). `Spacingd` is already active for Task01 (1.0³) — good.
 
-**Convert to expected format**
-
-```python
-import glob, shutil, os
-
-src = "/root/autodl-tmp/feta_2.2"
-dst = "/root/autodl-tmp/feta-processed"
-subjects = sorted(glob.glob(f"{src}/sub-*/"))
-
-for split, subs in [("Tr", subjects[:70]), ("Val", subjects[70:])]:
-    os.makedirs(f"{dst}/images{split}", exist_ok=True)
-    os.makedirs(f"{dst}/labels{split}", exist_ok=True)
-    for sub in subs:
-        sid = os.path.basename(sub.rstrip("/"))
-        shutil.copy(f"{sub}/anat/{sid}_T2w.nii.gz", f"{dst}/images{split}/{sid}.nii.gz")
-        shutil.copy(f"{sub}/anat/{sid}_dseg.nii.gz", f"{dst}/labels{split}/{sid}.nii.gz")
-print("Train:", len(os.listdir(f"{dst}/imagesTr")))   # 70
-print("Val:  ", len(os.listdir(f"{dst}/imagesVal")))  # 10
-```
-
-**FeTA label mapping**: 0 BG | 1 IS | 2 WM | 3 CGM | 4 DGM\* | 5 CE | 6 BS | 7 CSF
+**Class names for obs** (`run_observations.py` `DATASET_NAMES`): `["Edema","NonEnh","Enh"]`
+(out_classes=4).
 
 ---
 
@@ -479,14 +472,14 @@ original paper actually built an EffiDec3D decoder pair — with a predeclared l
 
 > **Coverage = cross / L-shape (~6–7 cells), not the full grid.** Anchor at
 > **UX-Net/BTCV** (also the frozen-encoder factorial backbone): dataset axis = UX-Net
-> across **BTCV / FeTA / MSD Task08 HepaticVessel**; backbone axis = BTCV
+> across **BTCV / MSD Task08 HepaticVessel / MSD Task01 BrainTumour**; backbone axis = BTCV
 > across **UX-Net / SwinUNETR / MedNeXt-M-K3** (three families). Each cell is a standard
 > Full-vs-Effi pair (the 4-corner factorial is UX-Net/BTCV only); O7 aggregates rows,
 > O8 aggregates columns.
 
 | Backbones | EffiDec3D pair? | Datasets | Observations |
 |---|---|---|---|
-| 3D UX-Net (large-kernel CNN) | ✅ Full + EffiDec3D | BTCV, FeTA, MSD08 HepaticVessel (dataset axis) | **six metrics H1/H2/C1/C2/P1/P2** (full-vs-efficient flips) |
+| 3D UX-Net (large-kernel CNN) | ✅ Full + EffiDec3D | BTCV, MSD08 HepaticVessel, MSD01 BrainTumour (dataset axis) | **six metrics H1/H2/C1/C2/P1/P2** (full-vs-efficient flips) |
 | SwinUNETR (Transformer), MedNeXt-M-K3 (ConvNeXt) | ✅ Full + EffiDec3D | BTCV (architecture axis) | **six metrics H1/H2/C1/C2/P1/P2** |
 
 > **Why only these backbones.** EffiDec3D applies its decoder *only* to 3D UX-Net,
@@ -515,8 +508,8 @@ original paper actually built an EffiDec3D decoder pair — with a predeclared l
 `--network` is the backbone; the EffiDec3D counterpart appends `_EffiDec3D`:
 
 ```bash
-# Matched pair, e.g. SwinUNETR on FeTA (repeat per backbone × dataset)
-NET=SwinUNETR; DS=feta; ROOT=/root/autodl-tmp/feta-processed
+# Matched pair, e.g. SwinUNETR on HepaticVessel (repeat per backbone × dataset)
+NET=SwinUNETR; DS=Task08_HepaticVessel; ROOT=/root/autodl-tmp/Task08_HepaticVessel
 python main_train_BTCV_TU.py --root $ROOT --output /root/output/${NET}_${DS}_full \
   --dataset $DS --network $NET \
   --lr 0.001 --overlap 0.7 --crop_sample 4 --max_iter 45000 --eval_step 250 \
@@ -533,8 +526,8 @@ class count and organ names come from `--dataset`):
 
 ```bash
 # Matched cell → six converged metrics (needs both full + EffiDec3D checkpoints)
-python run_observations.py --network SwinUNETR --dataset feta \
-  --root /root/autodl-tmp/feta-processed --output /root/output --obs_dir /root/obs/swin_feta \
+python run_observations.py --network 3DUXNET --dataset Task08_HepaticVessel \
+  --root /root/autodl-tmp/Task08_HepaticVessel --output /root/output --obs_dir /root/obs/uxnet_hv \
   --skip_aggregation concatenation
 ```
 
@@ -1097,17 +1090,20 @@ concentrate at boundaries and small organs late in training.
 
 O7 is not limited to a single CT→MRI check. The final generality study should
 align with the representative task families evaluated in the original EffiDec3D
-paper (FeTA, BTCV, and the ten MSD tasks) without reproducing all 12 datasets:
+paper (BTCV and the MSD tasks) without reproducing all datasets:
 
 | Priority | Dataset | Modality / task | Role |
 |---:|---|---|---|
 | 1 | **BTCV** | abdominal CT, 13 organs | primary multi-organ experiment (anchor) |
-| 2 | **FeTA 2021** | fetal brain MRI, 7 tissues | cross-modality and cross-anatomy replication |
-| 3 | **MSD Task08 HepaticVessel** | abdominal CT, thin vessels + small lesions | thin-structure stress test for the high-resolution decoder |
+| 2 | **MSD Task08 HepaticVessel** | abdominal CT, thin vessels + small lesions | thin-structure stress test for the high-resolution decoder |
+| 3 | **MSD Task01 BrainTumour** | brain **MRI** (4 modalities), heterogeneous lesions | cross-modality (MRI) + heterogeneous-lesion replication (replaces FeTA) |
 
-Dataset axis is **frozen at these three** (UX-Net across all three); the third is
-HepaticVessel — chosen over BrainTumour because FeTA already covers MRI and
-HepaticVessel directly stresses the high-res-decoder question. Freeze before inspecting results. On every dataset,
+Dataset axis is **frozen at these three** (UX-Net across all three): BTCV = complete main
+experiment; Task08 = thin/elongated structures; Task01 = MRI + brain heterogeneous lesions.
+**FeTA 2021 was dropped (unobtainable); Task01 BrainTumour replaces it** and gives the same
+MRI + lesion coverage while staying freely available. This is the most balanced, convincing
+three-dataset set without blowing up the experiment count. Freeze before inspecting results.
+On every dataset,
 report the same positive flip, negative flip, net flip,
 spatial concentration, and opportunity curve with subject-level confidence
 intervals.
@@ -1120,7 +1116,7 @@ derived from `--dataset`), then aggregate the per-cell `results.json`:
 
 ```bash
 # 3D UX-Net matched pair across the frozen dataset ladder
-for DS in BTCV13 feta Task01_BrainTumour Task06_Lung; do
+for DS in BTCV13 Task08_HepaticVessel Task01_BrainTumour; do
   python run_observations.py --network 3DUXNET --dataset $DS \
     --root /root/autodl-tmp/$DS --output /root/output --obs_dir /root/obs/uxnet_$DS
 done
@@ -1389,7 +1385,7 @@ Run after O5. Evaluate five signals on the BTCV validation set:
 For each signal compute:
 - Pearson correlation with per-bin O5 net flip
 - Inference latency overhead (ms/volume vs baseline)
-- Stability: BTCV vs FeTA correlation difference
+- Stability: BTCV vs Task01/Task08 correlation difference
 
 *Requires O5 to have been run (`bin_ent`, `bin_net` populated).*
 
@@ -1499,7 +1495,7 @@ for sig, vals in signal_results.items():
 save_obs("O11", signal_results)
 ```
 
-| Signal | Corr (BTCV) | Corr (FeTA) | Latency (ms) | Memory (MB) |
+| Signal | Corr (BTCV) | Corr (Task01) | Latency (ms) | Memory (MB) |
 |---|---|---|---|---|
 | Entropy | | | ≈ 0 | ≈ 0 |
 | Confidence | | | ≈ 0 | ≈ 0 |
@@ -1544,7 +1540,7 @@ regardless of any single model's distance from the published number.
 
 | Obs | Axis | Criterion | Result | Pass? |
 |-----|------|-----------|--------|-------|
-| O7 | dataset | on ≥3 datasets spanning CT+MRI+lesion the headline recurs: H1 net ≈ 0 (CI crosses 0), H2 net concentrated at the boundary band, P1 direction AUROC ≈ 0.5 | pending matrix (BTCV/FeTA/MSD01/MSD06-08) | ☐ |
+| O7 | dataset | on ≥3 datasets spanning CT+MRI+lesion the headline recurs: H1 net ≈ 0 (CI crosses 0), H2 net concentrated at the boundary band, P1 direction AUROC weakly-above-chance | BTCV (done) + Task08 HepaticVessel + Task01 BrainTumour | ☐ |
 | O8 | architecture (matched) | ≥2 matched EffiDec3D backbones (Swin, opt. SwinV2/MedNeXt) hold the same H1/H2/P1 direction | pending E0/E1-Swin | ☐ |
 | O11 | routing | Entropy is best or tied-best cheap routing signal | confidence 0.663 vs entropy 0.655; MC dropout inactive | ◐ partial |
 
@@ -1723,8 +1719,9 @@ Week 5-6: Generalization matrix (run_observations.py --network/--dataset)
         MedNeXt-M-K3        E0 .8374 → E1 .8147 (−2.3, addition; over-sized fs=48, retrain at fs=32)
         NB: MedNeXt-Effi required two inherited-code bug fixes (BF1 --ds parse, BF2
             train/deploy head) before it was valid — see Part 0b Errata + EffiDec3D/MODIFICATIONS.md
-  [ ] Dataset axis — freeze 2-3 more tasks (FeTA, MSD-Task08 HepaticVessel),
-      rerun matched UX-Net (six metrics) per dataset; aggregate H1 net + P1 direction across CT+MRI+lesion
+  [ ] Dataset axis — MSD-Task08 HepaticVessel (CT, thin structures) + MSD-Task01 BrainTumour
+      (MRI, brain lesions; FeTA dropped/unobtainable, Task01 replaces it — run as 4-class softmax,
+      in_channels=4); matched UX-Net (six metrics) per dataset; aggregate H1 net + P1 direction across CT+MRI+lesion
   [ ] O7: cross-dataset consistency = aggregate over dataset axis (Go: ≥3 datasets)  — STILL PENDING
   [x] O8: architecture-family consistency (converged six-metric re-run, 2026-07-30) — UX-Net & Swin (concat):
         H1 R_net ≈0, CI crosses 0 (UX +.047% [−.020,+.109] / Swin −.001% [−.045,+.040]);
@@ -1744,8 +1741,8 @@ Week 7: Paper A draft
   [~] Paper A manuscript first draft (wacv-2027/, 7 pp, compiles clean).
        Architecture axis (3D UX-Net + SwinUNETR + MedNeXt-M-K3 on BTCV13) COMPLETE —
        tab:arch + the O8 Mechanism/consistency paragraph are fillable now (numbers above).
-       Remaining \todo cells: DATASET axis (FeTA + MSD-Task08 HepaticVessel) for O7,
-       and the mechanism runs (frozen-encoder factorial, null-pair seed control).
+       Remaining \todo cells: DATASET axis (MSD-Task08 HepaticVessel + MSD-Task01 BrainTumour) for O7,
+       and the mechanism runs (frozen-encoder factorial [done], null-pair seed control).
   [ ] UX-Net/BTCV concatenation validation (skip_aggregation=concatenation) — running:
        tests whether part of the −2.2% Full−Effi gap is the addition-vs-concatenation config
        (expect params 2.955→~3.15 M; Dice .770→~.79). Does NOT change the O8 direction.

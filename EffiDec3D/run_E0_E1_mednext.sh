@@ -21,19 +21,19 @@ mkdir -p "$OUT" "$OBS"
 
 cd /root/AdaDec3D && git pull && cd EffiDec3D
 
-# feature_size 48 (MedNeXt-M default n_channels).
+# feature_size 32 (MedNeXt-M reduced size to match the paper's param count).
 COMMON="--root $ROOT --dataset BTCV13 \
         --cache_rate 1.0 --num_workers 8 --gpu 0 \
-        --lr 0.001 --overlap 0.7 --crop_sample 4 --feature_size 48"
+        --lr 0.001 --overlap 0.7 --crop_sample 4 --feature_size 32"
 TRAIN_ARGS="--max_iter 45000 --eval_step 250"
 log() { echo "[$(date '+%H:%M:%S')] $*" | tee -a "$LOG"; }
 
 # ── E0: full MedNeXt-M-K3 (upper bound) ──────────────────────────────────────
 run_E0() {
-    LM=$(ls $OUT/E0_mednext*/MedNeXt_M/BTCV13/last_model.pth 2>/dev/null | head -1 || true)
+    LM=$(ls $OUT/E0_mednext_fs32*/MedNeXt_M/BTCV13/last_model.pth 2>/dev/null | head -1 || true)
     if [ -n "$LM" ]; then log "E0 resuming from $LM"; else log "E0 training full MedNeXt-M-K3 from scratch"; fi
     # main_train auto-resumes from last_model.pth and skips the loop if already at max_iter.
-    python main_train_BTCV_TU.py $COMMON $TRAIN_ARGS --output $OUT/E0_mednext \
+    python main_train_BTCV_TU.py $COMMON $TRAIN_ARGS --output $OUT/E0_mednext_fs32 \
         --network MedNeXt_M 2>&1 | tee -a "$LOG"
     log "E0 (MedNeXt_M) done"
 }
@@ -41,15 +41,15 @@ run_E0() {
 # ── E1: MedNeXt-M-K3 + EffiDec3D ─────────────────────────────────────────────
 run_E1() {
     log "E1 starting — MedNeXt_M_EffiDec3D (auto-resumes; saves O6 milestones)"
-    python main_train_BTCV_TU.py $COMMON $TRAIN_ARGS --output $OUT/E1_mednext \
+    python main_train_BTCV_TU.py $COMMON $TRAIN_ARGS --output $OUT/E1_mednext_fs32 \
         --network MedNeXt_M_EffiDec3D --ds False 2>&1 | tee -a "$LOG"
     log "E1 (MedNeXt_M_EffiDec3D) done"
 }
 
 # ── Observations: all O1–O11 + O_pareto/O_anatomy/boundary/surface + teaser ───
 run_obs() {
-    E0=$(ls $OUT/E0_mednext*/MedNeXt_M/BTCV13/best_metric_model.pth 2>/dev/null | head -1 || true)
-    E1=$(ls $OUT/E1_mednext*/MedNeXt_M_EffiDec3D/BTCV13/best_metric_model.pth 2>/dev/null | head -1 || true)
+    E0=$(ls $OUT/E0_mednext_fs32*/MedNeXt_M/BTCV13/best_metric_model.pth 2>/dev/null | head -1 || true)
+    E1=$(ls $OUT/E1_mednext_fs32*/MedNeXt_M_EffiDec3D/BTCV13/best_metric_model.pth 2>/dev/null | head -1 || true)
     if [ -z "$E0" ] || [ -z "$E1" ]; then
         log "Observations skipped — need both E0 and E1 (E0='$E0' E1='$E1')"
         return

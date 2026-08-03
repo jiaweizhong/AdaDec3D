@@ -1250,7 +1250,20 @@ Reproduction/efficiency ([results/last_validation_metrics_task08_hepaticvessel.c
 - **Even sharper than BTCV**: H1 is net-neutral (CI crosses 0) with the point estimate *slightly negative*, `abs_net` is negative, P2 is significantly *negative* (routing to Full is worse than random), and R shows routing to Full *lowers* Dice. So on thin high-resolution structures the extra decoder capacity is at best unused and never net-beneficial — the strongest form of the thesis.
 - **Direction still unpredictable** (.520, CI includes 0.5) — the P1 finding generalizes across the dataset axis.
 - **Convergence caveat (reviewer pre-empt).** The Effi run plateaued cleanly (~0.594 by step ~37.5k). The Full run's curve was overwritten (`tee` in `run_hv_sp.sh`), so its convergence isn't directly confirmed, and the larger Full model (53M) could be marginally under-trained vs the small Effi (3M) on the 243-volume set at 45k steps. But the ≤1 pt difference is within noise and matches the EffiDec3D tie, and **the net-neutral conclusion rests on H1's CI (crosses 0), not on absolute Dice** — so no retrain is needed. If certainty is wanted, extend the Full run to ~60k and confirm it plateaus below Effi.
-- **⚠️ R_recovery edge case**: `recovered_fraction_at_20pct` in the JSON is garbage (~1e7) because the code clamps `gap=max(fd−ed,1e-9)` → division blows up when Full ≤ Effi. Report the raw Dice curve instead; ignore that field for this cell (a code guard for negative gap is a nice-to-have fix).
+- **⚠️ R_recovery edge case**: `recovered_fraction_at_20pct` in the JSON is garbage (~1e7) because the code clamps `gap=max(fd−ed,1e-9)` → division blows up when Full ≤ Effi. Report the raw Dice curve instead; ignore that field for this cell (fixed 2026-08-03: now emits `null` for negative gap).
+
+**Dataset axis (O7) — cell 2: MSD Task01 BrainTumour (UX-Net, concat, 4-class softmax, 4-channel MRI, 2026-08-03).**
+Reproduction/efficiency ([results/E0_E1_metrics_task01_braintumour.csv](results/E0_E1_metrics_task01_braintumour.csv)):
+
+| | Edema | Enh | NCR | **Mean** | MACs | Params | Lat |
+|---|---|---|---|---|---|---|---|
+| Full (E0) | .818 | .605 | .844 | **.756** | 587 | 53.1M | 40.8 ms |
+| Effi (E1, concat) | .811 | .609 | .829 | **.750** | 54.9 | 3.21M | 8.3 ms |
+| Δ (Effi−Full) | −.007 | +.004 | −.015 | **−.006** | 10.7× | 16.6× | 4.9× |
+
+- **Full ≈ Effi (−0.6 pt, within noise)** — normal direction (Full marginally ahead), the full decoder adds ~nothing. Efficiency 10.7×/16.6×/4.9× (slightly below BTCV's 11.7×/16.8× because the 4-channel input adds a fixed first-conv cost).
+- **Per-subregion softmax** (edema=1 / enhancing=2 / NCR=3), **not** BraTS WT/TC/ET → **not comparable to EffiDec3D Table 3 (~78.6)**; the ~0.75 here is a healthy per-subregion result (4-modality MRI segments the large edema and necrotic core well; the thin enhancing ring is the hard class at ~0.60). See CFG3 in MODIFICATIONS.md for why we use softmax sub-regions (the flip framework needs one argmax class per voxel).
+- **Adds the MRI-anatomical + heterogeneous-lesion axis** (replaces FeTA). **Flip metrics (H1/H2/C1/P1/P2/R) pending** the obs (`obs-task01-concat`) — this row is Dice/efficiency only so far.
 
 ---
 

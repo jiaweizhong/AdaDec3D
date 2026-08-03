@@ -1232,8 +1232,24 @@ Reproduction/efficiency ([results/last_validation_metrics_task08_hepaticvessel.c
 | Δ (Effi−Full) | +.014 | +.009 | **+.011** | 11.7× | 16.8× | 5.0× |
 
 - **Spacingd fixed the absolute Dice** — from ~0.54 (no resample) to **0.575/0.586**, now paper-comparable (EffiDec3D Table 3 UX-Net Task08 = 0.557).
-- **Effi > Full (+1.1 pt)** — the efficient decoder *beats* the full decoder on thin vessels: strong on-thesis evidence that the full decoder's extra capacity is net-neutral (here even net-negative) on high-resolution structures. Same efficiency reductions as BTCV (11.7×/16.8×/5.0×).
-- **Flip metrics (H1/H2/C1/P1/P2/R) pending** the obs re-run (`obs-hv-concat`) — this row is Dice/efficiency only so far.
+- **Effi ≥ Full (+1.1 pt)** — the efficient decoder *beats* the full decoder on thin vessels: strong on-thesis evidence. Same efficiency reductions as BTCV (11.7×/16.8×/5.0×).
+
+**Flip metrics ([results/obs-hv-concat](results/obs-hv-concat)) — the dataset axis confirms the thesis, more sharply than BTCV:**
+
+| Metric | Task08 HepaticVessel (UX-Net, concat) |
+|---|---|
+| **H1** GAIN R_net (CI) / Activity | **−0.002% [−.032,+.033]** (net-neutral) / 0.204% |
+| **H2** boundary net | +.005 @0–1 (CI crosses 0), then **negative** in interior (−.019 @1–2, **−.134 @>4** [−.184,−.088]) |
+| **H2** per-organ net / ΔDice | Vessel −.047 / −.013; Tumour −.051 / −.009 (Full *worse* on both) |
+| **P1** any / positive / **direction** AUROC | .865 / .857 / **.520** [.496,.545] (direction **at chance**) |
+| **P1** any / direction AUPRC | .417 / .764† |
+| **C1** oracle cov@10 / K80 / abs_net | 100% / 5% / **−418 vox** (negative total) |
+| **P2** entropy−random net-flip @20% | **−1.18 [−1.60,−0.78]** (routing to Full is *worse* than random) |
+| **R** Dice recovery | gap = **−0.011 (Full < Effi)** → routing blocks to Full *decreases* Dice (.586→.575); recovery **undefined** (negative gap) |
+
+- **Even stronger than BTCV**: here the full decoder's net is not just ≈0 but **net-negative** — Effi ≥ Full, `abs_net` is negative, P2 is significantly *negative* (routing to Full hurts), and R shows routing to Full *lowers* Dice. So on thin high-resolution structures the extra decoder capacity is actively unhelpful.
+- **Direction still unpredictable** (.520, CI includes 0.5) — the P1 finding generalizes across the dataset axis.
+- **⚠️ R_recovery edge case**: `recovered_fraction_at_20pct` in the JSON is garbage (~1e7) because the code clamps `gap=max(fd−ed,1e-9)` → division blows up when Full ≤ Effi. Report the raw Dice curve instead; ignore that field for this cell (a code guard for negative gap is a nice-to-have fix).
 
 ---
 

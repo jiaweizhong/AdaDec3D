@@ -104,5 +104,389 @@
       0.0027200647599784134
     ],
     "net_neutral": true
+  },
+  "H2_boundary": {
+    "distance_bins": [
+      "0-1",
+      "1-2",
+      "2-4",
+      ">4"
+    ],
+    "positive_rate": [
+      0.06377662654003562,
+      0.08833445680168671,
+      0.09625708977363968,
+      0.11005983457430304
+    ],
+    "negative_rate": [
+      0.05848791262791889,
+      0.10744141321849042,
+      0.11418333552463227,
+      0.2436405904308865
+    ],
+    "net_rate": [
+      0.005288713912116725,
+      -0.019106956416803704,
+      -0.017926245750992567,
+      -0.13358075585658347
+    ],
+    "net_rate_ci": [
+      [
+        -0.009463084594931653,
+        0.01946469888766029
+      ],
+      [
+        -0.03238943880798195,
+        -0.0066501928835036505
+      ],
+      [
+        -0.03846940280377138,
+        0.0016953934759577
+      ],
+      [
+        -0.18411181877596405,
+        -0.08750866381324342
+      ]
+    ],
+    "note": "voxels binned by distance-to-GT-boundary; subject-mean rates over union(GT,Full,Effi) foreground; net = positive - negative"
+  },
+  "O_anatomy": {
+    "organ": [
+      "Vessel",
+      "Tumour"
+    ],
+    "positive_rate": [
+      0.07811503084860132,
+      0.10294607216387912
+    ],
+    "negative_rate": [
+      0.12535923248118783,
+      0.15359995974686444
+    ],
+    "net_rate": [
+      -0.04724420163258651,
+      -0.05065388758298532
+    ],
+    "organ_size": [
+      39599.816666666666,
+      245959.6
+    ],
+    "dice_delta_full_minus_effi": [
+      -0.013271827843505002,
+      -0.009105494014809756
+    ],
+    "size_net_spearman": NaN,
+    "foreground": "union(GT,Full,Effi) per organ"
+  },
+  "O_pareto": {
+    "budgets_pct": [
+      5,
+      10,
+      20,
+      30,
+      50
+    ],
+    "block_size": 16,
+    "oracle": {
+      "net_recovered_mean": [
+        0.999978,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "ci_lower": [
+        0.999948,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "ci_upper": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "entropy": {
+      "net_recovered_mean": [
+        -1.308191,
+        -1.458751,
+        -1.470742,
+        -1.470742,
+        -1.470742
+      ],
+      "ci_lower": [
+        -1.803807,
+        -1.983544,
+        -1.999575,
+        -1.999575,
+        -1.999575
+      ],
+      "ci_upper": [
+        -0.850008,
+        -0.969263,
+        -0.975916,
+        -0.975916,
+        -0.975916
+      ]
+    },
+    "confidence": {
+      "net_recovered_mean": [
+        -1.303675,
+        -1.459449,
+        -1.470742,
+        -1.470742,
+        -1.470742
+      ],
+      "ci_lower": [
+        -1.855861,
+        -2.034105,
+        -2.047551,
+        -2.047551,
+        -2.047551
+      ],
+      "ci_upper": [
+        -0.839749,
+        -0.975197,
+        -0.991663,
+        -0.991663,
+        -0.991663
+      ]
+    },
+    "boundary": {
+      "net_recovered_mean": [
+        -1.293852,
+        -1.43354,
+        -1.470742,
+        -1.470742,
+        -1.470742
+      ],
+      "ci_lower": [
+        -1.821042,
+        -1.959058,
+        -1.992767,
+        -1.992767,
+        -1.992767
+      ],
+      "ci_upper": [
+        -0.812866,
+        -0.934824,
+        -0.973654,
+        -0.973654,
+        -0.973654
+      ]
+    },
+    "random": {
+      "net_recovered_mean": [
+        -0.073998,
+        -0.14576,
+        -0.291139,
+        -0.440518,
+        -0.740511
+      ],
+      "ci_lower": [
+        -0.103187,
+        -0.201437,
+        -0.403691,
+        -0.612783,
+        -1.024855
+      ],
+      "ci_upper": [
+        -0.04924,
+        -0.095781,
+        -0.19171,
+        -0.289975,
+        -0.48935
+      ]
+    },
+    "concentration": {
+      "oracle_coverage_at_10pct": 1.0,
+      "oracle_coverage_at_20pct": 1.0,
+      "budget_for_80pct_net_pct": 5,
+      "abs_net_voxels_mean": -417.73333333333335,
+      "abs_pos_mass_voxels_mean": 19280.8,
+      "note": "C1/C2: coverage = fraction of the subject's positive net mass sum_r max(B(r),0) recovered by the top-k% oracle blocks; K80 = smallest block budget reaching 0.8. abs_net is the signed total net benefit in voxels: report it WITH the coverage so a steep curve over a ~0 absolute total is not mistaken for a large opportunity."
+    },
+    "selection_gap_at_20pct": {
+      "oracle": {
+        "mean_minus_random": 1.291139345780563,
+        "ci": [
+          1.192245769221056,
+          1.395760454886567
+        ]
+      },
+      "entropy": {
+        "mean_minus_random": -1.179602305111557,
+        "ci": [
+          -1.6041147724514075,
+          -0.7786786179149848
+        ]
+      },
+      "confidence": {
+        "mean_minus_random": -1.1796023051115572,
+        "ci": [
+          -1.6314221291646698,
+          -0.7652652485421094
+        ]
+      },
+      "boundary": {
+        "mean_minus_random": -1.1796023051115572,
+        "ci": [
+          -1.6188992919926677,
+          -0.7696036608573412
+        ]
+      },
+      "note": "P2: paired subject-bootstrap of (signal - matched random) net recovered at 20% block budget. A deployable signal beats random iff its CI excludes 0; the oracle row is the non-deployable upper bound."
+    }
+  },
+  "R_recovery": {
+    "budgets_pct": [
+      5,
+      10,
+      20,
+      30,
+      50
+    ],
+    "block_size": 16,
+    "halo": 4,
+    "effi_dice": 0.5862485331955097,
+    "full_dice": 0.5750598722663524,
+    "full_minus_effi_dice": -0.011188660929157379,
+    "effi_nsd_tau1": 0.4767712280154228,
+    "full_nsd_tau1": 0.4473949000239372,
+    "nsd_budget_pct": 20,
+    "oracle": {
+      "dice_mean": [
+        0.62849,
+        0.6285,
+        0.62851,
+        0.6285,
+        0.6285
+      ],
+      "dice_ci_lower": [
+        0.59541,
+        0.59542,
+        0.59542,
+        0.59542,
+        0.59542
+      ],
+      "dice_ci_upper": [
+        0.66067,
+        0.66068,
+        0.66069,
+        0.66069,
+        0.66069
+      ],
+      "executed_volume_fraction_mean": [
+        0.0946,
+        0.1607,
+        0.2748,
+        0.378,
+        0.5582
+      ],
+      "nsd_tau1_at_20pct_mean": 0.5182268664240837
+    },
+    "entropy": {
+      "dice_mean": [
+        0.57701,
+        0.5754,
+        0.57506,
+        0.57506,
+        0.57506
+      ],
+      "dice_ci_lower": [
+        0.54224,
+        0.54125,
+        0.54089,
+        0.54089,
+        0.54089
+      ],
+      "dice_ci_upper": [
+        0.61084,
+        0.60782,
+        0.60755,
+        0.60755,
+        0.60755
+      ],
+      "executed_volume_fraction_mean": [
+        0.0877,
+        0.1556,
+        0.2744,
+        0.3695,
+        0.5562
+      ],
+      "nsd_tau1_at_20pct_mean": 0.4473949000239372
+    },
+    "confidence": {
+      "dice_mean": [
+        0.57696,
+        0.5754,
+        0.57506,
+        0.57506,
+        0.57506
+      ],
+      "dice_ci_lower": [
+        0.54235,
+        0.54213,
+        0.54194,
+        0.54194,
+        0.54194
+      ],
+      "dice_ci_upper": [
+        0.61249,
+        0.60968,
+        0.60928,
+        0.60928,
+        0.60928
+      ],
+      "executed_volume_fraction_mean": [
+        0.0875,
+        0.1556,
+        0.2744,
+        0.3695,
+        0.5562
+      ],
+      "nsd_tau1_at_20pct_mean": 0.4473949000239372
+    },
+    "random": {
+      "dice_mean": [
+        0.58556,
+        0.58498,
+        0.58436,
+        0.58238,
+        0.58064
+      ],
+      "dice_ci_lower": [
+        0.54921,
+        0.54876,
+        0.54842,
+        0.5469,
+        0.54545
+      ],
+      "dice_ci_upper": [
+        0.62033,
+        0.61896,
+        0.61802,
+        0.61625,
+        0.61322
+      ],
+      "executed_volume_fraction_mean": [
+        0.1502,
+        0.2767,
+        0.4754,
+        0.6209,
+        0.8116
+      ],
+      "nsd_tau1_at_20pct_mean": 0.47292488639553387
+    },
+    "recovered_fraction_at_20pct": {
+      "oracle": 42261466.804490276,
+      "entropy": -11188533.195509719,
+      "random": -1888533.195509745,
+      "note": "(hybrid Dice - Efficient Dice) / (Full Dice - Efficient Dice) at 20% block budget"
+    }
   }
 }

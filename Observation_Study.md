@@ -1232,7 +1232,7 @@ Reproduction/efficiency ([results/last_validation_metrics_task08_hepaticvessel.c
 | Δ (Effi−Full) | +.014 | +.009 | **+.011** | 11.7× | 16.8× | 5.0× |
 
 - **Spacingd fixed the absolute Dice** — from ~0.54 (no resample) to **0.575/0.586**, now paper-comparable (EffiDec3D Table 3 UX-Net Task08 = 0.557).
-- **Effi ≥ Full (+1.1 pt)** — the efficient decoder *beats* the full decoder on thin vessels: strong on-thesis evidence. Same efficiency reductions as BTCV (11.7×/16.8×/5.0×).
+- **Effi is statistically *tied* with Full** (0.586 vs 0.575, within run-to-run variance; cf. EffiDec3D's own Task08 tie 55.65 vs 55.62). Frame it as a **tie, not "Effi beats Full"** — the full decoder's extra capacity is simply **unused** on thin vessels. Same efficiency reductions as BTCV (11.7×/16.8×/5.0×).
 
 **Flip metrics ([results/obs-hv-concat](results/obs-hv-concat)) — the dataset axis confirms the thesis, more sharply than BTCV:**
 
@@ -1247,8 +1247,9 @@ Reproduction/efficiency ([results/last_validation_metrics_task08_hepaticvessel.c
 | **P2** entropy−random net-flip @20% | **−1.18 [−1.60,−0.78]** (routing to Full is *worse* than random) |
 | **R** Dice recovery | gap = **−0.011 (Full < Effi)** → routing blocks to Full *decreases* Dice (.586→.575); recovery **undefined** (negative gap) |
 
-- **Even stronger than BTCV**: here the full decoder's net is not just ≈0 but **net-negative** — Effi ≥ Full, `abs_net` is negative, P2 is significantly *negative* (routing to Full hurts), and R shows routing to Full *lowers* Dice. So on thin high-resolution structures the extra decoder capacity is actively unhelpful.
+- **Even sharper than BTCV**: H1 is net-neutral (CI crosses 0) with the point estimate *slightly negative*, `abs_net` is negative, P2 is significantly *negative* (routing to Full is worse than random), and R shows routing to Full *lowers* Dice. So on thin high-resolution structures the extra decoder capacity is at best unused and never net-beneficial — the strongest form of the thesis.
 - **Direction still unpredictable** (.520, CI includes 0.5) — the P1 finding generalizes across the dataset axis.
+- **Convergence caveat (reviewer pre-empt).** The Effi run plateaued cleanly (~0.594 by step ~37.5k). The Full run's curve was overwritten (`tee` in `run_hv_sp.sh`), so its convergence isn't directly confirmed, and the larger Full model (53M) could be marginally under-trained vs the small Effi (3M) on the 243-volume set at 45k steps. But the ≤1 pt difference is within noise and matches the EffiDec3D tie, and **the net-neutral conclusion rests on H1's CI (crosses 0), not on absolute Dice** — so no retrain is needed. If certainty is wanted, extend the Full run to ~60k and confirm it plateaus below Effi.
 - **⚠️ R_recovery edge case**: `recovered_fraction_at_20pct` in the JSON is garbage (~1e7) because the code clamps `gap=max(fd−ed,1e-9)` → division blows up when Full ≤ Effi. Report the raw Dice curve instead; ignore that field for this cell (a code guard for negative gap is a nice-to-have fix).
 
 ---

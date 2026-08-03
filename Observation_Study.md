@@ -1175,11 +1175,12 @@ currently over-sized (fs=48 → 2× the paper's MedNeXt-M-K3; retrain at fs=32 p
 Six-metric numbers below are from the **converged-code re-run** (2026-07-30,
 [results/obs-uxnet-concat](results/obs-uxnet-concat), [results/obs-swin-concat](results/obs-swin-concat)):
 
-| Metric | 3D UX-Net (concat) | SwinUNETR (concat) | MedNeXt (addition\*) |
+| Metric | 3D UX-Net (concat) | SwinUNETR (concat) | MedNeXt fs=32 (addition\*) |
 |---|---|---|---|
-| Full → Effi Dice | .792 → .777 (−1.5%) | .805 → .795 (−1.0%) | .837 → .815 (−2.3%) |
-| GMac (× reduction) | 579 → 49 (11.7×) | 308 → 56 (5.5×) | 231 → 107 (2.2×) |
-| **H1** GAIN R_net (subject CI) | **+0.047% [−.020,+.109]** | **−0.001% [−.045,+.040]** | pending fs=32 |
+| Full → Effi Dice | .792 → .777 (−1.5%) | .805 → .795 (−1.0%) | **.826 → .814 (−1.3%)** |
+| GMac (× reduction) | 579 → 49 (11.7×) | 308 → 56 (5.5×) | 106 → 50 (2.1×) |
+| Params (× reduction) | 53.0 → 3.16M (16.8×) | 62.2 → 11.2M (5.5×) | **17.56 → 5.80M (3.0×)** |
+| **H1** GAIN R_net (subject CI) | **+0.047% [−.020,+.109]** | **−0.001% [−.045,+.040]** | pending obs |
 | **H1** ACTIVITY P+N (act/gain) | .510% [.42,.61] (~11×) | .402% [.33,.48] (≫; net≈0) | pending |
 | **H2** boundary net peak | +0.085 @0–1 vox [.070,.101] | +0.015/+0.021 @0–2 vox | pending |
 | **H2** size↔net ρ (union fg) | +0.02 | −0.58 | pending |
@@ -1190,8 +1191,11 @@ Six-metric numbers below are from the **converged-code re-run** (2026-07-30,
 | **R** entropy **Dice** recovery @20% (of gap) | **100%** (5%→60%); random 17% | **100%**; random 20% | pending |
 | **TTA** direction AUROC (MI, K=8) | .539 [.50,.58] | .570 [.53,.61] | pending |
 
-\* MedNeXt has no addition/concat decoder knob; listed at its native config but over-sized
-(fs=48), so it is **not** a canonical result until re-trained at fs=32.
+\* MedNeXt has no addition/concat knob (native additive skip). **fs=32 retrain done
+(2026-08-02) — now canonical:** params **17.56M / 5.80M** match the paper exactly
+(17.55 / 5.77M), full Dice **0.826** ≈ paper 0.8298, gap narrowed to **−1.3** (the fs=48
+model was 2.24× oversized → −2.3, void). The flip metrics still need the MedNeXt fs=32
+**obs** (`--feature_size 32 --skip_aggregation addition`; the crash was the fs=48 default).
 † direction AUPRC is **prevalence-inflated** — positive flips are the majority among flip
 voxels (~54%), so the AUPRC baseline is already ~0.54; the AUROC (~0.57) is the honest
 discrimination measure. Reporting both is the point.
@@ -1215,6 +1219,19 @@ thin boundary band that a selective decoder can recover* — not a positive net-
 model and is excluded from the headline.) **Caveat:** the MedNeXt-Effi
 cell was only valid after fixing two inherited-code bugs (Part 0b Errata); all pre-fix
 MedNeXt-Effi numbers (~0.02 Dice) are void.
+
+**Dataset axis (O7) — cell 1: MSD Task08 HepaticVessel (UX-Net, concat, Spacingd on, 2026-08-02).**
+Reproduction/efficiency ([results/last_validation_metrics_task08_hepaticvessel.csv](results/last_validation_metrics_task08_hepaticvessel.csv)):
+
+| | Vessel | Tumour | **Mean** | MACs | Params | Lat |
+|---|---|---|---|---|---|---|
+| Full (E0) | .582 | .568 | **.575** | 578 | 53.0M | 40.3 ms |
+| Effi (E1, concat) | .596 | .577 | **.586** | 49.4 | 3.16M | 8.0 ms |
+| Δ (Effi−Full) | +.014 | +.009 | **+.011** | 11.7× | 16.8× | 5.0× |
+
+- **Spacingd fixed the absolute Dice** — from ~0.54 (no resample) to **0.575/0.586**, now paper-comparable (EffiDec3D Table 3 UX-Net Task08 = 0.557).
+- **Effi > Full (+1.1 pt)** — the efficient decoder *beats* the full decoder on thin vessels: strong on-thesis evidence that the full decoder's extra capacity is net-neutral (here even net-negative) on high-resolution structures. Same efficiency reductions as BTCV (11.7×/16.8×/5.0×).
+- **Flip metrics (H1/H2/C1/P1/P2/R) pending** the obs re-run (`obs-hv-concat`) — this row is Dice/efficiency only so far.
 
 ---
 

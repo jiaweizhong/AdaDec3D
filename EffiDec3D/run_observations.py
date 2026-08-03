@@ -54,8 +54,10 @@ BTCV13_NAMES = ["Spleen", "R.Kidney", "L.Kidney", "Gallbladder", "Esophagus",
                 "Pancreas", "R.Adrenal", "L.Adrenal"]
 FETA_NAMES = ["ECF", "GM", "WM", "Ventricles", "Cerebellum", "DeepGM", "Brainstem"]
 HEPATIC_NAMES = ["Vessel", "Tumour"]   # MSD Task08: 2 foreground classes (out_classes=3)
+BRAIN_NAMES = ["Edema", "Enh", "NCR"]  # MSD Task01: 3 foreground classes 1/2/3 (out_classes=4, 4-class softmax)
 DATASET_NAMES = {"BTCV13": BTCV13_NAMES, "feta": FETA_NAMES,
-                 "Task08_HepaticVessel": HEPATIC_NAMES}
+                 "Task08_HepaticVessel": HEPATIC_NAMES,
+                 "Task01_BrainTumour": BRAIN_NAMES}
 
 # Module global; main() sets it from the dataset. O1/O4/O10 reference CLASS_NAMES,
 # so per-organ observations stay generic across datasets (else class_1..N).
@@ -97,7 +99,7 @@ def save_obs(tag, metrics):
 
 def build_model(network, role, out_classes, device, img_size=(96, 96, 96),
                 feature_size=48, resolution_factor=2, n_decoder_channels=48,
-                skip_aggregation="concatenation"):
+                skip_aggregation="concatenation", in_channels=1):
     """Build Full ('full') or EffiDec3D ('effi') model for `network`.
 
     Mirrors main_train_BTCV_TU.py instantiation. MedNeXt uses kernel size 3 to
@@ -106,7 +108,7 @@ def build_model(network, role, out_classes, device, img_size=(96, 96, 96),
     decoder for the frozen-encoder factor decomposition (E1): the four corners are
     all role='effi' with (rf, nchan) in {(1,C_full),(1,48),(2,C_full),(2,48)}.
     """
-    ic = 1
+    ic = in_channels
     if network == "3DUXNET":
         from networks.UXNet_3D.network_backbone import UXNET, UXNET_EffiDec3D
         if role == "effi":
@@ -1469,15 +1471,16 @@ def main():
     e0 = ([args_ns.e0_ckpt] if args_ns.e0_ckpt else
           sorted(glob.glob(f"{args_ns.output}/*/{full_folder}/{args_ns.dataset}/best_metric_model.pth")))
     assert e0, f"No full checkpoint under {args_ns.output}/*/{full_folder}/{args_ns.dataset}/"
+    in_ch = 4 if args_ns.dataset == "Task01_BrainTumour" else 1   # Task01 = 4 stacked MRI modalities
     if e0_factorial:
         full = load_ckpt(build_model(network, "effi", out_classes, device, feature_size=fsize,
                                      resolution_factor=(args_ns.e0_rf or 2),
                                      n_decoder_channels=(args_ns.e0_nchan or 48),
-                                     skip_aggregation=args_ns.skip_aggregation), e0[-1], device)
+                                     skip_aggregation=args_ns.skip_aggregation, in_channels=in_ch), e0[-1], device)
         print(f"Full (factorial rf={args_ns.e0_rf},nchan={args_ns.e0_nchan}): {e0[-1]}")
     else:
-        full = load_ckpt(build_model(network, "full", out_classes, device, feature_size=fsize),
-                         e0[-1], device)
+        full = load_ckpt(build_model(network, "full", out_classes, device, feature_size=fsize,
+                                     in_channels=in_ch), e0[-1], device)
         print(f"Full: {e0[-1]}")
 
     # EffiDec3D counterpart (matched backbones only, or explicit factorial side).
@@ -1489,7 +1492,7 @@ def main():
             effi = load_ckpt(build_model(network, "effi", out_classes, device, feature_size=fsize,
                                          resolution_factor=(args_ns.e1_rf or 2),
                                          n_decoder_channels=(args_ns.e1_nchan or 48),
-                                         skip_aggregation=args_ns.skip_aggregation), e1[-1], device)
+                                         skip_aggregation=args_ns.skip_aggregation, in_channels=in_ch), e1[-1], device)
             print(f"Effi (rf={args_ns.e1_rf or 2},nchan={args_ns.e1_nchan or 48}): {e1[-1]}")
         else:
             print(f"[warn] no EffiDec3D checkpoint for {network}; falling back to single-model mode")

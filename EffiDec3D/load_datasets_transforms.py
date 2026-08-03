@@ -83,7 +83,7 @@ def data_loader(args):
     elif dataset == 'BTCV13':
         out_classes = 14
     elif dataset == 'Task01_BrainTumour':
-        out_classes = 3 # for sigmoid
+        out_classes = 4 # 4-class softmax: bg + edema(1) + enhancing(2) + NCR/NET(3), single-label for the argmax flip analysis
     elif dataset == 'Task10_Colon':
         out_classes = 2
     elif dataset == 'Task06_Lung':
@@ -109,15 +109,15 @@ def data_loader(args):
 
         ## Input training data
         #print(os.path.join(root_dir, 'imagesTr', 'x.nii.gz'))
-        train_img = sorted(glob.glob(os.path.join(root_dir, 'imagesTr', '*.nii.gz')))
-        train_label = sorted(glob.glob(os.path.join(root_dir, 'labelsTr', '*.nii.gz')))
+        train_img = sorted(glob.glob(os.path.join(root_dir, 'imagesTr', '*.nii*')))
+        train_label = sorted(glob.glob(os.path.join(root_dir, 'labelsTr', '*.nii*')))
         #print(len(train_img))
         train_samples['images'] = train_img
         train_samples['labels'] = train_label
 
         ## Input validation data
-        valid_img = sorted(glob.glob(os.path.join(root_dir, 'imagesVal', '*.nii.gz')))
-        valid_label = sorted(glob.glob(os.path.join(root_dir, 'labelsVal', '*.nii.gz')))
+        valid_img = sorted(glob.glob(os.path.join(root_dir, 'imagesVal', '*.nii*')))
+        valid_label = sorted(glob.glob(os.path.join(root_dir, 'labelsVal', '*.nii*')))
         valid_samples['images'] = valid_img
         valid_samples['labels'] = valid_label
 
@@ -130,7 +130,7 @@ def data_loader(args):
         test_samples = {}
 
         ## Input inference data
-        test_img = sorted(glob.glob(os.path.join(root_dir, 'imagesTs', '*.nii.gz')))
+        test_img = sorted(glob.glob(os.path.join(root_dir, 'imagesTs', '*.nii*')))
         test_samples['images'] = test_img
 
         print('Finished loading all inference samples from dataset: {}!'.format(dataset))
@@ -745,9 +745,9 @@ def data_transforms(args):
             [
                 # load 4 Nifti images and stack them together
                 LoadImaged(keys=["image", "label"]),
-                EnsureChannelFirstd(keys="image"),
+                EnsureChannelFirstd(keys=["image", "label"]),
                 EnsureTyped(keys=["image", "label"]),
-                ConvertToMultiChannelBasedOnBratsClassesd(keys="label"),
+                # ConvertToMultiChannelBasedOnBratsClassesd(keys="label"),  # 4-class softmax: keep raw labels 0/1/2/3
                 Orientationd(keys=["image", "label"], axcodes="RAS"),
                 Spacingd(
                     keys=["image", "label"],
@@ -768,9 +768,9 @@ def data_transforms(args):
         val_transforms = Compose(
             [
                 LoadImaged(keys=["image", "label"]),
-                EnsureChannelFirstd(keys="image"),
+                EnsureChannelFirstd(keys=["image", "label"]),
                 EnsureTyped(keys=["image", "label"]),
-                ConvertToMultiChannelBasedOnBratsClassesd(keys="label"),
+                # ConvertToMultiChannelBasedOnBratsClassesd(keys="label"),  # 4-class softmax: keep raw labels 0/1/2/3
                 Orientationd(keys=["image", "label"], axcodes="RAS"),
                 Spacingd(
                     keys=["image", "label"],

@@ -131,7 +131,7 @@ Boundary Net Gain (\%) & $-0.020$ & $+0.033$ & $-0.004$ \\
 \subsection{Gain Concentration and Predictability}
 \label{sec:results_predictability}
 
-Figure \ref{fig:concentration} presents oracle benefit concentration curves. Across our evaluated benchmark backbones and datasets, an oracle selecting the top 5\% of spatial blocks contains 80\% of the total positive net gain ($K_{80} \le 5\%$). At a 10\% volume budget, oracle coverage reaches 99.98\%.
+Figure \ref{fig:concentration} presents oracle benefit concentration curves. Across the three BTCV backbone pairs, the top 5\% of spatial blocks captured at least 80\% of positive gain ($K_{80} \le 5\%$), and the top 10\% captured up to 99.98\%.
 
 \begin{figure*}[tb]
 \centering
@@ -208,7 +208,7 @@ Figure \ref{fig:macro_recovery} presents retrospective hybrid prediction recover
 \label{sec:results_cross_dataset}
 
 To evaluate whether the observations discovered on BTCV generalize across imaging modalities and anatomical targets, Table~\ref{tab:cross_dataset} summarizes these metrics across all three datasets for the 3D UX-Net reference architecture.
-Across the two additional datasets, the absolute activity and net-gain rates varied with target morphology, but the three central observations were retained: gross correctness activity exceeded directional net gain, positive gain remained spatially concentrated, and uncertainty localized activity substantially better than it discriminated gain direction.
+Across datasets, gross bidirectional correctness activity, positive-gain concentration (e.g., the strong concentration pattern persisted on MSD08 with $K_{80} \le 5\%$), and the activity--direction predictability gap remained observable. However, the magnitude and sign of net gain were task-dependent: on MSD08, the efficient decoder outperformed the full decoder, producing a negative foreground-union net gain.
 
 \begin{table*}[tb]
 \centering

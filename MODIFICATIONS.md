@@ -86,6 +86,14 @@ additions. Line numbers are approximate and may drift as the code evolves.
 - Mixed-precision uses the PyTorch 2.x API (`from torch.amp import GradScaler`,
   `torch.autocast("cuda", dtype=...)`), BF16 on Blackwell.
 
+### C2 — dataset loader accepts `.nii` as well as `.nii.gz`  **[COMPAT]**
+- **File:** `load_datasets_transforms.py` (`data_loader` globs for imagesTr/labelsTr/
+  imagesVal/labelsVal/imagesTs)
+- Upstream globbed only `'*.nii.gz'`. MSD **Task01 BrainTumour** ships **uncompressed
+  `.nii`** files, so the loader matched zero files → an empty validation set → `Dice = nan`
+  and `Best Avg. Dice` stuck at `0.0`. Changed the five globs to `'*.nii*'` (matches both
+  `.nii` and `.nii.gz`; backward-compatible for the `.nii.gz` datasets).
+
 ---
 
 ## Features added for the observation study
@@ -120,6 +128,14 @@ additions. Line numbers are approximate and may drift as the code evolves.
 - `--skip_aggregation {addition, concatenation}` surfaces a previously internal knob and
   threads it to the Effi builds. (MedNeXt-Effi has no such knob and ignores it.)
 
+### F7 — Configurable input channels (multi-modal MRI)  **[FEATURE]**
+- **File:** `run_observations.py` (`build_model(..., in_channels=1)`; `main()` derives
+  `in_ch = 4 if dataset == "Task01_BrainTumour" else 1`)
+- Upstream `build_model` hard-coded `ic = 1` (single-channel CT). Task01 BrainTumour stacks
+  **4 MRI modalities** (FLAIR/T1/T1ce/T2), so the obs rebuild needs `in_channels=4` to load
+  those checkpoints. Training already supported it via `--n_channels 4`
+  (`in_chans=args.n_channels`); this threads the same choice through the observation path.
+
 ---
 
 ## Configuration choices for the matched-pair protocol
@@ -130,12 +146,56 @@ additions. Line numbers are approximate and may drift as the code evolves.
 - Makes the full and efficient models a clean matched pair differing **only** in the
   decoder, matching the paper's MedNeXt-M-K3.
 
-### CFG2 — Skip-aggregation default = concatenation  **[CONFIG]**
+### CFG2 — Skip-aggregation: concatenation is the canonical config  **[CONFIG]**
 - `build_model` in `run_observations.py` defaults `skip_aggregation="concatenation"`,
-  matching the EffiDec3D network class default (the training CLI historically defaulted to
-  `addition`). Our currently-analyzed UX-Net/Swin Effi checkpoints were trained with
-  `addition`; observations on them must pass `--skip_aggregation addition` so the rebuilt
-  model matches the checkpoint.
+  matching the EffiDec3D network class default. **Concatenation reproduces the paper's
+  parameter counts** (UX-Net Effi 3.16M, Swin Effi 11.21M — exact), so it is our canonical
+  matched-pair config for UX-Net and Swin; `addition` is retained only as an ablation. The
+  rebuilt model must use the same skip as the checkpoint (`--skip_aggregation`). **MedNeXt**
+  has no such knob — its decoder is natively additive — so MedNeXt uses `addition`.
+
+### CFG3 — Task01 BrainTumour: single-label 4-class softmax, NOT BraTS multi-label  **[CONFIG]**
+- **File:** `load_datasets_transforms.py` (`Task01_BrainTumour` branch) + `run_observations.py`
+  (`BRAIN_NAMES`)
+- **Upstream (= EffiDec3D paper's setup):** `out_classes = 3 # for sigmoid` +
+  `ConvertToMultiChannelBasedOnBratsClassesd` → three **overlapping** BraTS regions
+  (WT ⊃ TC ⊃ ET), multi-label **sigmoid**. This is the standard brain-tumour evaluation the
+  paper reports (Table 3, ~78% average, where the large easy WT region dominates).
+- **Change:** `out_classes` 3 → 4; **drop** `ConvertToMultiChannelBasedOnBratsClassesd`
+  (train + val); add the label to `EnsureChannelFirstd(keys=["image","label"])` → **single-label
+  softmax** over the raw atomic sub-regions (bg + edema=1 + enhancing=2 + NCR/necrotic=3).
+  Registered class names `["Edema","Enh","NCR"]`. Train with `--n_channels 4`.
+- **Why:** our entire analysis is per-voxel prediction **flips** (`P/N/U`, H1/H2/C1/P1/P2/R),
+  which require a single **`argmax`** class per voxel. BraTS's overlapping regions have **no
+  `argmax`** (a voxel can be WT *and* TC *and* ET), so the flip framework cannot be computed
+  on the multi-label setup. The atomic sub-regions are single-label and argmax-compatible,
+  and consistent with our other cells (BTCV organs, Task08 vessel/tumour are mutually
+  exclusive).
+- **Consequence:** our Task01 Dice (~0.66, per-subregion) is **not comparable** to the paper's
+  WT/TC/ET average (~0.786) — a *different quantity*, not worse performance. Footnoted in the
+  paper. The flip analysis is relational (Full vs Effi on identical data), so absolute Dice is
+  not a gate. (A WT/TC/ET Dice can be derived post-hoc from the `argmax` for a paper-comparable
+  baseline row if desired, without changing the flip pipeline.)
+
+### CFG4 — Task08 HepaticVessel: `Spacingd` resampling enabled  **[CONFIG]**
+- **File:** `load_datasets_transforms.py` (`Task08_HepaticVessel` branch, train/val/test)
+- **Upstream:** `Spacingd` was **commented out** for Task08 in the inherited code (base commit
+  `d5a71e6`), i.e. no spacing normalization — the config behind EffiDec3D's own Task08 result
+  (~0.557). (Note: BTCV's `Spacingd` is active but a *nominal* no-op on our identity-affine
+  data; Task01's is active upstream.)
+- **Change:** uncommented `Spacingd(pixdim=(1.0,1.0,1.0))` for train/val/test.
+- **Why:** HepaticVessel CT has highly variable slice thickness (~0.8–8 mm); without spacing
+  normalization thin vessels sit on inconsistent voxel scales and are ~unlearnable (Dice
+  ~0.54). Resampling is standard (nnU-Net) and aligns Task08 with the real-affine MSD data.
+  Lifts Dice to ~0.575/0.586 (paper-comparable to their 0.557).
+- **Consequence:** deviates from EffiDec3D's released Task08 preprocessing, so our absolute
+  Task08 Dice is not a strict reproduction of their Table 3. Footnoted; the relational flip
+  analysis is unaffected.
+
+### CFG5 — Dataset axis: BTCV + Task08 + Task01 (FeTA dropped)  **[CONFIG]**
+- The generality dataset axis is BTCV (CT, main) / MSD Task08 HepaticVessel (CT, thin
+  structures) / MSD Task01 BrainTumour (MRI, heterogeneous lesions). **FeTA 2021 was dropped**
+  (could not be obtained) and Task01 replaces it for the MRI + lesion coverage.
 
 ---
 
@@ -143,10 +203,14 @@ additions. Line numbers are approximate and may drift as the code evolves.
 
 These are new files, listed for completeness; they do not alter EffiDec3D training/inference:
 
-- `run_observations.py` — O1–O11 + O_pareto / O_anatomy / O_boundary_flips / O_surface,
-  boundary-resolved flips, surface metrics (NSD), O3 flip-prediction, O9 foreground
-  denominator, arbitrary-pair (factorial) support.
-- `make_figure1.py` — Figure 1 teaser (now with `--skip_aggregation`).
+- `run_observations.py` — the **six converged metrics** along Heterogeneity → Concentration
+  → Predictability → Recoverability: H1 global flips (`O5`), H2 boundary/anatomy net
+  (`H2_boundary`, `O_anatomy`), C1/C2 oracle concentration + P2 signal-vs-random (`O_pareto`),
+  P1 any/positive/direction AUROC+AUPRC (`O3`), R hybrid selective-decoding Dice recovery
+  (`R_recovery`), plus Activity=P+N (in `O5`) and an opt-in TTA-uncertainty diagnostic
+  (`--tta`, `O_tta`). The exploratory O1/O2/O4/O9 survive behind `--appendix`; O6/O10/O11,
+  O_dice_aware and O_errortype were deleted. Arbitrary-pair (frozen-encoder factorial) support.
+- `make_figure1.py` — Figure 1 teaser (`--skip_aggregation`, `--zoom_half`).
 - `aggregate_generality.py` — Figure 4 (cross-dataset / cross-architecture aggregation).
 - `run_E0_E1.sh`, `run_E0_E1_swin.sh`, `run_E0_E1_mednext.sh`, `run_frozen_factorial.sh`
   — training + observation runners.
@@ -155,10 +219,14 @@ These are new files, listed for completeness; they do not alter EffiDec3D traini
 
 ## Known non-issues
 
-- **`O11.MC Dropout.subject_corr_mean = NaN`** in `results.json` — expected. MC Dropout needs
-  active dropout layers at inference; these backbones use dropout = 0, so predictive
-  variance is degenerate. The code flags `"warn": "dropout_inactive"`. Only the Entropy and
-  Confidence signals are used. (The literal `NaN` token is non-strict-JSON; Python reads it,
-  strict parsers may reject it.)
+- **MC-Dropout was removed, not fixed.** These backbones use dropout = 0, so MC-Dropout
+  predictive variance is degenerate; the old O11 routing-signal comparison (and MC-dropout)
+  were **deleted**. The richer-uncertainty question is instead answered by the opt-in
+  **TTA mutual-information** diagnostic (`O_tta`), which needs no dropout. Only entropy and
+  confidence are used as the default deployable signals.
+- **`R_recovery.recovered_fraction_at_20pct = null`** when Full Dice ≤ Effi Dice (e.g. Task08):
+  expected. The fraction `(hybrid−Effi)/(Full−Effi)` is undefined when the full decoder does
+  not improve Dice; the code emits `null` + a note and the raw `dice_mean` curve is the source
+  of truth.
 - **Non-tuple indexing `UserWarning`s** from `monai_utils/inferers/utils.py` on PyTorch 2.6
   — harmless deprecation notices, not errors.

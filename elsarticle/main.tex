@@ -64,7 +64,7 @@
 
 %% Abstract
 \begin{abstract}
-Modern 3D medical image segmentation networks (e.g. vision transformers and large-kernel CNNs) increasingly incorporate heavy multi-resolution decoders, assuming that dense decoding is universally necessary across the volumetric grid. Conversely, efficient alternatives (e.g. EffiDec3D and EfficientMedNeXt) simplify these decoding pathways based on macroscopic metrics. However, where, under what spatial conditions, and to what extent additional decoder computation actually contributes to segmentation correctness remain uncharacterized. In this work, we present a systematic characterization study of decoder computation in 3D medical image segmentation. We evaluate end-to-end full–efficient decoder pairs across three representative backbones on BTCV CT, examine cross-dataset consistency using 3D UX-Net across BTCV CT, MSD01 BrainTumour MRI, and MSD08 HepaticVessel CT, and perform controlled factor attribution using a frozen shared-encoder $2\times2$ factorial design on 3D UX-Net. Our findings establish a core conceptual distinction: \textit{correctness activity} measures where the decoder alters prediction correctness (gross activity), whereas \textit{decoder net gain} measures the directional balance between positive voxel corrections and negative degradations. We demonstrate that additional decoder capacity produces substantial gross correctness activity that is largely offset by bidirectional cancellation, resulting in small global net gain. Spatially, positive net gain is highly concentrated near ground-truth anatomical boundaries, with an oracle selector containing 80\% of positive decoder gain on a 5\% spatial block budget ($K_{80} \le 5\%$). Furthermore, while inference-time predictive entropy reliably locates active regions (Location AUROC $>0.90$), it provides weak directional discrimination (Direction AUROC $\approx 0.545$--$0.591$). Retrospectively substituting full-decoder outputs within a 20\% entropy-selected block budget recovers 100\% of the macro-metric Dice gap across evaluated backbones. This demonstrates that prediction difficulty and computational utility are related but fundamentally distinct quantities, providing essential characterization insights, opportunity bounds, and design directions for future utility-aware adaptive decoders.
+Modern 3D medical image segmentation networks (e.g. vision transformers and large-kernel CNNs) increasingly incorporate heavy multi-resolution decoders, assuming that dense decoding is universally necessary across the volumetric grid. Conversely, efficient alternatives (e.g. EffiDec3D and EfficientMedNeXt) simplify these decoding pathways based on macroscopic metrics. However, where, under what spatial conditions, and to what extent additional decoder computation actually contributes to segmentation correctness remain uncharacterized. In this work, we present a systematic characterization study of decoder computation in 3D medical image segmentation. We evaluate end-to-end full–efficient decoder pairs across three representative backbones on BTCV CT, examine cross-dataset consistency using 3D UX-Net across BTCV CT, MSD01 BrainTumour MRI, and MSD08 HepaticVessel CT, and perform controlled factor attribution using a frozen shared-encoder $2\times2$ factorial design on 3D UX-Net. Our findings establish a core conceptual distinction: \textit{correctness activity} measures where the decoder alters prediction correctness (gross activity), whereas \textit{decoder net gain} measures the directional balance between positive voxel corrections and negative degradations. We demonstrate that additional decoder capacity produces substantial gross correctness activity that is largely offset by bidirectional cancellation, resulting in small global net gain. Spatially, positive net gain is highly concentrated near ground-truth anatomical boundaries, with an oracle selector containing 80\% of positive decoder gain on a 5\% spatial block budget ($K_{80} \le 5\%$). Furthermore, while inference-time predictive entropy reliably locates active regions (Location AUROC $>0.90$), it provides weak directional discrimination (Direction AUROC $\approx 0.556$--$0.591$). Retrospectively substituting full-decoder outputs within a 20\% entropy-selected block budget recovered the full macro-Dice gap for 3D UX-Net and SwinUNETR, while recovery remained partial for MedNeXt-M-K3. This demonstrates that prediction difficulty and computational utility are related but not interchangeable quantities, providing essential characterization insights, opportunity bounds, and design directions for future utility-aware adaptive decoders.
 \end{abstract}
 
 %% Highlights
@@ -122,18 +122,39 @@ The data used in this study (BTCV/Synapse, MSD01 BrainTumour, and MSD08 HepaticV
 
 This section provides supplementary qualitative visualizations for 3D UX-Net and MedNeXt-M-K3 backbones, complementing the SwinUNETR qualitative motivation example in Figure 2 of the main manuscript.
 
-\begin{figure}[htbp]
+\begin{figure*}[htbp]
 \centering
-\includegraphics[width=0.95\columnwidth]{figures/obs-uxnet-concat/figure1_motivation.png}
+\includegraphics[width=0.95\textwidth]{figures/obs-uxnet-concat/figure1_motivation.png}
 \caption{Supplementary Figure S1: Qualitative motivation visualization for 3D UX-Net on BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders.}
 \label{fig:supp_uxnet}
-\end{figure}
+\end{figure*}
 
-\begin{figure}[htbp]
+\begin{figure*}[htbp]
 \centering
-\includegraphics[width=0.95\columnwidth]{figures/obs-mednext/figure1_motivation.png}
+\includegraphics[width=0.95\textwidth]{figures/obs-mednext/figure1_motivation.png}
 \caption{Supplementary Figure S2: Qualitative motivation visualization for MedNeXt-M-K3 on BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders.}
 \label{fig:supp_mednext}
-\end{figure}
+\end{figure*}
+
+\section*{Supplementary Material: Entropy Monotonicity with Block-Level Error Rate}
+
+Figure \ref{fig:supp_error_rate} visualizes the block-level spatial correlation between mean predictive entropy and block-level error rate across all three evaluated backbones. The monotonic relationship confirms that entropy reliably localizes active, error-prone regions (Location AUROC), even though its directional discrimination ability remains weak.
+
+\begin{figure*}[htbp]
+\centering
+\begin{tabular}{ccc}
+\includegraphics[width=0.32\textwidth]{figures/obs-uxnet-concat/O3_unc_error.png} &
+\includegraphics[width=0.32\textwidth]{figures/obs-swin-concat/O3_unc_error.png} &
+\includegraphics[width=0.32\textwidth]{figures/obs-mednext/O3_unc_error.png} \\
+(a) 3D UX-Net Error Correlation & (b) SwinUNETR Error Correlation & (c) MedNeXt-M-K3 Error Correlation \\
+\end{tabular}
+\caption{Supplementary Figure S3: Correlation between mean predictive entropy and block-level error rate across backbones.}
+\label{fig:supp_error_rate}
+\end{figure*}
+
+\section*{Supplementary Material: Additional Implementation Details}
+
+\subsection*{TTA-MI (Test-Time Augmentation Mutual Information) Setup}
+For evaluating the predictive power of multi-view epistemic disagreement against spatial entropy, we utilized 8-view Test-Time Augmentation (TTA). Each volume was forwarded through the network across all 8 spatial flip combinations ($x, y, z$ axes). The Mutual Information (TTA-MI) was computed as the difference between the entropy of the mean prediction and the mean of the individual view entropies. Despite this computationally expensive multi-pass estimation, TTA-MI provided only marginally better directional discrimination (Direction AUROC 0.570 for SwinUNETR, 0.539 for 3D UX-Net) compared to single-pass predictive entropy, further reinforcing our conclusion that uncertainty measures are powerful activity indicators but weak directional utility classifiers.
 
 \end{document}

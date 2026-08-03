@@ -5,15 +5,11 @@ Precise 3D medical image segmentation is essential for clinical applications suc
 
 Conversely, emerging lightweight models attempt to mitigate this computational burden by simplifying decoding pathways based on macroscopic metrics, such as EffiDec3D \cite{effidec3d} and EfficientMedNeXt \cite{efficientmednext}. However, standard evaluation paradigms assess decoder designs almost exclusively through aggregate metrics such as the global Dice similarity coefficient or Hausdorff distance. While these macroscopic metrics summarize overall performance, they average out localized prediction changes and conceal spatial micro-dynamics across homogeneous organ interiors vs. complex anatomical boundaries. Consequently, a fundamental scientific question remains unexamined: \textbf{How does additional decoder computation actually contribute to 3D medical image segmentation?}
 
-To address this question, we present a systematic characterization study of decoder computation in 3D medical image segmentation models. Rather than proposing a new network architecture, we advocate computation characterization as a research approach complementary to architecture design. We structure our evaluation along three complementary experimental axes:
+To address this question, we present a systematic characterization study of decoder computation in 3D medical image segmentation models. Rather than proposing a new network architecture, we advocate computation characterization as a research approach complementary to architecture design. The main contributions of this study are:
 \begin{enumerate}
-    \item \textbf{Cross-Architecture Evaluation on BTCV CT}: We evaluate matched full and efficient decoder pairs across three representative 3D backbones (3D UX-Net, SwinUNETR, MedNeXt-M-K3).
-    \item \textbf{Cross-Dataset Evaluation}: We examine consistency using a fixed canonical backbone (3D UX-Net) across three diverse clinical datasets (BTCV CT, MSD01 BrainTumour MRI, and MSD08 HepaticVessel CT).
-    \item \textbf{Decoder-Isolated Factor Attribution}: Building on a frozen shared-encoder $2\times2$ factorial design on 3D UX-Net and BTCV CT, we freeze feature extractor weights to isolate decoder capacity interventions (channel reduction vs. stage removal).
+    \item We introduce a voxel-level framework that separates decoder correctness activity from directional net gain.
+    \item We characterize decoder contribution in terms of spatial heterogeneity, positive-gain concentration, and inference-time predictability.
+    \item We provide controlled evidence across architectures, datasets, and decoder interventions, and establish retrospective opportunity bounds for future utility-aware adaptive decoding.
 \end{enumerate}
-
-We focus specifically on the decoder pathway as a well-defined subsystem responsible for spatial resolution reconstruction and multi-scale feature fusion. Skip-feature fusion is treated as part of the decoder pathway, whereas encoder representation dynamics present separate research questions requiring distinct experimental controls. Unlike efficient architecture papers that optimize for speed, our primary objective is to understand computation itself.
-
-We characterize the contribution of additional decoder computation across three complementary dimensions: (i) spatial heterogeneity, (ii) benefit concentration, and (iii) inference-time predictability.
 
 The remainder of this paper is organized as follows: Section \ref{sec:related} reviews related literature and highlights key gaps. Section \ref{sec:methods} details our characterization framework and metrics. Section \ref{sec:experiments} describes our experimental setup and evaluation protocols. Section \ref{sec:results} presents our observational findings, Section \ref{sec:discussion} discusses underlying mechanisms and limitations, and Section \ref{sec:conclusion} concludes the paper.

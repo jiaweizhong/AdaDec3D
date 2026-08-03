@@ -19,8 +19,8 @@ Therefore, a small global net voxel gain does not imply that additional decoder 
 \subsection{Implications for Adaptive Decoder Design}
 Based on these observational insights, we distill three evidence-backed directions for designing future adaptive decoders:
 \begin{enumerate}
-    \item \textbf{Predict Expected Gain Rather Than Uncertainty}: Predictive entropy measures task difficulty and spatial ambiguity ($>0.90$ Location AUROC), but provides weak directional discrimination ($\approx 0.545$--$0.591$ Direction AUROC). Future routing policies should train auxiliary heads to directly predict net accuracy gain rather than reusing task uncertainty signals.
-    \item \textbf{Decouple Spatial Resolution from Channel Capacity}: High-resolution decoding stages specifically drive boundary refinement, whereas channel capacity provides diffuse representation. Adaptive decoders should selectively allocate high-resolution upsampling paths near boundaries while maintaining narrow channel widths volume-wide.
+    \item \textbf{Predict Expected Gain Rather Than Uncertainty}: Predictive entropy measures task difficulty and spatial ambiguity ($>0.90$ Location AUROC), but provides weak directional discrimination ($\approx 0.556$--$0.591$ Direction AUROC). Future routing policies should train auxiliary heads to directly predict net accuracy gain rather than reusing task uncertainty signals.
+    \item \textbf{Decouple Spatial Resolution from Channel Capacity}: In the 3D UX-Net/BTCV factorial setting, retaining the high-resolution decoding stage primarily improved boundary-adjacent regions, whereas channel reduction produced a more spatially diffuse effect. This observation motivates exploring adaptive decoders that selectively allocate high-resolution refinement near anatomical boundaries while maintaining narrower channel widths elsewhere.
     \item \textbf{Exploit Boundary Concentration for Retrospective Opportunity Bounds}: Positive gain is spatially concentrated in 5\% of spatial blocks ($K_{80} \le 5\%$), establishing a high-ceiling opportunity for future dynamic compute allocation engines.
 \end{enumerate}
 

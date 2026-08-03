@@ -1005,6 +1005,20 @@ def O_pareto(val_loader, effi, full, block_size=16, halo=4):
     out = {"budgets_pct": budgets.tolist(), "block_size": int(block_size)}
     colors = {"oracle": "black", "entropy": "steelblue", "confidence": "darkorange",
               "boundary": "seagreen", "random": "gray"}
+              
+    # --- Generate pure Oracle K80 curve ---
+    plt.figure(figsize=(7, 5))
+    s_oracle = "oracle"
+    arr_oracle = np.asarray(rec[s_oracle], dtype=np.float64)
+    m_oracle = arr_oracle.mean(0)
+    plt.plot(budgets, m_oracle * 100, "-", marker="o", color=colors[s_oracle], label="Oracle")
+    plt.xlabel("Fraction of regions given the full decoder (%)")
+    plt.ylabel("Positive net flip utility covered (%)")
+    plt.title("Oracle positive-gain coverage")
+    plt.legend(); plt.tight_layout()
+    plt.savefig(f"{OBS_DIR}/O_pareto_oracle.png", dpi=150); plt.close()
+    
+    # --- Generate all signals curve ---
     plt.figure(figsize=(7, 5))
     for s in ["oracle", "entropy", "confidence", "boundary", "random"]:
         arr = np.asarray(rec[s], dtype=np.float64)        # (subjects, budgets)

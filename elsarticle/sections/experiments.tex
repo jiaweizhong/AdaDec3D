@@ -6,20 +6,20 @@ This section describes the target 3D backbones, clinical datasets, evaluation ax
 \subsection{Target Architectures and Intervention Specifications}
 \label{sec:backbones}
 
-We evaluate matched decoder pairs across three representative 3D medical image segmentation backbones: a large-kernel CNN (3D UX-Net \cite{lee20233d}), a vision transformer (SwinUNETR \cite{hatamizadeh2022swin}), and a ConvNeXt-style network (MedNeXt-M-K3 \cite{roy2023mednext}). Interventions occur strictly within the decoder pathway (upsampling, skip fusion, and refinement) while keeping feature encoder architectures untouched. Table \ref{tab:backbone_specs} details the intervention specifications and FLOP trade-offs across backbones.
+We evaluate matched decoder pairs across three representative 3D medical image segmentation backbones: a large-kernel CNN (3D UX-Net \cite{lee20233d}), a vision transformer (SwinUNETR \cite{hatamizadeh2022swin}), and a ConvNeXt-style network (MedNeXt-M-K3 \cite{roy2023mednext}). Interventions occur strictly within the decoder pathway (upsampling, skip fusion, and refinement) while keeping feature encoder architectures untouched. Table \ref{tab:backbone_specs} details the intervention specifications across backbones.
 
 \begin{table*}[t]
 \centering
-\caption{Backbone decoder specifications and intervention parameters.}
+\caption{Backbone decoder specifications and efficient intervention parameters.}
 \label{tab:backbone_specs}
 \small
-\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}lccccc}
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}lcccc}
 \toprule
-\textbf{Architecture} & \textbf{Full Decoder ($E_0$)} & \textbf{Channel Cut ($C_{\text{dec}}$)} & \textbf{Stage Omitted ($RF$)} & \textbf{Effi FLOPs ($E_1$)} & \textbf{Full FLOPs ($E_0$)} \\
+\textbf{Architecture} & \textbf{Base Feature Size} & \textbf{Full Decoder ($E_0$)} & \textbf{Efficient Intervention ($E_1$)} \\
 \midrule
-\textbf{3D UX-Net} \cite{lee20233d} & $C_{384}, RF_1$ & $384 \rightarrow 48$ ($87.5\%$ cut) & Stage 1 ($1\times$) & 49.49 GMac & 578.74 GMac \\
-\textbf{SwinUNETR} \cite{hatamizadeh2022swin} & $C_{384}, RF_1$ & $384 \rightarrow 48$ ($87.5\%$ cut) & Stage 1 ($1\times$) & 55.84 GMac & 308.24 GMac \\
-\textbf{MedNeXt-M-K3} \cite{roy2023mednext} & $C_{384}, RF_1$ & $384 \rightarrow 48$ ($87.5\%$ cut) & Stage 1 ($1\times$) & 106.91 GMac & 230.87 GMac \\
+\textbf{3D UX-Net} \cite{lee20233d} & $C=48$ & $C_{384}$, $1\times$ resolution & $384 \rightarrow 48$ ($87.5\%$ cut), omit Stage 1 \\
+\textbf{SwinUNETR} \cite{hatamizadeh2022swin} & $C=48$ & $C_{384}$, $1\times$ resolution & $384 \rightarrow 48$ ($87.5\%$ cut), omit Stage 1 \\
+\textbf{MedNeXt-M-K3} \cite{roy2023mednext} & $C=32$ & $C_{256}$, $1\times$ resolution & $256 \rightarrow 32$ ($87.5\%$ cut), omit Stage 1 \\
 \bottomrule
 \end{tabular*}
 \end{table*}
@@ -29,6 +29,17 @@ We evaluate matched decoder pairs across three representative 3D medical image s
     \item \textbf{End-to-End Reference Configuration} (Table \ref{tab:main_results}): Trained end-to-end with default MONAI training pipelines containing auxiliary deep-supervision heads (53.01M params / 578.74 GMac).
     \item \textbf{Frozen-Encoder Factorial Configuration} (Table \ref{tab:factorial}): Evaluates the standalone decoder pathway with auxiliary heads detached under fixed unpadded patch profiling ($96\times96\times96$, 46.72M params / 657.76 GMac).
 \end{enumerate}
+
+\subsection{Factorial Configurations}
+\label{sec:factorial_configs}
+
+To cleanly isolate the architectural mechanisms driving decoder activity, we perform a $2 \times 2$ factorial analysis on the 3D UX-Net backbone. By freezing the encoder and separating the decoding capacity along two structural axes (feature resolution and channel width), we evaluate whether performance and error variations originate from high-resolution spatial routing or abstract semantic capacity. Note that the factorial full configuration uses a separately instantiated decoder pathway to isolate these specific variables, and its FLOPs (657.76 GMac) are therefore not directly comparable with the tightly integrated end-to-end full configuration (578.74 GMac).
+
+\noindent
+\textbf{End-to-End Reference Full} (Table~\ref{tab:backbone_specs}): The baseline symmetric architecture.
+
+\noindent
+\textbf{Factorial-Analysis Full} (Table~\ref{tab:factorial}): The isolated decoder pathway with all factorial features intact.
 
 \subsection{Clinical Datasets and Target Spacings}
 \label{sec:datasets}
@@ -53,4 +64,9 @@ We evaluate decoder contribution along three complementary experimental axes rat
 \subsection{Training Protocols and Implementation Setup}
 \label{sec:setup}
 
-All models were implemented in PyTorch using an NVIDIA RTX 5090 GPU with CUDA 12.8. Models were trained for 45,000 optimizer iterations using bfloat16 mixed precision and the AdamW optimizer (initial learning rate $1 \times 10^{-3}$ with cosine annealing) under a compound Dice-CrossEntropy loss function, evaluating every 250 iterations to match the EffiDec3D protocol. Sub-volume patches of $96 \times 96 \times 96$ voxels were extracted with a batch size of 2 per GPU. Standard 3D online data augmentations (random rotations, flips, intensity scaling) and dataset-specific intensity normalization were applied. Evaluation was conducted using sliding-window inference with 50\% patch overlap.
+All models were implemented in PyTorch using an NVIDIA RTX 5090 GPU with CUDA 12.8. Models were trained for 45,000 optimizer iterations using bfloat16 mixed precision and the AdamW optimizer (initial learning rate $1 \times 10^{-3}$ with cosine annealing, weight decay $1 \times 10^{-5}$) under a compound Dice-CrossEntropy loss function, evaluating every 250 iterations to match the EffiDec3D protocol. Sub-volume patches of $96 \times 96 \times 96$ voxels were extracted with an optimizer batch size of 1 volume per GPU, drawing 4 spatial crops per volume (yielding an effective batch size of 4 crops per optimization step). Standard 3D online data augmentations (random rotations, flips, intensity scaling) and dataset-specific intensity normalization were applied. Evaluation networks dynamically allocated a foreground sliding-window overlap of 0.7.
+
+\subsection{Data Splits and Model Selection}
+\label{sec:data_splits}
+
+Full and efficient configurations used identical subject-level training, validation, and test partitions across the canonical datasets. Model checkpoints were selected exclusively according to their validation macro-Dice scores. All subsequent performance comparisons, correctness activity tracking, net gain evaluations, concentration plots, and predictability analyses were performed strictly on the held-out test subjects. In our results, the reported subject-level bootstrap confidence intervals rigorously quantify the test-set sampling variation for the evaluated model pairs, ensuring that the observed behavioral gaps are independent of the specific subject cohort drawn.

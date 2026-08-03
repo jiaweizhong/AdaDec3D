@@ -1,0 +1,91 @@
+{
+  "framework_map": {
+    "H1_global_flips": "O5 (subject-mean positive/negative/net flip + bootstrap CI)",
+    "H2_boundary": "H2_boundary (distance-to-boundary net flip)",
+    "H2_anatomy": "O_anatomy (per-organ union-fg net flip + per-organ Dice delta + size)",
+    "H2_support": "O_surface (per-organ NSD, optional boundary-quality column)",
+    "C1_C2_concentration": "O_pareto['oracle'] curve + O_pareto['concentration'] top-k/K80/abs_net",
+    "P1_predictability": "O3 (any / positive / direction=pos-vs-neg AUROC)",
+    "P2_selection": "O_pareto signals vs oracle vs random + O_pareto['selection_gap_at_20pct'] paired diff CI",
+    "R_recovery": "R_recovery (hybrid selective-decoding Dice/NSD vs budget; oracle/entropy/confidence/random + Effi/Full anchors)",
+    "activity_gain": "O5 activity=P+N (where the decoder acts) vs gain=P-N (where it helps)",
+    "P1_density": "O3 entropy-by-flip-class density (O3_entropy_by_flip.png)",
+    "tta_diagnostic": "O_tta (opt-in --tta): TTA mutual-information vs entropy on any/positive/direction AUROC+AUPRC \u2014 richer uncertainty still can't predict direction?",
+    "appendix": "O1, O2, O4, O9 (behind --appendix)"
+  },
+  "O3": {
+    "flip_auroc_mean": 0.8574202044993652,
+    "flip_auroc_ci": [
+      0.8460904836500959,
+      0.867995128649597
+    ],
+    "flip_auprc_mean": 0.3217414898021476,
+    "flip_auprc_ci": [
+      0.2999892524113624,
+      0.34315700286364226
+    ],
+    "positive_flip_prevalence_mean": 0.09711340209249944,
+    "flip_go": true,
+    "n_subjects_flip": 60,
+    "any_flip_auroc_mean": 0.8649997601312399,
+    "any_flip_auroc_ci": [
+      0.855689253249485,
+      0.875131664338579
+    ],
+    "any_flip_auprc_mean": 0.41690190505013996,
+    "any_flip_auprc_ci": [
+      0.3992761952118384,
+      0.4346203075776601
+    ],
+    "neg_flip_auroc_mean": 0.8284034524803812,
+    "neg_flip_auroc_ci": [
+      0.8143292478941282,
+      0.8427299947061577
+    ],
+    "pos_vs_neg_auroc_mean": 0.5202068301512979,
+    "pos_vs_neg_auroc_ci": [
+      0.49581400606396725,
+      0.5446069425331397
+    ],
+    "pos_vs_neg_auprc_mean": 0.7642231565360517,
+    "pos_vs_neg_auprc_ci": [
+      0.7287960964661986,
+      0.7960496090792306
+    ],
+    "n_subjects_pvn": 60,
+    "subject_auroc_mean": 0.638821144734285,
+    "subject_auroc_ci": [
+      0.5989450386675902,
+      0.6759516865551475
+    ],
+    "subject_auprc_mean": 0.6462790016971919,
+    "subject_auprc_ci": [
+      0.6206167863596976,
+      0.6722918689094969
+    ],
+    "error_prevalence_mean": 0.5030108486138126,
+    "subject_ece_mean": 0.3708729547861673,
+    "subject_ece_ci": [
+      0.3256767614008892,
+      0.41437437111964376
+    ],
+    "n_subjects": 60,
+    "pooled_bin_pearson_r": 0.8887225380847603,
+    "pooled_bin_spearman_rho": 0.9010046046886002,
+    "pearson_r": 0.8887225380847603,
+    "spearman_rho": 0.9010046046886002,
+    "go": true
+  },
+  "O_surface": {
+    "nsd_tau1_mean": 0.4767712354660034,
+    "nsd_tau1_per_organ": {
+      "Vessel": 0.6717,
+      "Tumour": 0.2819
+    },
+    "nsd_tau2_mean": 0.5846880674362183,
+    "nsd_tau2_per_organ": {
+      "Vessel": 0.7485,
+      "Tumour": 0.4209
+    }
+  }
+}

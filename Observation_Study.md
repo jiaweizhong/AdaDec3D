@@ -1180,16 +1180,16 @@ Six-metric numbers below are from the **converged-code re-run** (2026-07-30,
 | Full → Effi Dice | .792 → .777 (−1.5%) | .805 → .795 (−1.0%) | **.826 → .814 (−1.3%)** |
 | GMac (× reduction) | 579 → 49 (11.7×) | 308 → 56 (5.5×) | 106 → 50 (2.1×) |
 | Params (× reduction) | 53.0 → 3.16M (16.8×) | 62.2 → 11.2M (5.5×) | **17.56 → 5.80M (3.0×)** |
-| **H1** GAIN R_net (subject CI) | **+0.047% [−.020,+.109]** | **−0.001% [−.045,+.040]** | pending obs |
-| **H1** ACTIVITY P+N (act/gain) | .510% [.42,.61] (~11×) | .402% [.33,.48] (≫; net≈0) | pending |
-| **H2** boundary net peak | +0.085 @0–1 vox [.070,.101] | +0.015/+0.021 @0–2 vox | pending |
-| **H2** size↔net ρ (union fg) | +0.02 | −0.58 | pending |
-| **P1** any / positive / **direction** AUROC | .900 / .902 / **.591** [.558,.624] | .913 / .910 / **.560** [.514,.609] | pending |
-| **P1** any / direction AUPRC | .371 / .776† | .351 / .703† | pending |
-| **C1** oracle cov @10% / K80 / abs_net | >99% / 5% / **+6.1k vox** | 100% / 5% / **−1.3k vox** | pending |
-| **P2** entropy−random **net-flip** @20% | +0.23 [−.06,+.45] | −0.06 [−.37,+.22] | pending |
-| **R** entropy **Dice** recovery @20% (of gap) | **100%** (5%→60%); random 17% | **100%**; random 20% | pending |
-| **TTA** direction AUROC (MI, K=8) | .539 [.50,.58] | .570 [.53,.61] | pending |
+| **H1** GAIN R_net (subject CI) | **+0.047% [−.020,+.109]** | **−0.001% [−.045,+.040]** | **+0.052% [−.010,+.108]** |
+| **H1** ACTIVITY P+N (act/gain) | .510% [.42,.61] (~11×) | .402% [.33,.48] (≫; net≈0) | .446% (~8.6×) |
+| **H2** boundary net peak | +0.085 @0–1 vox [.070,.101] | +0.015/+0.021 @0–2 vox | +0.040 @1–2 vox [.032,.048] (0–1 −0.041) |
+| **H2** size↔net ρ (union fg) | +0.02 | −0.58 | −0.33 |
+| **P1** any / positive / **direction** AUROC | .900 / .902 / **.591** [.558,.624] | .913 / .910 / **.560** [.514,.609] | .907 / .912 / **.556** [.493,.624] |
+| **P1** any / direction AUPRC | .371 / .776† | .351 / .703† | .389 / .707† |
+| **C1** oracle cov @10% / K80 / abs_net | >99% / 5% / **+6.1k vox** | 100% / 5% / **−1.3k vox** | 100% / 5% / **+6.4k vox** |
+| **P2** entropy−random **net-flip** @20% | +0.23 [−.06,+.45] | −0.06 [−.37,+.22] | +0.13 [−.28,+.44] |
+| **R** entropy **Dice** recovery @20% (of gap) | **100%** (5%→60%); random 17% | **100%**; random 20% | **100%** (5%→52%); random 20% |
+| **TTA** direction AUROC (MI, K=8) | .539 [.50,.58] | .570 [.53,.61] | not run |
 
 \* MedNeXt has no addition/concat knob (native additive skip). **fs=32 retrain done
 (2026-08-02) — now canonical:** params **17.56M / 5.80M** match the paper exactly
@@ -1207,18 +1207,20 @@ discrimination measure. Reporting both is the point.
 4. **TTA confirms direction is unpredictable** — multi-sample TTA mutual-information direction AUROC is *even lower* (UX .539, Swin .570) than entropy (~.57): richer uncertainty **still** can't tell better-from-worse → upgrade to *"even multi-sample predictive uncertainty predicts instability, not gain."* (TTA-MI is also a weaker flip *locator*: any-AUROC .81/.79 vs entropy .90.)
 5. **Activity ≫ Gain** — P+N activity is ~11× the net gain on UX (.510% vs .047%) and ≫ on Swin (net≈0): the decoder churns many predictions with almost no net correctness change.
 
-The **consistent** finding on the two parameter-matched backbones is a **voxel-level net
-flip indistinguishable from zero** (both CIs cross zero), with boundary-localized flips whose
-*location* is entropy-predictable (AUROC ~0.90) but whose *direction* is not (~0.57, even
-with TTA). Correspondingly there is **no reliable net-flip opportunity** (P2 gaps cross zero)
-— **but** the small **Dice** gap *is* recoverable by routing high-entropy boundary blocks to
-Full (R: ~100% of the gap at a 20% budget), because Dice rewards boundary refinement that the
-net-flip count cancels. The honest architecture-axis statement is therefore: *the decoder's
-voxel-level net benefit is ≈ 0 across matched backbones, net-neutral but Dice-relevant via a
-thin boundary band that a selective decoder can recover* — not a positive net-flip benefit. (MedNeXt's apparent net>0 comes from the addition + over-sized
-model and is excluded from the headline.) **Caveat:** the MedNeXt-Effi
-cell was only valid after fixing two inherited-code bugs (Part 0b Errata); all pre-fix
-MedNeXt-Effi numbers (~0.02 Dice) are void.
+The **consistent** finding on **all three parameter-matched backbones** (3D UX-Net, Swin,
+and now MedNeXt fs=32) is a **voxel-level net flip indistinguishable from zero** (every CI
+crosses zero: UX +.047%, Swin −.001%, MedNeXt +.052%), with boundary-localized flips whose
+*location* is entropy-predictable (any/pos AUROC ~0.90) but whose *direction* is not
+(.556–.591, ≥2 with TTA). Correspondingly there is **no reliable net-flip opportunity** (P2
+gaps cross zero on all three) — **but** the small **Dice** gap *is* recoverable by routing
+high-entropy boundary blocks to Full (R: ~100% of the gap at a 20% budget on all three),
+because Dice rewards boundary refinement that the net-flip count cancels. The honest
+architecture-axis statement is therefore: *the decoder's voxel-level net benefit is ≈ 0
+across matched backbones, net-neutral but Dice-relevant via a thin boundary band that a
+selective decoder can recover.* MedNeXt fs=32 is now a **canonical** member (params match the
+paper; the void fs=48 oversized run is retired). **Caveat:** the MedNeXt-Effi cell was only
+valid after fixing two inherited-code bugs (Part 0b Errata); all pre-fix numbers (~0.02 Dice)
+are void.
 
 **Dataset axis (O7) — cell 1: MSD Task08 HepaticVessel (UX-Net, concat, Spacingd on, 2026-08-02).**
 Reproduction/efficiency ([results/last_validation_metrics_task08_hepaticvessel.csv](results/last_validation_metrics_task08_hepaticvessel.csv)):

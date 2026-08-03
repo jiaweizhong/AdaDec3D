@@ -1,10 +1,10 @@
 \section{Discussion}
 \label{sec:discussion}
 
-This characterization study shifts the evaluation of decoder efficiency from macroscopic FLOPs reduction toward understanding spatial computation dynamics. This section synthesizes the underlying mechanisms, addresses metric paradoxes, outlines architectural implications, and details study limitations.
+This study shifts the evaluation of decoder efficiency from global FLOPs reduction to spatial computation dynamics. This section explains the underlying mechanisms, addresses the metric weighting paradox, outlines architectural implications, and discusses limitations.
 
 \subsection{Decoder Activity versus Net Benefit}
-Our observational findings demonstrate that additional decoder capacity does not simply act as a monotonic accuracy enhancer. Instead, it generates substantial gross correctness activity $A_{\text{corr}}(v) = P(v) + N(v)$, which is largely offset by bidirectional cancellation ($P(v) \approx N(v)$). Positive corrections and negative degradations coexist within ambiguous boundary regions, producing substantial local activity but much smaller aggregate net gain. Rather than systematically fixing errors volume-wide, high-capacity decoders reallocate predictions near ambiguous boundaries.
+Our findings show that additional decoder capacity does not simply act as a monotonic accuracy enhancer. Instead, it generates substantial gross correctness activity $A_{\text{corr}}(v) = P(v) + N(v)$, which is largely offset by bidirectional cancellation ($P(v) \approx N(v)$). Positive corrections and negative degradations coexist within ambiguous boundary regions, producing substantial local activity but much smaller aggregate net gain. Rather than systematically fixing errors volume-wide, high-capacity decoders reallocate predictions near ambiguous boundaries.
 
 \subsection{Coexistence of Small Voxel Net Gain and Macro Dice Improvement}
 A key question arises: \textit{How can additional decoder computation yield a small global net voxel gain ($R_{\text{net}} < 0.1\%$) while still improving macroscopic Dice by 1--2 percentage points?}
@@ -12,16 +12,16 @@ A key question arises: \textit{How can additional decoder computation yield a sm
 This coexistence stems from the fundamental difference in metric weighting:
 \begin{enumerate}
     \item \textbf{Voxel Accuracy Weighting}: Global voxel correctness is heavily dominated by vast background regions and large organ interiors, where predictions are stable under both full and efficient decoders.
-    \item \textbf{Macro Dice Sensitivity}: The macro-averaged Mean Dice used in our evaluation assigns equal weight to anatomical classes and is foreground-sensitive. Positive voxel corrections $P(v)$ occurring at thin anatomical boundaries or small, morphologically volatile organs (such as the adrenal glands) exert a disproportionately large impact on macroscopic Dice scores.
+    \item \textbf{Macro Dice Sensitivity}: The macro-averaged Mean Dice assigns equal weight to anatomical classes and is foreground-sensitive. Positive voxel corrections $P(v)$ occurring at thin anatomical boundaries or small, morphologically volatile organs (such as the adrenal glands) exert a disproportionately large impact on macroscopic Dice scores.
 \end{enumerate}
-Therefore, a small global net voxel gain does not imply that additional decoder capacity lacks segmentation value; rather, its value is concentrated at Dice-sensitive boundary regions.
+Therefore, a small global net voxel gain does not imply that additional decoder capacity lacks segmentation value; rather, its value is highly concentrated at Dice-sensitive boundary regions.
 
 \subsection{Implications for Adaptive Decoder Design}
-Based on these observational insights, we distill three evidence-backed directions for designing future adaptive decoders:
+These findings suggest three practical directions for adaptive decoder design:
 \begin{enumerate}
-    \item \textbf{Predict Expected Gain Rather Than Uncertainty}: Predictive entropy measures task difficulty and spatial ambiguity ($>0.90$ Location AUROC), but provides weak directional discrimination ($\approx 0.556$--$0.591$ Direction AUROC). Future routing policies should train auxiliary heads to directly predict net accuracy gain rather than reusing task uncertainty signals.
-    \item \textbf{Decouple Spatial Resolution from Channel Capacity}: In the 3D UX-Net/BTCV factorial setting, retaining the high-resolution decoding stage primarily improved boundary-adjacent regions, whereas channel reduction produced a more spatially diffuse effect. This observation motivates exploring adaptive decoders that selectively allocate high-resolution refinement near anatomical boundaries while maintaining narrower channel widths elsewhere.
-    \item \textbf{Exploit Boundary Concentration for Retrospective Opportunity Bounds}: Positive gain is spatially concentrated in 5\% of spatial blocks ($K_{80} \le 5\%$), establishing a high-ceiling opportunity for future dynamic compute allocation engines.
+    \item \textbf{Directly Predict Accuracy Gain}: Predictive entropy measures task difficulty and spatial ambiguity ($>0.90$ Location AUROC), but provides weak directional discrimination ($\approx 0.556$--$0.591$ Direction AUROC). Future routing policies should train auxiliary heads to directly predict net accuracy gain rather than reusing task uncertainty signals.
+    \item \textbf{Decouple Spatial Resolution from Channel Capacity}: In the 3D UX-Net/BTCV factorial setting, retaining the high-resolution decoding stage primarily improved boundary-adjacent regions, whereas channel reduction produced a more spatially diffuse effect. This suggests exploring adaptive decoders that selectively allocate high-resolution refinement near anatomical boundaries while maintaining narrower channel widths elsewhere.
+    \item \textbf{Exploit Spatial Concentration for Compute Allocation}: Because positive gain is tightly concentrated in 5\% of spatial blocks ($K_{80} \le 5\%$), future dynamic compute allocation engines have a high theoretical performance ceiling if they can correctly identify these regions.
 \end{enumerate}
 
 \subsection{Limitations}

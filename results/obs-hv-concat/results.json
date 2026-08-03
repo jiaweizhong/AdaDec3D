@@ -87,5 +87,22 @@
       "Vessel": 0.7485,
       "Tumour": 0.4209
     }
+  },
+  "O5": {
+    "mean_positive_rate": 0.0010099135722460536,
+    "mean_negative_rate": 0.0010267183943748629,
+    "subject_pos_rate_mean": 0.0010099135722460536,
+    "subject_neg_rate_mean": 0.0010267183943748629,
+    "subject_net_rate_mean": -1.6804822128809366e-05,
+    "subject_net_rate_ci": [
+      -0.00031755045869431343,
+      0.00032821699935084295
+    ],
+    "subject_activity_rate_mean": 0.0020366319666209167,
+    "subject_activity_rate_ci": [
+      0.0014775016093093048,
+      0.0027200647599784134
+    ],
+    "net_neutral": true
   }
 }

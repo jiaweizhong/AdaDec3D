@@ -38,14 +38,27 @@ Subject-mean All-Volume net gain rates $R_{\text{net}}^{\text{all}}$ across mode
 
 \begin{figure*}[tb]
 \centering
-\begin{tabular}{ccc}
-\includegraphics[width=0.32\textwidth]{figures/obs-uxnet-concat/H1_global_flips.png} &
-\includegraphics[width=0.32\textwidth]{figures/obs-swin-concat/H1_global_flips.png} &
-\includegraphics[width=0.32\textwidth]{figures/obs-mednext/H1_global_flips.png} \\
+% --- Figure 3: Global Flips ---
+\begin{tabular}{@{}c@{\hspace{1mm}}c@{\hspace{1mm}}c@{}}
+\includegraphics[width=0.28\textwidth]{figures/obs-uxnet-concat/H1_global_flips.png} &
+\includegraphics[width=0.28\textwidth]{figures/obs-swin-concat/H1_global_flips.png} &
+\includegraphics[width=0.28\textwidth]{figures/obs-mednext/H1_global_flips.png} \\
 (a) 3D UX-Net Global Flips & (b) SwinUNETR Global Flips & (c) MedNeXt-M-K3 Global Flips \\
 \end{tabular}
 \caption{Voxel-level net gain rates across 3D UX-Net, SwinUNETR, and MedNeXt-M-K3 backbones under Full ($E_0$) vs. Efficient ($E_1$) decoders.}
 \label{fig:global_flips}
+
+\vspace{1.5em}
+
+% --- Figure 4: Boundary Flips ---
+\begin{tabular}{@{}c@{\hspace{1mm}}c@{\hspace{1mm}}c@{}}
+\includegraphics[width=0.33\textwidth]{figures/obs-uxnet-concat/H2_boundary.png} &
+\includegraphics[width=0.33\textwidth]{figures/obs-swin-concat/H2_boundary.png} &
+\includegraphics[width=0.33\textwidth]{figures/obs-mednext/H2_boundary.png} \\
+(a) 3D UX-Net Boundary Flips & (b) SwinUNETR Boundary Flips & (c) MedNeXt-M-K3 Boundary Flips \\
+\end{tabular}
+\caption{Spatial ground-truth boundary concentration of prediction flips across the three evaluated backbones.}
+\label{fig:boundary_flips}
 \end{figure*}
 
 \subsection{Spatial Heterogeneity}
@@ -54,17 +67,7 @@ Subject-mean All-Volume net gain rates $R_{\text{net}}^{\text{all}}$ across mode
 \subsubsection{Physical Ground-Truth Boundary Concentration}
 Stratifying correctness activity $A_{\text{corr}}(v)$ by physical Euclidean distance $d_{GT}(v)$ to true ground-truth anatomical boundaries shows that correctness changes peak sharply within a 0--2 mm physical distance band (Figure \ref{fig:boundary_flips}). Both positive corrections and negative degradations decrease rapidly in organ interiors ($d_{GT} > 8\text{ mm}$).
 
-\begin{figure*}[tb]
-\centering
-\begin{tabular}{ccc}
-\includegraphics[width=0.32\textwidth]{figures/obs-uxnet-concat/H2_boundary.png} &
-\includegraphics[width=0.32\textwidth]{figures/obs-swin-concat/H2_boundary.png} &
-\includegraphics[width=0.32\textwidth]{figures/obs-mednext/H2_boundary.png} \\
-(a) 3D UX-Net Boundary Flips & (b) SwinUNETR Boundary Flips & (c) MedNeXt-M-K3 Boundary Flips \\
-\end{tabular}
-\caption{Spatial ground-truth boundary concentration of prediction flips across the three evaluated backbones.}
-\label{fig:boundary_flips}
-\end{figure*}
+
 
 \subsubsection{Anatomical Structure Volatility}
 Anatomical analysis (Figure \ref{fig:heterogeneity_anatomy}) demonstrates that small, morphologically complex organs exhibit high flip volatility. The left and right adrenal glands show positive correction rates of 16.2\%/16.9\% in 3D UX-Net, 14.4\%/14.8\% in SwinUNETR, and 12.3\%/14.0\% in MedNeXt-M-K3. Conversely, large structures like the liver remain highly stable ($<3\%$ correctness activity).
@@ -132,14 +135,39 @@ Figure \ref{fig:concentration} presents oracle benefit concentration curves. Acr
 
 \begin{figure*}[tb]
 \centering
-\begin{tabular}{ccc}
-\includegraphics[width=0.32\textwidth]{figures/obs-uxnet-concat/O_pareto_oracle.png} &
-\includegraphics[width=0.32\textwidth]{figures/obs-swin-concat/O_pareto_oracle.png} &
-\includegraphics[width=0.32\textwidth]{figures/obs-mednext/O_pareto_oracle.png} \\
+% --- Figure 6: Concentration ---
+\begin{tabular}{@{}c@{\hspace{1mm}}c@{\hspace{1mm}}c@{}}
+\includegraphics[width=0.33\textwidth]{figures/obs-uxnet-concat/O_pareto_oracle.png} &
+\includegraphics[width=0.33\textwidth]{figures/obs-swin-concat/O_pareto_oracle.png} &
+\includegraphics[width=0.33\textwidth]{figures/obs-mednext/O_pareto_oracle.png} \\
 (a) 3D UX-Net Oracle Concentration & (b) SwinUNETR Oracle Concentration & (c) MedNeXt-M-K3 Oracle Concentration \\
 \end{tabular}
 \caption{Oracle positive-gain concentration curves across backbones. The dashed line represents the random selection baseline. In all three architectures, the positive gain is heavily skewed, satisfying $K_{80} \le 5\%$.}
 \label{fig:concentration}
+
+\vspace{1.5em}
+
+% --- Figure 7: Flip Density ---
+\begin{tabular}{@{}c@{\hspace{1mm}}c@{\hspace{1mm}}c@{}}
+\includegraphics[width=0.33\textwidth]{figures/obs-uxnet-concat/O3_entropy_by_flip.png} &
+\includegraphics[width=0.33\textwidth]{figures/obs-swin-concat/O3_entropy_by_flip.png} &
+\includegraphics[width=0.33\textwidth]{figures/obs-mednext/O3_entropy_by_flip.png} \\
+(a) 3D UX-Net Flip Entropy Density & (b) SwinUNETR Flip Entropy Density & (c) MedNeXt-M-K3 Flip Entropy Density \\
+\end{tabular}
+\caption{Conditional entropy density distributions for positive corrections ($P$) and negative degradations ($N$).}
+\label{fig:flip_density}
+
+\vspace{1.5em}
+
+% --- Figure 8: Macro Recovery ---
+\begin{tabular}{@{}c@{\hspace{1mm}}c@{\hspace{1mm}}c@{}}
+\includegraphics[width=0.33\textwidth]{figures/obs-uxnet-concat/R_recovery.png} &
+\includegraphics[width=0.33\textwidth]{figures/obs-swin-concat/R_recovery.png} &
+\includegraphics[width=0.33\textwidth]{figures/obs-mednext/R_recovery.png} \\
+(a) 3D UX-Net Macro Recovery & (b) SwinUNETR Macro Recovery & (c) MedNeXt-M-K3 Macro Recovery \\
+\end{tabular}
+\caption{Signal-guided retrospective macro-metric Dice recovery curves ($R_{\text{recovery}}$) under output hybridization vs. random selection.}
+\label{fig:macro_recovery}
 \end{figure*}
 
 We evaluate whether cheap inference-time signals can locate regions where decoder computation alters correctness (Location AUROC) and whether they can further discriminate the direction of those changes (Direction AUROC) (Table \ref{tab:predictability} and Figure \ref{fig:flip_density}):
@@ -165,17 +193,7 @@ MedNeXt-M-K3 & 0.907 & 0.556 \\
 \end{tabular}
 \end{table}
 
-\begin{figure*}[tb]
-\centering
-\begin{tabular}{ccc}
-\includegraphics[width=0.32\textwidth]{figures/obs-uxnet-concat/O3_entropy_by_flip.png} &
-\includegraphics[width=0.32\textwidth]{figures/obs-swin-concat/O3_entropy_by_flip.png} &
-\includegraphics[width=0.32\textwidth]{figures/obs-mednext/O3_entropy_by_flip.png} \\
-(a) 3D UX-Net Flip Entropy Density & (b) SwinUNETR Flip Entropy Density & (c) MedNeXt-M-K3 Flip Entropy Density \\
-\end{tabular}
-\caption{Conditional entropy density distributions for positive corrections ($P$) and negative degradations ($N$).}
-\label{fig:flip_density}
-\end{figure*}
+
 
 \subsubsection{Signal-Guided Retrospective Hybrid Recovery}
 Figure \ref{fig:macro_recovery} presents retrospective hybrid prediction recovery curves $R_{\text{recovery}}(k)$ using various predictive signals:
@@ -184,17 +202,7 @@ Figure \ref{fig:macro_recovery} presents retrospective hybrid prediction recover
     \item At a \textbf{20\% block budget}, entropy-guided output substitution achieves \textbf{full recovery of the macro-Dice gap} for 3D UX-Net and SwinUNETR, while recovery remained partial for MedNeXt-M-K3 (vs. 17--20\% for random selection).
 \end{itemize}
 
-\begin{figure*}[tb]
-\centering
-\begin{tabular}{ccc}
-\includegraphics[width=0.32\textwidth]{figures/obs-uxnet-concat/R_recovery.png} &
-\includegraphics[width=0.32\textwidth]{figures/obs-swin-concat/R_recovery.png} &
-\includegraphics[width=0.32\textwidth]{figures/obs-mednext/R_recovery.png} \\
-(a) 3D UX-Net Macro Recovery & (b) SwinUNETR Macro Recovery & (c) MedNeXt-M-K3 Macro Recovery \\
-\end{tabular}
-\caption{Signal-guided retrospective macro-metric Dice recovery curves ($R_{\text{recovery}}$) under output hybridization vs. random selection.}
-\label{fig:macro_recovery}
-\end{figure*}
+
 
 \subsection{Cross-Dataset Replication}
 \label{sec:results_cross_dataset}
@@ -214,7 +222,7 @@ Across the two additional datasets, the absolute activity and net-gain rates var
 \midrule
 \textbf{BTCV CT} & 79.18 & 77.73 & 3.42 & $+0.046$ & 12.84 & $+0.381$ & $\le 5\%$ & 0.900 & 0.591 \\
 \textbf{MSD01 BrainTumour} & \textit{[Pending]} & \textit{[Pending]} & \textit{[Pending]} & \textit{[Pending]} & \textit{[Pending]} & \textit{[Pending]} & \textit{[Pending]} & \textit{[Pending]} & \textit{[Pending]} \\
-\textbf{MSD08 HepaticVessel} & \textit{[Pending]} & \textit{[Pending]} & \textit{[Pending]} & \textit{[Pending]} & \textit{[Pending]} & \textit{[Pending]} & \textit{[Pending]} & \textit{[Pending]} & \textit{[Pending]} \\
+\textbf{MSD08 HepaticVessel} & 57.51 & 58.63 & \textit{[Pending]} & \textit{[Pending]} & \textit{[Pending]} & \textit{[Pending]} & \textit{[Pending]} & 0.865 & 0.520 \\
 \bottomrule
 \end{tabular*}
 \end{table*}

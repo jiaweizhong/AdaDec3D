@@ -1290,12 +1290,19 @@ def O_recovery(val_loader, effi, full, out_classes, block_size=16, halo=4):
     plt.legend(fontsize=8); plt.tight_layout()
     plt.savefig(f"{OBS_DIR}/R_recovery.png", dpi=150); plt.close()
     # Dice-space recovered fraction at 20% for the deployable entropy router vs oracle.
-    i20 = int(np.where(budgets == 20)[0][0]); gap = max(fd - ed, 1e-9)
+    i20 = int(np.where(budgets == 20)[0][0]); gap = fd - ed
     ent20 = out["entropy"]["dice_mean"][i20]; orc20 = out["oracle"]["dice_mean"][i20]; rnd20 = out["random"]["dice_mean"][i20]
-    out["recovered_fraction_at_20pct"] = {
-        "oracle": (orc20 - ed) / gap, "entropy": (ent20 - ed) / gap, "random": (rnd20 - ed) / gap,
-        "note": "(hybrid Dice - Efficient Dice) / (Full Dice - Efficient Dice) at 20% block budget",
-    }
+    if gap > 1e-4:                       # fraction only meaningful when Full > Effi
+        out["recovered_fraction_at_20pct"] = {
+            "oracle": (orc20 - ed) / gap, "entropy": (ent20 - ed) / gap, "random": (rnd20 - ed) / gap,
+            "note": "(hybrid Dice - Efficient Dice) / (Full Dice - Efficient Dice) at 20% block budget",
+        }
+    else:                               # Full <= Effi: routing to Full does not help; ratio undefined
+        out["recovered_fraction_at_20pct"] = {
+            "oracle": None, "entropy": None, "random": None,
+            "note": f"undefined: Full Dice <= Effi Dice (gap={gap:+.4f}); the full decoder does "
+                    "not improve Dice here, so read the raw dice_mean curve instead of a recovered fraction.",
+        }
     save_obs("R_recovery", out)
     print(f"[R-recovery] Effi={ed:.3f} Full={fd:.3f} (gap {fd-ed:+.3f})  @20%: "
           f"oracle={orc20:.3f} entropy={ent20:.3f} random={rnd20:.3f}  "

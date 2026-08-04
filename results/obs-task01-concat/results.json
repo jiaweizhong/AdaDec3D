@@ -1,0 +1,500 @@
+{
+  "framework_map": {
+    "H1_global_flips": "O5 (subject-mean positive/negative/net flip + bootstrap CI)",
+    "H2_boundary": "H2_boundary (distance-to-boundary net flip)",
+    "H2_anatomy": "O_anatomy (per-organ union-fg net flip + per-organ Dice delta + size)",
+    "H2_support": "O_surface (per-organ NSD, optional boundary-quality column)",
+    "C1_C2_concentration": "O_pareto['oracle'] curve + O_pareto['concentration'] top-k/K80/abs_net",
+    "P1_predictability": "O3 (any / positive / direction=pos-vs-neg AUROC)",
+    "P2_selection": "O_pareto signals vs oracle vs random + O_pareto['selection_gap_at_20pct'] paired diff CI",
+    "R_recovery": "R_recovery (hybrid selective-decoding Dice/NSD vs budget; oracle/entropy/confidence/random + Effi/Full anchors)",
+    "activity_gain": "O5 activity=P+N (where the decoder acts) vs gain=P-N (where it helps)",
+    "P1_density": "O3 entropy-by-flip-class density (O3_entropy_by_flip.png)",
+    "tta_diagnostic": "O_tta (opt-in --tta): TTA mutual-information vs entropy on any/positive/direction AUROC+AUPRC \u2014 richer uncertainty still can't predict direction?",
+    "appendix": "O1, O2, O4, O9 (behind --appendix)"
+  },
+  "O3": {
+    "flip_auroc_mean": 0.8818798298185777,
+    "flip_auroc_ci": [
+      0.8730379207186146,
+      0.8914792971806594
+    ],
+    "flip_auprc_mean": 0.27382554527293546,
+    "flip_auprc_ci": [
+      0.2580811757334984,
+      0.28977076099626886
+    ],
+    "positive_flip_prevalence_mean": 0.07413165203887981,
+    "flip_go": true,
+    "n_subjects_flip": 84,
+    "any_flip_auroc_mean": 0.8690798543611515,
+    "any_flip_auroc_ci": [
+      0.8543493192097937,
+      0.8825339877384637
+    ],
+    "any_flip_auprc_mean": 0.3719031276301552,
+    "any_flip_auprc_ci": [
+      0.360926268276753,
+      0.3828080331887419
+    ],
+    "neg_flip_auroc_mean": 0.8181226353562523,
+    "neg_flip_auroc_ci": [
+      0.7966567903098462,
+      0.8369864050819229
+    ],
+    "pos_vs_neg_auroc_mean": 0.5578958313885912,
+    "pos_vs_neg_auroc_ci": [
+      0.5334408547093202,
+      0.581201411324269
+    ],
+    "pos_vs_neg_auprc_mean": 0.7151801848919714,
+    "pos_vs_neg_auprc_ci": [
+      0.6830468836794824,
+      0.7452639683242217
+    ],
+    "n_subjects_pvn": 84,
+    "subject_auroc_mean": 0.8374923164436342,
+    "subject_auroc_ci": [
+      0.8192885866873851,
+      0.8536366273877466
+    ],
+    "subject_auprc_mean": 0.5766513516986217,
+    "subject_auprc_ci": [
+      0.563517215375391,
+      0.5897833006651262
+    ],
+    "error_prevalence_mean": 0.24469893537553208,
+    "subject_ece_mean": 0.15252662151659577,
+    "subject_ece_ci": [
+      0.13417025509091823,
+      0.17199768626508266
+    ],
+    "n_subjects": 84,
+    "pooled_bin_pearson_r": 0.9267410492943823,
+    "pooled_bin_spearman_rho": 0.9282426781134036,
+    "pearson_r": 0.9267410492943823,
+    "spearman_rho": 0.9282426781134036,
+    "go": true
+  },
+  "O_surface": {
+    "nsd_tau1_mean": 0.7204200029373169,
+    "nsd_tau1_per_organ": {
+      "Edema": 0.7452,
+      "Enh": 0.607,
+      "NCR": 0.809
+    },
+    "nsd_tau2_mean": 0.8366793394088745,
+    "nsd_tau2_per_organ": {
+      "Edema": 0.8774,
+      "Enh": 0.7243,
+      "NCR": 0.9083
+    }
+  },
+  "O5": {
+    "mean_positive_rate": 0.002479547360313258,
+    "mean_negative_rate": 0.0020963359267971967,
+    "subject_pos_rate_mean": 0.002479547360313258,
+    "subject_neg_rate_mean": 0.0020963359267971967,
+    "subject_net_rate_mean": 0.0003832114335160614,
+    "subject_net_rate_ci": [
+      -7.532600111084146e-06,
+      0.0007601726319123934
+    ],
+    "subject_activity_rate_mean": 0.0045758832871104545,
+    "subject_activity_rate_ci": [
+      0.004046178400589962,
+      0.005175747773717461
+    ],
+    "net_neutral": true
+  },
+  "H2_boundary": {
+    "distance_bins": [
+      "0-1",
+      "1-2",
+      "2-4",
+      ">4"
+    ],
+    "positive_rate": [
+      0.09029576936603945,
+      0.10493522258079649,
+      0.053582187897829495,
+      0.05263369313876409
+    ],
+    "negative_rate": [
+      0.06736139472248161,
+      0.07319093377043663,
+      0.039604302724058786,
+      0.06463350280961684
+    ],
+    "net_rate": [
+      0.022934374643557843,
+      0.031744288810359886,
+      0.013977885173770691,
+      -0.011999809670852749
+    ],
+    "net_rate_ci": [
+      [
+        0.005690716896822496,
+        0.04129133505964808
+      ],
+      [
+        0.017656356018180407,
+        0.04566134195138807
+      ],
+      [
+        0.002076023652389114,
+        0.026565970095003232
+      ],
+      [
+        -0.03551676880409903,
+        0.009818410519771385
+      ]
+    ],
+    "note": "voxels binned by distance-to-GT-boundary; subject-mean rates over union(GT,Full,Effi) foreground; net = positive - negative"
+  },
+  "O_anatomy": {
+    "organ": [
+      "Edema",
+      "Enh",
+      "NCR"
+    ],
+    "positive_rate": [
+      0.08839670044237995,
+      0.16258343329934533,
+      0.06462061246456488
+    ],
+    "negative_rate": [
+      0.07961920032942886,
+      0.10609198605846325,
+      0.0441843188038041
+    ],
+    "net_rate": [
+      0.008777500112951087,
+      0.05649144724088208,
+      0.02043629366076078
+    ],
+    "organ_size": [
+      63226.90476190476,
+      15998.857142857143,
+      29184.261904761905
+    ],
+    "dice_delta_full_minus_effi": [
+      0.006596803729159606,
+      -0.004157929705845054,
+      0.015503496289727026
+    ],
+    "size_net_spearman": -1.0,
+    "foreground": "union(GT,Full,Effi) per organ"
+  },
+  "O_pareto": {
+    "budgets_pct": [
+      5,
+      10,
+      20,
+      30,
+      50
+    ],
+    "block_size": 16,
+    "oracle": {
+      "net_recovered_mean": [
+        0.966512,
+        0.998991,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "ci_lower": [
+        0.953448,
+        0.99757,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "ci_upper": [
+        0.978598,
+        0.9999,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "entropy": {
+      "net_recovered_mean": [
+        -0.596586,
+        -0.994118,
+        -0.969203,
+        -0.968403,
+        -0.968403
+      ],
+      "ci_lower": [
+        -1.151365,
+        -2.097602,
+        -2.06189,
+        -2.060329,
+        -2.060329
+      ],
+      "ci_upper": [
+        -0.140182,
+        -0.171519,
+        -0.138222,
+        -0.137422,
+        -0.137422
+      ]
+    },
+    "confidence": {
+      "net_recovered_mean": [
+        -0.539996,
+        -0.988308,
+        -0.969091,
+        -0.968403,
+        -0.968403
+      ],
+      "ci_lower": [
+        -1.052043,
+        -2.0076,
+        -1.987244,
+        -1.985215,
+        -1.985215
+      ],
+      "ci_upper": [
+        -0.106006,
+        -0.19799,
+        -0.165465,
+        -0.164725,
+        -0.164725
+      ]
+    },
+    "boundary": {
+      "net_recovered_mean": [
+        -0.167748,
+        -0.75334,
+        -0.963245,
+        -0.968403,
+        -0.968403
+      ],
+      "ci_lower": [
+        -0.501375,
+        -1.547914,
+        -2.05515,
+        -2.063592,
+        -2.063592
+      ],
+      "ci_upper": [
+        0.083359,
+        -0.084502,
+        -0.113772,
+        -0.117525,
+        -0.117525
+      ]
+    },
+    "random": {
+      "net_recovered_mean": [
+        -0.049837,
+        -0.093994,
+        -0.180653,
+        -0.28726,
+        -0.475329
+      ],
+      "ci_lower": [
+        -0.103777,
+        -0.205639,
+        -0.374948,
+        -0.605237,
+        -1.000083
+      ],
+      "ci_upper": [
+        -0.005247,
+        -0.007548,
+        -0.020367,
+        -0.029326,
+        -0.051628
+      ]
+    },
+    "concentration": {
+      "oracle_coverage_at_10pct": 0.998991,
+      "oracle_coverage_at_20pct": 1.0,
+      "budget_for_80pct_net_pct": 5,
+      "abs_net_voxels_mean": 1292.9404761904761,
+      "abs_pos_mass_voxels_mean": 4482.3452380952385,
+      "note": "C1/C2: coverage = fraction of the subject's positive net mass sum_r max(B(r),0) recovered by the top-k% oracle blocks; K80 = smallest block budget reaching 0.8. abs_net is the signed total net benefit in voxels: report it WITH the coverage so a steep curve over a ~0 absolute total is not mistaken for a large opportunity."
+    },
+    "selection_gap_at_20pct": {
+      "oracle": {
+        "mean_minus_random": 1.180652605469648,
+        "ci": [
+          1.0249587754719678,
+          1.3865674691683234
+        ]
+      },
+      "entropy": {
+        "mean_minus_random": -0.7885508415288937,
+        "ci": [
+          -1.648137306021633,
+          -0.13982261939484825
+        ]
+      },
+      "confidence": {
+        "mean_minus_random": -0.7884380001838248,
+        "ci": [
+          -1.6183660394387365,
+          -0.14071674881253232
+        ]
+      },
+      "boundary": {
+        "mean_minus_random": -0.7825920905005811,
+        "ci": [
+          -1.5899672854061104,
+          -0.09961826001199021
+        ]
+      },
+      "note": "P2: paired subject-bootstrap of (signal - matched random) net recovered at 20% block budget. A deployable signal beats random iff its CI excludes 0; the oracle row is the non-deployable upper bound."
+    }
+  },
+  "R_recovery": {
+    "budgets_pct": [
+      5,
+      10,
+      20,
+      30,
+      50
+    ],
+    "block_size": 16,
+    "halo": 4,
+    "effi_dice": 0.749477709044866,
+    "full_dice": 0.7554584991492131,
+    "full_minus_effi_dice": 0.005980790104347156,
+    "effi_nsd_tau1": 0.720420051188696,
+    "full_nsd_tau1": 0.7392467593862897,
+    "nsd_budget_pct": 20,
+    "oracle": {
+      "dice_mean": [
+        0.77874,
+        0.77957,
+        0.7796,
+        0.7796,
+        0.77961
+      ],
+      "dice_ci_lower": [
+        0.75382,
+        0.75479,
+        0.75482,
+        0.75482,
+        0.75485
+      ],
+      "dice_ci_upper": [
+        0.80219,
+        0.80304,
+        0.8031,
+        0.8031,
+        0.80311
+      ],
+      "executed_volume_fraction_mean": [
+        0.1096,
+        0.1937,
+        0.3324,
+        0.4486,
+        0.6193
+      ],
+      "nsd_tau1_at_20pct_mean": 0.7651437560007686
+    },
+    "entropy": {
+      "dice_mean": [
+        0.75405,
+        0.75462,
+        0.75545,
+        0.75546,
+        0.75546
+      ],
+      "dice_ci_lower": [
+        0.72781,
+        0.72725,
+        0.72782,
+        0.72782,
+        0.72782
+      ],
+      "dice_ci_upper": [
+        0.77805,
+        0.7801,
+        0.78114,
+        0.78115,
+        0.78115
+      ],
+      "executed_volume_fraction_mean": [
+        0.1138,
+        0.1802,
+        0.3135,
+        0.4198,
+        0.5985
+      ],
+      "nsd_tau1_at_20pct_mean": 0.7391816909824099
+    },
+    "confidence": {
+      "dice_mean": [
+        0.75473,
+        0.75481,
+        0.75545,
+        0.75546,
+        0.75546
+      ],
+      "dice_ci_lower": [
+        0.72904,
+        0.72802,
+        0.72823,
+        0.72823,
+        0.72823
+      ],
+      "dice_ci_upper": [
+        0.77897,
+        0.78093,
+        0.78209,
+        0.7821,
+        0.7821
+      ],
+      "executed_volume_fraction_mean": [
+        0.1141,
+        0.1802,
+        0.3133,
+        0.4197,
+        0.5985
+      ],
+      "nsd_tau1_at_20pct_mean": 0.7391827134858995
+    },
+    "random": {
+      "dice_mean": [
+        0.7498,
+        0.74981,
+        0.75049,
+        0.75043,
+        0.75223
+      ],
+      "dice_ci_lower": [
+        0.7227,
+        0.72275,
+        0.72336,
+        0.72341,
+        0.72451
+      ],
+      "dice_ci_upper": [
+        0.77443,
+        0.77472,
+        0.77537,
+        0.77533,
+        0.7776
+      ],
+      "executed_volume_fraction_mean": [
+        0.147,
+        0.2708,
+        0.4662,
+        0.6105,
+        0.8034
+      ],
+      "nsd_tau1_at_20pct_mean": 0.7225681092767489
+    },
+    "recovered_fraction_at_20pct": {
+      "oracle": 5.0365069546980905,
+      "entropy": 0.9985789253485062,
+      "random": 0.16925706093551285,
+      "note": "(hybrid Dice - Efficient Dice) / (Full Dice - Efficient Dice) at 20% block budget"
+    }
+  }
+}

@@ -1263,7 +1263,22 @@ Reproduction/efficiency ([results/E0_E1_metrics_task01_braintumour.csv](results/
 
 - **Full ≈ Effi (−0.6 pt, within noise)** — normal direction (Full marginally ahead), the full decoder adds ~nothing. Efficiency 10.7×/16.6×/4.9× (slightly below BTCV's 11.7×/16.8× because the 4-channel input adds a fixed first-conv cost).
 - **Per-subregion softmax** (edema=1 / enhancing=2 / NCR=3), **not** BraTS WT/TC/ET → **not comparable to EffiDec3D Table 3 (~78.6)**; the ~0.75 here is a healthy per-subregion result (4-modality MRI segments the large edema and necrotic core well; the thin enhancing ring is the hard class at ~0.60). See CFG3 in MODIFICATIONS.md for why we use softmax sub-regions (the flip framework needs one argmax class per voxel).
-- **Adds the MRI-anatomical + heterogeneous-lesion axis** (replaces FeTA). **Flip metrics (H1/H2/C1/P1/P2/R) pending** the obs (`obs-task01-concat`) — this row is Dice/efficiency only so far.
+- **Adds the MRI-anatomical + heterogeneous-lesion axis** (replaces FeTA).
+
+**Flip metrics ([results/obs-task01-concat](results/obs-task01-concat)) — consistent with the thesis across a 3rd modality/anatomy:**
+
+| Metric | Task01 BrainTumour (UX-Net, concat) |
+|---|---|
+| **H1** GAIN R_net (CI) / Activity | **+0.038% [−.001,+.076]** (net-neutral) / 0.458% |
+| **H2** boundary net | +.023 @0–1, **peaks +.032 @1–2**, negative interior (−.012 @>4) |
+| **H2** per-organ net | Edema +.009, Enh +.057, NCR +.020 (all small-positive) |
+| **P1** any / positive / **direction** AUROC | .869 / .882 / **.558** [.533,.581] |
+| **P1** any / direction AUPRC | .372 / .715† |
+| **C1** oracle cov@10 / K80 / abs_net | >99% / 5% / **+1.3k vox** |
+| **P2** entropy−random net-flip @20% | **−0.79 [−1.65,−0.14]** (worse than random) |
+| **R** entropy Dice recovery @20% | ~**100%** of the small (+0.6 pt) gap; random 17% |
+
+- **Same pattern as the other cells**: H1 net-neutral (CI crosses 0), H2 boundary-localized (peaks 0–2 vox like BTCV), P1 direction weak (.558, location predictable at ~.88), C1 steep over a small abs_net, and R entropy recovers the (tiny) Dice gap (Full > Effi here, so gap is positive). P2 is *negative* like Task08 — no net-flip opportunity. **The net-neutral, boundary-localized, direction-unpredictable finding thus holds across all three modalities/anatomies.**
 
 ---
 

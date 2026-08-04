@@ -1,0 +1,580 @@
+{
+  "framework_map": {
+    "H1_global_flips": "O5 (subject-mean positive/negative/net flip + bootstrap CI)",
+    "H2_boundary": "H2_boundary (distance-to-boundary net flip)",
+    "H2_anatomy": "O_anatomy (per-organ union-fg net flip + per-organ Dice delta + size)",
+    "H2_support": "O_surface (per-organ NSD, optional boundary-quality column)",
+    "C1_C2_concentration": "O_pareto['oracle'] curve + O_pareto['concentration'] top-k/K80/abs_net",
+    "P1_predictability": "O3 (any / positive / direction=pos-vs-neg AUROC)",
+    "P2_selection": "O_pareto signals vs oracle vs random + O_pareto['selection_gap_at_20pct'] paired diff CI",
+    "R_recovery": "R_recovery (hybrid selective-decoding Dice/NSD vs budget; oracle/entropy/confidence/random + Effi/Full anchors)",
+    "activity_gain": "O5 activity=P+N (where the decoder acts) vs gain=P-N (where it helps)",
+    "P1_density": "O3 entropy-by-flip-class density (O3_entropy_by_flip.png)",
+    "tta_diagnostic": "O_tta (opt-in --tta): TTA mutual-information vs entropy on any/positive/direction AUROC+AUPRC \u2014 richer uncertainty still can't predict direction?",
+    "appendix": "O1, O2, O4, O9 (behind --appendix)"
+  },
+  "O3": {
+    "flip_auroc_mean": 0.91161721239394,
+    "flip_auroc_ci": [
+      0.8808529624305899,
+      0.9369128767691709
+    ],
+    "flip_auprc_mean": 0.28161779490191235,
+    "flip_auprc_ci": [
+      0.2644813637217222,
+      0.30082019658333525
+    ],
+    "positive_flip_prevalence_mean": 0.046325,
+    "flip_go": true,
+    "n_subjects_flip": 12,
+    "any_flip_auroc_mean": 0.9066679250368382,
+    "any_flip_auroc_ci": [
+      0.8760753562540379,
+      0.9314395056505003
+    ],
+    "any_flip_auprc_mean": 0.388576047506612,
+    "any_flip_auprc_ci": [
+      0.3651503320160203,
+      0.41152491611021164
+    ],
+    "neg_flip_auroc_mean": 0.8820858450822131,
+    "neg_flip_auroc_ci": [
+      0.8372262566591583,
+      0.9171773637261174
+    ],
+    "pos_vs_neg_auroc_mean": 0.5556788124544144,
+    "pos_vs_neg_auroc_ci": [
+      0.49266975425929044,
+      0.62396512874465
+    ],
+    "pos_vs_neg_auprc_mean": 0.707426620829069,
+    "pos_vs_neg_auprc_ci": [
+      0.6698697312212583,
+      0.7454422948000964
+    ],
+    "n_subjects_pvn": 12,
+    "subject_auroc_mean": 0.9036939040940037,
+    "subject_auroc_ci": [
+      0.8734984503978422,
+      0.9267620852407942
+    ],
+    "subject_auprc_mean": 0.5724174518810656,
+    "subject_auprc_ci": [
+      0.5418141488568653,
+      0.6101054905472011
+    ],
+    "error_prevalence_mean": 0.1401369444444444,
+    "subject_ece_mean": 0.09650140868216751,
+    "subject_ece_ci": [
+      0.07187357766782906,
+      0.12287043369642167
+    ],
+    "n_subjects": 12,
+    "pooled_bin_pearson_r": 0.953248048844552,
+    "pooled_bin_spearman_rho": 0.9700556880190747,
+    "pearson_r": 0.953248048844552,
+    "spearman_rho": 0.9700556880190747,
+    "go": true
+  },
+  "O_surface": {
+    "nsd_tau1_mean": 0.8097938299179077,
+    "nsd_tau1_per_organ": {
+      "Spleen": 0.8605,
+      "R.Kidney": 0.8285,
+      "L.Kidney": 0.8437,
+      "Gallbladder": 0.6442,
+      "Esophagus": 0.7828,
+      "Liver": 0.87,
+      "Stomach": 0.6736,
+      "Aorta": 0.9477,
+      "IVC": 0.8482,
+      "Veins": 0.8128,
+      "Pancreas": 0.7308,
+      "R.Adrenal": 0.8433,
+      "L.Adrenal": 0.8413
+    },
+    "nsd_tau2_mean": 0.8916609287261963,
+    "nsd_tau2_per_organ": {
+      "Spleen": 0.9205,
+      "R.Kidney": 0.8948,
+      "L.Kidney": 0.8917,
+      "Gallbladder": 0.7637,
+      "Esophagus": 0.8876,
+      "Liver": 0.951,
+      "Stomach": 0.7866,
+      "Aorta": 0.9746,
+      "IVC": 0.9247,
+      "Veins": 0.8966,
+      "Pancreas": 0.8575,
+      "R.Adrenal": 0.9254,
+      "L.Adrenal": 0.9169
+    }
+  },
+  "O5": {
+    "mean_positive_rate": 0.0024884267089267573,
+    "mean_negative_rate": 0.001971458210997904,
+    "subject_pos_rate_mean": 0.0024884267089267573,
+    "subject_neg_rate_mean": 0.001971458210997904,
+    "subject_net_rate_mean": 0.0005169684979288528,
+    "subject_net_rate_ci": [
+      -9.9605633780205e-05,
+      0.001077745057894693
+    ],
+    "subject_activity_rate_mean": 0.0044598849199246615,
+    "subject_activity_rate_ci": [
+      0.0035897855811829987,
+      0.005452251104482759
+    ],
+    "net_neutral": true
+  },
+  "H2_boundary": {
+    "distance_bins": [
+      "0-1",
+      "1-2",
+      "2-4",
+      ">4"
+    ],
+    "positive_rate": [
+      0.05375784885954374,
+      0.08967580633622485,
+      0.0230092714280679,
+      0.030929184885248387
+    ],
+    "negative_rate": [
+      0.0948773229483106,
+      0.04961994529268963,
+      0.020815126342411932,
+      0.018677767705437703
+    ],
+    "net_rate": [
+      -0.04111947408876688,
+      0.04005586104353522,
+      0.0021941450856559678,
+      0.012251417179810683
+    ],
+    "net_rate_ci": [
+      [
+        -0.05992453316897644,
+        -0.02312511991978399
+      ],
+      [
+        0.03175141164756517,
+        0.04816018146415934
+      ],
+      [
+        -0.005978261648555321,
+        0.00921845371009831
+      ],
+      [
+        -0.0065273956264173425,
+        0.03169702266593717
+      ]
+    ],
+    "note": "voxels binned by distance-to-GT-boundary; subject-mean rates over union(GT,Full,Effi) foreground; net = positive - negative"
+  },
+  "O_anatomy": {
+    "organ": [
+      "Spleen",
+      "R.Kidney",
+      "L.Kidney",
+      "Gallbladder",
+      "Esophagus",
+      "Liver",
+      "Stomach",
+      "Aorta",
+      "IVC",
+      "Veins",
+      "Pancreas",
+      "R.Adrenal",
+      "L.Adrenal"
+    ],
+    "positive_rate": [
+      0.031356224233279786,
+      0.04488848428842848,
+      0.0959916214204241,
+      0.16824965094634683,
+      0.10897910618902422,
+      0.023686290617683778,
+      0.10290293987760946,
+      0.03525111008742128,
+      0.06308761619201801,
+      0.10769911683110099,
+      0.08277292537837044,
+      0.12335533605418979,
+      0.1399458949262463
+    ],
+    "negative_rate": [
+      0.04614425133852058,
+      0.06012426839519625,
+      0.024651555103142264,
+      0.11982163609027169,
+      0.08636570930576666,
+      0.022164997410358326,
+      0.07581343888495047,
+      0.03940045515043571,
+      0.05609935687415035,
+      0.08911226800731499,
+      0.09046512606733582,
+      0.09634965398775695,
+      0.11160035491956867
+    ],
+    "net_rate": [
+      -0.01478802710524079,
+      -0.01523578410676777,
+      0.07134006631728183,
+      0.04842801485607515,
+      0.022613396883257558,
+      0.001521293207325452,
+      0.027089500992658985,
+      -0.004149345063014433,
+      0.006988259317867659,
+      0.018586848823786,
+      -0.007692200688965381,
+      0.027005682066432835,
+      0.02834554000667762
+    ],
+    "organ_size": [
+      55643.666666666664,
+      33459.75,
+      34212.0,
+      5265.727272727273,
+      3069.9166666666665,
+      378314.9166666667,
+      116621.75,
+      17620.25,
+      20680.666666666668,
+      6829.5,
+      19259.0,
+      996.75,
+      1173.9166666666667
+    ],
+    "dice_delta_full_minus_effi": [
+      -0.004439363036783828,
+      0.0010213251842889903,
+      0.03059520339301347,
+      0.07760901359255035,
+      0.0338456767336045,
+      -0.00037937849028391035,
+      0.026040554370275415,
+      -0.004157962431793005,
+      0.008472072683979204,
+      -0.003393674212282427,
+      -0.0006734532515856317,
+      0.011633854784772746,
+      -0.0034049348122057177
+    ],
+    "size_net_spearman": -0.32967032967032966,
+    "foreground": "union(GT,Full,Effi) per organ"
+  },
+  "O_pareto": {
+    "budgets_pct": [
+      5,
+      10,
+      20,
+      30,
+      50
+    ],
+    "block_size": 16,
+    "oracle": {
+      "net_recovered_mean": [
+        0.984727,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "ci_lower": [
+        0.978783,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "ci_upper": [
+        0.990621,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "entropy": {
+      "net_recovered_mean": [
+        0.262891,
+        0.190927,
+        0.15773,
+        0.15773,
+        0.15773
+      ],
+      "ci_lower": [
+        0.130312,
+        -0.252415,
+        -0.392254,
+        -0.392254,
+        -0.392254
+      ],
+      "ci_upper": [
+        0.416381,
+        0.517948,
+        0.553939,
+        0.553939,
+        0.553939
+      ]
+    },
+    "confidence": {
+      "net_recovered_mean": [
+        0.263562,
+        0.202906,
+        0.15773,
+        0.15773,
+        0.15773
+      ],
+      "ci_lower": [
+        0.122148,
+        -0.223455,
+        -0.377938,
+        -0.377938,
+        -0.377938
+      ],
+      "ci_upper": [
+        0.415211,
+        0.521646,
+        0.550812,
+        0.550812,
+        0.550812
+      ]
+    },
+    "boundary": {
+      "net_recovered_mean": [
+        0.073005,
+        0.10021,
+        0.15773,
+        0.15773,
+        0.15773
+      ],
+      "ci_lower": [
+        0.037951,
+        -0.248368,
+        -0.392098,
+        -0.392098,
+        -0.392098
+      ],
+      "ci_upper": [
+        0.111589,
+        0.360561,
+        0.544767,
+        0.544767,
+        0.544767
+      ]
+    },
+    "random": {
+      "net_recovered_mean": [
+        0.007402,
+        0.015803,
+        0.024595,
+        0.044978,
+        0.084174
+      ],
+      "ci_lower": [
+        -0.019328,
+        -0.040362,
+        -0.091724,
+        -0.118452,
+        -0.178748
+      ],
+      "ci_upper": [
+        0.026629,
+        0.056137,
+        0.106739,
+        0.160841,
+        0.271991
+      ]
+    },
+    "concentration": {
+      "oracle_coverage_at_10pct": 1.0,
+      "oracle_coverage_at_20pct": 1.0,
+      "budget_for_80pct_net_pct": 5,
+      "abs_net_voxels_mean": 6377.0,
+      "abs_pos_mass_voxels_mean": 20389.583333333332,
+      "note": "C1/C2: coverage = fraction of the subject's positive net mass sum_r max(B(r),0) recovered by the top-k% oracle blocks; K80 = smallest block budget reaching 0.8. abs_net is the signed total net benefit in voxels: report it WITH the coverage so a steep curve over a ~0 absolute total is not mistaken for a large opportunity."
+    },
+    "selection_gap_at_20pct": {
+      "oracle": {
+        "mean_minus_random": 0.9754046836605403,
+        "ci": [
+          0.8938028737609132,
+          1.0910530556743283
+        ]
+      },
+      "entropy": {
+        "mean_minus_random": 0.13313504302910725,
+        "ci": [
+          -0.2825114938148647,
+          0.4412987226714592
+        ]
+      },
+      "confidence": {
+        "mean_minus_random": 0.13313504302910725,
+        "ci": [
+          -0.291127853296793,
+          0.44032176795990985
+        ]
+      },
+      "boundary": {
+        "mean_minus_random": 0.13313504302910725,
+        "ci": [
+          -0.3011937940049773,
+          0.44609802252607045
+        ]
+      },
+      "note": "P2: paired subject-bootstrap of (signal - matched random) net recovered at 20% block budget. A deployable signal beats random iff its CI excludes 0; the oracle row is the non-deployable upper bound."
+    }
+  },
+  "R_recovery": {
+    "budgets_pct": [
+      5,
+      10,
+      20,
+      30,
+      50
+    ],
+    "block_size": 16,
+    "halo": 4,
+    "effi_dice": 0.8124384505923613,
+    "full_dice": 0.8252773077816139,
+    "full_minus_effi_dice": 0.012838857189252595,
+    "effi_nsd_tau1": 0.8097938299179077,
+    "full_nsd_tau1": 0.822241852680842,
+    "nsd_budget_pct": 20,
+    "oracle": {
+      "dice_mean": [
+        0.83546,
+        0.83587,
+        0.83573,
+        0.836,
+        0.83603
+      ],
+      "dice_ci_lower": [
+        0.81181,
+        0.81244,
+        0.8122,
+        0.81273,
+        0.81275
+      ],
+      "dice_ci_upper": [
+        0.85758,
+        0.85802,
+        0.85796,
+        0.85785,
+        0.85787
+      ],
+      "executed_volume_fraction_mean": [
+        0.1025,
+        0.1828,
+        0.3158,
+        0.4146,
+        0.5877
+      ],
+      "nsd_tau1_at_20pct_mean": 0.8456260611613592
+    },
+    "entropy": {
+      "dice_mean": [
+        0.81921,
+        0.82548,
+        0.82528,
+        0.82528,
+        0.82528
+      ],
+      "dice_ci_lower": [
+        0.791,
+        0.80022,
+        0.79956,
+        0.79956,
+        0.79956
+      ],
+      "dice_ci_upper": [
+        0.84448,
+        0.84825,
+        0.84823,
+        0.84823,
+        0.84823
+      ],
+      "executed_volume_fraction_mean": [
+        0.1089,
+        0.1585,
+        0.2859,
+        0.3821,
+        0.578
+      ],
+      "nsd_tau1_at_20pct_mean": 0.822241852680842
+    },
+    "confidence": {
+      "dice_mean": [
+        0.81922,
+        0.8257,
+        0.82528,
+        0.82528,
+        0.82528
+      ],
+      "dice_ci_lower": [
+        0.79002,
+        0.80039,
+        0.80034,
+        0.80034,
+        0.80034
+      ],
+      "dice_ci_upper": [
+        0.84384,
+        0.84833,
+        0.84845,
+        0.84845,
+        0.84845
+      ],
+      "executed_volume_fraction_mean": [
+        0.1094,
+        0.1584,
+        0.2857,
+        0.3821,
+        0.578
+      ],
+      "nsd_tau1_at_20pct_mean": 0.822241852680842
+    },
+    "random": {
+      "dice_mean": [
+        0.81296,
+        0.81378,
+        0.81506,
+        0.81621,
+        0.81851
+      ],
+      "dice_ci_lower": [
+        0.7831,
+        0.78447,
+        0.78628,
+        0.78786,
+        0.79161
+      ],
+      "dice_ci_upper": [
+        0.84151,
+        0.84188,
+        0.84247,
+        0.84324,
+        0.84417
+      ],
+      "executed_volume_fraction_mean": [
+        0.1488,
+        0.2749,
+        0.4722,
+        0.6183,
+        0.8099
+      ],
+      "nsd_tau1_at_20pct_mean": 0.8103733609120051
+    },
+    "recovered_fraction_at_20pct": {
+      "oracle": 1.8141450648065482,
+      "entropy": 1.0002096929926416,
+      "random": 0.20418868821386998,
+      "note": "(hybrid Dice - Efficient Dice) / (Full Dice - Efficient Dice) at 20% block budget"
+    }
+  }
+}

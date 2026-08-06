@@ -7,22 +7,24 @@ This study shifts the evaluation of decoder efficiency from global FLOPs reducti
 Our findings show that additional decoder capacity does not simply act as a monotonic accuracy enhancer. Instead, it generates substantial gross correctness activity $A_{\text{corr}}(v) = P(v) + N(v)$, which is largely offset by bidirectional cancellation ($P(v) \approx N(v)$). Positive corrections and negative degradations coexist within ambiguous boundary regions, producing substantial local activity but much smaller aggregate net gain. Rather than systematically fixing errors volume-wide, high-capacity decoders reallocate predictions near ambiguous boundaries.
 
 \subsection{Coexistence of Small Voxel Net Gain and Macro Dice Improvement}
-A key question arises: \textit{How can additional decoder computation yield a small global net voxel gain ($R_{\text{net}} < 0.1\%$) while still improving macroscopic Dice by 1--2 percentage points?}
+A key question arises: \textit{How can additional decoder computation improve macroscopic Dice on BTCV and MSD01 while producing a small all-volume net voxel gain, and conversely, decrease macroscopic Dice on MSD08?}
 
 This coexistence stems from the fundamental difference in metric weighting:
 \begin{enumerate}
     \item \textbf{Voxel Accuracy Weighting}: Global voxel correctness is heavily dominated by vast background regions and large organ interiors, where predictions are stable under both full and efficient decoders.
     \item \textbf{Macro Dice Sensitivity}: The macro-averaged Mean Dice assigns equal weight to anatomical classes and is foreground-sensitive. Positive voxel corrections $P(v)$ occurring at thin anatomical boundaries or small, morphologically volatile organs (such as the adrenal glands) exert a disproportionately large impact on macroscopic Dice scores.
 \end{enumerate}
-Therefore, a small global net voxel gain does not imply that additional decoder capacity lacks segmentation value; rather, its value is highly concentrated at Dice-sensitive boundary regions.
+Together, these results show that aggregate decoder utility is task-dependent, while all-volume voxel shifts remain small relative to foreground-localized changes.
 
 \subsection{Implications for Adaptive Decoder Design}
-These findings suggest three practical directions for adaptive decoder design:
+These findings do not directly prescribe a specific adaptive decoder architecture. Instead, they suggest three practical constraints and directions for future utility-aware decoder design:
 \begin{enumerate}
-    \item \textbf{Directly Predict Accuracy Gain}: Predictive entropy measures task difficulty and spatial ambiguity ($>0.90$ Location AUROC), but provides weak directional discrimination ($\approx 0.556$--$0.591$ Direction AUROC). Future routing policies should train auxiliary heads to directly predict net accuracy gain rather than reusing task uncertainty signals.
-    \item \textbf{Decouple Spatial Resolution from Channel Capacity}: In the 3D UX-Net/BTCV factorial setting, retaining the high-resolution decoding stage primarily improved boundary-adjacent regions, whereas channel reduction produced a more spatially diffuse effect. This suggests exploring adaptive decoders that selectively allocate high-resolution refinement near anatomical boundaries while maintaining narrower channel widths elsewhere.
-    \item \textbf{Exploit Spatial Concentration for Compute Allocation}: Because positive gain is tightly concentrated in 5\% of spatial blocks ($K_{80} \le 5\%$), future dynamic compute allocation engines have a high theoretical performance ceiling if they can correctly identify these regions.
+    \item \textbf{Separate activity localization from utility estimation}: Predictive uncertainty is effective for locating regions where decoder computation may alter correctness, but it is insufficient for determining whether those alterations will be beneficial. Future adaptive decoders should therefore separate candidate-region proposal from expected-gain estimation.
+    \item \textbf{Decouple globally shared decoding from local high-resolution refinement}: The frozen-encoder factorial analysis suggests that high-resolution decoding stages contribute most strongly near anatomical boundaries, whereas channel-capacity changes produce more spatially diffuse effects. This motivates globally lightweight decoders with selectively activated high-resolution refinement modules.
+    \item \textbf{Treat additional computation as a task-dependent intervention}: Because the sign and magnitude of net gain vary across datasets---and the efficient decoder outperforms the full decoder on MSD08---additional computation should not be assumed to be monotonically beneficial. Routing policies should preserve the efficient prediction unless the expected gain of refinement exceeds its computational cost.
 \end{enumerate}
+
+Together, these requirements establish an opportunity bound that motivates globally lightweight decoders that activate local refinement only when its expected benefit justifies its cost.
 
 \subsection{Limitations}
 \label{sec:limitations}

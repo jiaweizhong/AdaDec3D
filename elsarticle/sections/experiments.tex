@@ -47,8 +47,8 @@ To cleanly isolate the architectural mechanisms driving decoder activity, we per
 Experiments are conducted across three diverse 3D volumetric medical imaging datasets covering different anatomical regions and imaging modalities. Volumes are resampled to target spacings to match physical block side lengths of approximately $24\text{ mm}$:
 \begin{enumerate}
     \item \textbf{BTCV Multi-Organ CT Dataset} \cite{landman2015btcv}: 30 abdominal CT scans (resampled to $1.5 \times 1.5 \times 2.0\text{ mm}^3$; block dimensions $16 \times 16 \times 12$ voxels) with manual annotations for 13 organ structures.
-    \item \textbf{MSD01 BrainTumour MRI Dataset} \cite{bakas2018identifying,simpson2019large}: 484 multi-modal 3D MRI volumes (resampled to $1.0 \times 1.0 \times 1.0\text{ mm}^3$; block dimensions $24 \times 24 \times 24$ voxels) with 4 target classes.
-    \item \textbf{MSD08 HepaticVessel CT Dataset} \cite{simpson2019large}: 443 abdominal CT volumes (resampled to $0.8 \times 0.8 \times 1.5\text{ mm}^3$; block dimensions $30 \times 30 \times 16$ voxels) focused on vascular and neoplastic structures.
+    \item \textbf{MSD01 BrainTumour MRI Dataset} \cite{bakas2018identifying,simpson2019large}: 484 multi-modal 3D MRI volumes (resampled to $1.0 \times 1.0 \times 1.0\text{ mm}^3$; block dimensions $24 \times 24 \times 24$ voxels) with three foreground tumor classes.
+    \item \textbf{MSD08 HepaticVessel CT Dataset} \cite{simpson2019large}: 303 training volumes (resampled to $0.8 \times 0.8 \times 1.5\text{ mm}^3$; block dimensions $30 \times 30 \times 16$ voxels) focused on vascular and neoplastic structures.
 \end{enumerate}
 
 \subsection{Experimental Evaluation Axes}

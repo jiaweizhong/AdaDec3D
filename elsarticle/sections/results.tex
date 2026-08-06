@@ -166,7 +166,7 @@ Figure \ref{fig:concentration} presents oracle benefit concentration curves. Acr
 \includegraphics[width=0.33\textwidth]{figures/obs-mednext/R_recovery.png} \\
 (a) 3D UX-Net Macro Recovery & (b) SwinUNETR Macro Recovery & (c) MedNeXt-M-K3 Macro Recovery \\
 \end{tabular}
-\caption{Signal-guided retrospective macro-metric Dice recovery curves ($R_{\text{recovery}}$) under output hybridization vs. random selection.}
+\caption{Signal-guided retrospective macro-Dice trajectories under output hybridization at increasing spatial budgets.}
 \label{fig:macro_recovery}
 \end{figure*}
 
@@ -196,7 +196,7 @@ MedNeXt-M-K3 & 0.907 & 0.556 \\
 
 
 \subsubsection{Signal-Guided Retrospective Hybrid Recovery}
-Figure \ref{fig:macro_recovery} presents retrospective hybrid prediction recovery curves $R_{\text{recovery}}(k)$ using various predictive signals:
+Figure \ref{fig:macro_recovery} presents retrospective macro-Dice trajectories under output hybridization using various predictive signals:
 \begin{itemize}
     \item At a \textbf{5\% block budget}, entropy-guided output substitution recovers \textbf{60\% of the full decoder's Dice gap} over $E_1$ for 3D UX-Net (vs. 8\% for random selection).
     \item At a \textbf{20\% block budget}, entropy-guided output substitution achieves \textbf{full recovery of the macro-Dice gap} for 3D UX-Net and SwinUNETR, while recovery remained partial for MedNeXt-M-K3 (vs. 17--20\% for random selection).
@@ -221,7 +221,7 @@ Across datasets, gross bidirectional correctness activity, positive-gain concent
  & \textbf{(\%)} & \textbf{(\%)} & \textbf{$R_{\text{act}}^{\text{all}}$ (\%)} & \textbf{$R_{\text{net}}^{\text{all}}$ (\%)} & \textbf{$R_{\text{act}}^{\text{fg}}$ (\%)} & \textbf{$R_{\text{net}}^{\text{fg}}$ (\%)} & \textbf{$K_{80}$} & \textbf{AUROC} & \textbf{AUROC} \\
 \midrule
 \textbf{BTCV CT} & 79.18 & 77.73 & 3.42 & $+0.046$ & 12.84 & $+0.381$ & $\le 5\%$ & 0.900 & 0.591 \\
-\textbf{MSD01 BrainTumour} & \textit{[Pending]} & \textit{[Pending]} & \textit{[Pending]} & \textit{[Pending]} & \textit{[Pending]} & \textit{[Pending]} & \textit{[Pending]} & \textit{[Pending]} & \textit{[Pending]} \\
+\textbf{MSD01 BrainTumour} & 75.55 & 74.95 & 0.46 & $+0.038$ & 18.10 & $+2.86$ & $\le 5\%$ & 0.869 & 0.558 \\
 \textbf{MSD08 HepaticVessel} & 57.51 & 58.63 & 0.20 & $-0.002$ & 22.99 & $-4.89$ & $\le 5\%$ & 0.865 & 0.520 \\
 \bottomrule
 \end{tabular*}

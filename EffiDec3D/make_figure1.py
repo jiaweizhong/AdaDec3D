@@ -152,7 +152,7 @@ def main():
     ax_d = fig.add_subplot(gs[1, 0:2]); ax_e = fig.add_subplot(gs[1, 2:4]); ax_f = fig.add_subplot(gs[1, 4:6])
     ax_a.imshow(im2, cmap="gray"); ax_a.set_title("(a) image"); ax_a.axis("off")
     seg_panel(ax_b, gt2, "(b) ground truth")
-    seg_panel(ax_c, pe2, "(c) EffiDec3D prediction")
+    seg_panel(ax_c, pe2, "(c) Efficient decoder $E_1$ prediction")
     seg_panel(ax_d, pf2, "(d) full-decoder prediction")
     ax_e.imshow(im2, cmap="gray"); ax_e.imshow(flip_rgb)
     ax_e.set_title("(e) flip map: green=+, red=$-$"); ax_e.axis("off")

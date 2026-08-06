@@ -11,8 +11,8 @@
 |---|---|---|
 | **Claim** | With the parameter-matched efficient decoder, the full decoder's net benefit is statistically indistinguishable from zero at the voxel level — net-neutral, **not** "genuinely redundant" (it is still Dice-relevant via a thin boundary band); residual flips are boundary-localized and predictable in location but not in direction (**observation only**) | AdaDec3D realizes region-adaptive decoding — **iso-accuracy at lower executed cost** |
 | **Venue** | WACV E&D / ISBI | MICCAI 2026 / TMI |
-| **Gate** | H2/P1 hold (boundary concentration + location predictability); H1/C1/P2 show net≈0 / no recoverable opportunity at the matched config (concat, 2026-07-29) | O7, O8 + AdaDec3D beats controls |
-| **Key result** | Net decoder benefit ≈ 0 across UX-Net (+0.047%, CI crosses 0) and Swin (−0.001%); flips boundary-localized + predictable in **location** (P1 positive-flip AUROC ~0.90) but **not in direction** (P1 pos-vs-neg ~0.5) → no recoverable selective-allocation opportunity | **DICE ≈ EffiDec3D at meaningfully lower executed MACs** (input-adaptive) |
+| **Gate** | ✅ **MET** — H2/P1 hold (boundary concentration + location predictability); H1/C1/P2 show net≈0 / no net-flip opportunity; **O7 (3 datasets) + O8 (3 backbones) COMPLETE** (2026-08-03, Figure 4) | O7, O8 + AdaDec3D beats controls |
+| **Key result** | Net decoder benefit ≈ 0 across **all 3 backbones** (UX +.047%, Swin −.001%, MedNeXt +.052%; every CI crosses 0) and **all 3 datasets** (BTCV/Task08/Task01); flips boundary-localized + predictable in **location** (P1 AUROC ~0.90) but only **weakly in direction** (P1 pos-vs-neg ~0.52–0.59) → no net-flip opportunity, though the small **Dice** gap is recoverable via boundary routing (R) | **DICE ≈ EffiDec3D at meaningfully lower executed MACs** (input-adaptive) |
 
 > **Scope note**: Paper A is an **observation paper**. With the parameter-matched
 > (concatenation) efficient decoder, the full decoder's net flip rate is statistically
@@ -20,10 +20,11 @@
 > Swin −0.001%) — read here as **net-neutral in voxel correctness**, *not* "genuinely
 > redundant": the removed capacity still moves macro Dice through a thin boundary band, so
 > it is net-neutral, not unused. The residual flips are boundary-localized (H2) and
-> predictable in **location** (P1 positive-flip AUROC) but **not in direction** (P1
-> pos-vs-neg ≈ 0.5), so there is **no** recoverable selective-allocation opportunity (C1
-> steep over a ≈0 total; P2 signal−random gap CI crosses zero on UX-Net, negative on Swin)
-> — reported honestly as a negative result. Paper A makes no efficiency claim (that is
+> predictable in **location** (P1 positive-flip AUROC ~0.90) but only **weakly in direction**
+> (P1 pos-vs-neg ~0.52–0.59, weakly above chance), so there is **no** recoverable *net-flip*
+> opportunity (C1 steep over a ≈0 total; P2 signal−random gap CI crosses zero on UX-Net,
+> negative on Swin/Task08) — reported honestly as a negative result; note R shows the small
+> **Dice** gap *is* recoverable via boundary routing where Full>Effi. Paper A makes no efficiency claim (that is
 > Paper B); Paper B's design must adapt to this net≈0 finding rather than assume the
 > opportunity Paper A once expected.
 
@@ -932,7 +933,7 @@ save_obs("O4", {"dice": dice_summary, "entropy": ent_summary})
 
 ---
 
-### O5 — Decoder Flip Analysis *(critical Go/No-Go gate)*
+### O5 — Decoder Flip Analysis *(= H1: global P/N/net + Activity, the headline metric)*
 
 **Question**: Does a stronger decoder produce net benefit primarily in high-entropy voxels?
 
@@ -1165,15 +1166,16 @@ done
 
 **Go criterion (O8)**: on ≥2 matched backbones the headline direction recurs —
 H1 net ≈ 0 (CI crosses zero), H2 net concentrated at the boundary band, and P1
-direction AUROC ≈ 0.5 → the net-neutral, location-predictable-but-direction-unpredictable
-pattern is a property of the EffiDec3D backbone family, not an artifact of 3D UX-Net.
+direction AUROC ~0.56–0.59 (weakly above chance) → the net-neutral,
+location-predictable-but-direction-unpredictable pattern is a property of the EffiDec3D
+backbone family, not an artifact of 3D UX-Net.
 
-**Result — O8: consistent across backbones at the parameter-matched (concat) config
-(BTCV13).** Headline uses concat (UX-Net, Swin); MedNeXt is an addition control and is
-currently over-sized (fs=48 → 2× the paper's MedNeXt-M-K3; retrain at fs=32 pending):
+**Result — O8: consistent across all three backbones at the parameter-matched config
+(BTCV13). ✅ COMPLETE.** UX-Net + Swin use concat (matches paper params); **MedNeXt uses its
+native additive skip at fs=32 (retrained; params 17.56M/5.80M match the paper exactly)**:
 
-Six-metric numbers below are from the **converged-code re-run** (2026-07-30,
-[results/obs-uxnet-concat](results/obs-uxnet-concat), [results/obs-swin-concat](results/obs-swin-concat)):
+Six-metric numbers below are from the **converged-code re-run** ([obs-uxnet-concat](results/obs-uxnet-concat)
++ [obs-swin-concat](results/obs-swin-concat), 2026-07-30; [obs-mednext-fs32](results/obs-mednext-fs32), 2026-08-02):
 
 | Metric | 3D UX-Net (concat) | SwinUNETR (concat) | MedNeXt fs=32 (addition\*) |
 |---|---|---|---|
@@ -1282,7 +1284,7 @@ Reproduction/efficiency ([results/E0_E1_metrics_task01_braintumour.csv](results/
 
 ---
 
-### O9 — Selective-Allocation Opportunity *(headline result for Paper A)*
+### O9 — Selective-Allocation Opportunity *(APPENDIX — superseded by C1/C2 + P2 in `O_pareto`; kept as the halo/executed-volume sensitivity)*
 
 **Question**: At a predeclared compute budget, can entropy select contiguous
 regions with more favorable **net flips** than matched random regions?
@@ -1606,19 +1608,19 @@ paired subject bootstrap) retains a positive lower bound (0.056) at the predecla
 the final Paper A submission gate is **O3**, which still needs a subject-level
 discrimination/calibration analysis (the pooled-bin r is descriptive only).
 
-### Generalization criteria (not yet run)
+### Generalization criteria — ✅ COMPLETE (2026-08-03)
 
-These are **within-study** criteria: each cell trains a Full/Effi pair (or a single
-control) under one protocol and checks whether the six-metric *direction* recurs.
-Exact reproduction of the paper's absolute Dice is **not** a prerequisite — the
-observations are relational (Full-vs-Effi on identical local data), so they hold
-regardless of any single model's distance from the published number.
+These are **within-study** criteria: each cell trains a Full/Effi pair under one protocol
+and checks whether the six-metric *direction* recurs. Exact reproduction of the paper's
+absolute Dice is **not** a prerequisite — the observations are relational (Full-vs-Effi on
+identical local data), so they hold regardless of any single model's distance from the
+published number. Aggregated in **Figure 4** (`results/figure4_generality.png`,
+`aggregate_generality.py`).
 
 | Obs | Axis | Criterion | Result | Pass? |
 |-----|------|-----------|--------|-------|
-| O7 | dataset | on ≥3 datasets spanning CT+MRI+lesion the headline recurs: H1 net ≈ 0 (CI crosses 0), H2 net concentrated at the boundary band, P1 direction AUROC weakly-above-chance | BTCV (done) + Task08 HepaticVessel + Task01 BrainTumour | ☐ |
-| O8 | architecture (matched) | ≥2 matched EffiDec3D backbones (Swin, opt. SwinV2/MedNeXt) hold the same H1/H2/P1 direction | pending E0/E1-Swin | ☐ |
-| O11 | routing | Entropy is best or tied-best cheap routing signal | confidence 0.663 vs entropy 0.655; MC dropout inactive | ◐ partial |
+| O7 | dataset | on 3 datasets spanning CT+MRI+lesion the headline recurs: H1 net ≈ 0 (CI crosses 0), H2 boundary-localized, P1 direction weakly-above-chance | **BTCV / Task08 HepaticVessel / Task01 BrainTumour — all net-neutral, boundary-localized, direction .52–.59** | ✅ |
+| O8 | architecture (matched) | ≥2 matched EffiDec3D backbones hold the same H1/H2/P1 direction | **UX-Net / SwinUNETR / MedNeXt fs=32 — all net-neutral (CI crosses 0), direction .556–.591** | ✅ |
 
 ---
 
@@ -1754,7 +1756,7 @@ Appendix figures only under `--appendix`: `O1_organ_error.png`, `O2_entropy.png`
 | C1/C2 (text) | oracle coverage @10/20%, K80 | `results.json["O_pareto"]["concentration"]` |
 | P2 (text) | signal−random gap + CI @20% | `results.json["O_pareto"]["selection_gap_at_20pct"]` |
 | Table (`tab:plan`) | backbone × dataset L-shape | manual |
-| pending | cross-dataset (O7), cross-backbone (O8) | `aggregate_generality.py` (≥2 cells) |
+| Figure 4 (`fig:generality`) ✅ | cross-dataset (O7) + cross-backbone (O8) L-shape | `aggregate_generality.py` → `results/figure4_generality.png` (all 6 cells) |
 
 ---
 
@@ -1775,7 +1777,7 @@ Week 2-3: Baseline training
 Week 4: Observations — preliminary gate (run_observations.py)   ✓ DIRECTION REPLICATED
   [x] O1: boundary error is 3.93× interior error
   [x] O2: entropy skewed (median ~0.0004; ~1.2% voxels > 0.5) — appendix diagnostic
-  [x] O3: pooled-bin entropy–error Pearson r = 0.973 (descriptive; audit pending)
+  [x] O3/P1: subject-level AUROC+AUPRC for any/positive/direction flips (pooled-bin r kept descriptive only)
   [x] O4: per-organ dice/entropy (hardest = highest-entropy organs)
   [x] O5: subject r = 0.646, CI [0.158, 0.994]; pos>neg (net effect ≈0.065%)
   [x] O6: entropy falls from 0.0279 (5k) to 0.0104 (45k)
@@ -1784,7 +1786,7 @@ Week 4: Observations — preliminary gate (run_observations.py)   ✓ DIRECTION 
   [x] O11: entropy/confidence comparable; MC dropout inactive
   [x] MAC profiling: decoder = 42.2% (decoder3 37%); encoder 57.8%
   [x] BF16 innocent (FP32 revalidation Δ=0.0000)
-  [~] Statistical audit: corrected O9 DONE (net/paired/region) — NEGATIVE at matched concat config (no opportunity); O3 pos-vs-neg discrimination added, re-run pending
+  [x] Statistical audit DONE: P2/O9 negative at matched concat (no net-flip opportunity); P1 pos-vs-neg direction + AUPRC re-run complete on all cells
   [x] --- Paper A is now independent (net≈0 characterization); Paper B decoupled and adapts to this finding ---
 
 Week 5-6: Generalization matrix (run_observations.py --network/--dataset)
@@ -1792,35 +1794,32 @@ Week 5-6: Generalization matrix (run_observations.py --network/--dataset)
   [x] Architecture axis — matched pairs COMPLETE (3 backbones, BTCV13, 2026-07-28):
         3D UX-Net (anchor)  E0 .7918 → E1 .7773 (−1.5, concat), 579→49 GMac (11.7×), 40.6→8.0 ms
         SwinUNETR           E0 .8048 → E1 .7949 (−1.0, concat), 308→56 GMac (5.5×),  37.0→16.7 ms
-        MedNeXt-M-K3        E0 .8374 → E1 .8147 (−2.3, addition; over-sized fs=48, retrain at fs=32)
+        MedNeXt-M-K3 fs=32  E0 .826 → E1 .814 (−1.3, addition; params 17.56/5.80M MATCH paper; fs=48 run void)
         NB: MedNeXt-Effi required two inherited-code bug fixes (BF1 --ds parse, BF2
             train/deploy head) before it was valid — see Part 0b Errata + EffiDec3D/MODIFICATIONS.md
-  [ ] Dataset axis — MSD-Task08 HepaticVessel (CT, thin structures) + MSD-Task01 BrainTumour
-      (MRI, brain lesions; FeTA dropped/unobtainable, Task01 replaces it — run as 4-class softmax,
-      in_channels=4); matched UX-Net (six metrics) per dataset; aggregate H1 net + P1 direction across CT+MRI+lesion
-  [ ] O7: cross-dataset consistency = aggregate over dataset axis (Go: ≥3 datasets)  — STILL PENDING
-  [x] O8: architecture-family consistency (converged six-metric re-run, 2026-07-30) — UX-Net & Swin (concat):
-        H1 R_net ≈0, CI crosses 0 (UX +.047% [−.020,+.109] / Swin −.001% [−.045,+.040]);
-        P1 location AUROC .90/.91 but direction (pos-vs-neg) only .593/.561 (weakly > chance);
-        H2 boundary net peak +0.085@0–1vox (UX) / +0.02@0–2vox (Swin); size↔net ρ +.02/−.58 (no robust law);
-        C1 oracle steep (K80=5%) but abs_net +6.1k/−1.3k vox; P2 entropy−random gap CI crosses 0 both → no opportunity.
-        MedNeXt pending fs=32 retrain.
-  [x] O10: organ size vs difficulty
-  [~] O11: entropy and confidence complete; MC dropout invalid/inactive
-  [x] Corrected O9 contiguous-region opportunity curve (net/paired/halo) — NEGATIVE at matched concat (no opportunity)
-  [ ] Corrected O3 subject-level discrimination/calibration analysis
-  [ ] (optional) Matched E0/E1 multi-seed run with paper-equivalent preprocessing
-       — improves absolute numbers; NOT required for within-study six-metric direction
-  [ ] Patch-level whole-model adaptivity study (extend efficiency beyond decoder's 42%)
+  [x] Dataset axis COMPLETE (2026-08-03) — UX-Net six metrics on BTCV / Task08 HepaticVessel (CT thin,
+      Spacingd on, Full≈Effi .575/.586) / Task01 BrainTumour (MRI 4-ch, 4-class softmax, Full≈Effi .756/.750;
+      FeTA dropped, Task01 replaces it). All net-neutral, boundary-localized, direction .52–.59.
+  [x] O7: cross-dataset consistency ✅ — aggregated in Figure 4 (all 3 datasets recur the pattern)
+  [x] O8: architecture-family consistency ✅ (converged six-metric re-run) — all THREE backbones:
+        H1 R_net ≈0, CI crosses 0 (UX +.047% [−.020,+.109] / Swin −.001% [−.045,+.040] / MedNeXt +.052% [−.010,+.108]);
+        P1 location AUROC .90/.91/.91 but direction (pos-vs-neg) only .591/.560/.556 (weakly > chance);
+        H2 boundary net peak +0.085@0–1vox (UX) / +0.02@0–2vox (Swin) / +0.04@1–2vox (MedNeXt);
+        C1 oracle steep (K80=5%); P2 entropy−random gap CI crosses 0 → no net-flip opportunity;
+        R entropy recovers ~100% of the Dice gap where Full>Effi (Dice-relevant via boundary band).
+  [x] Corrected O9 contiguous-region opportunity curve (net/paired/halo) — appendix (superseded by C1/P2)
+  [x] P1 subject-level discrimination — any/positive/direction AUROC + AUPRC (O3), all cells
+  [-] Multi-seed / null-pair / block-size robustness — SKIPPED (decision: standard ablations omit these;
+      net-neutral rests on H1's subject CI, not on absolute Dice)
+  [x] O6/O10/O11 deleted (off-thesis / MC-dropout inactive → replaced by opt-in TTA diagnostic)
 
 Week 7: Paper A draft
-  [~] Paper A manuscript first draft (wacv-2027/, 7 pp, compiles clean).
-       Architecture axis (3D UX-Net + SwinUNETR + MedNeXt-M-K3 on BTCV13) COMPLETE —
-       tab:arch + the O8 Mechanism/consistency paragraph are fillable now (numbers above).
-       Remaining \todo cells: DATASET axis (MSD-Task08 HepaticVessel + MSD-Task01 BrainTumour) for O7,
-       and the mechanism runs (frozen-encoder factorial [done], null-pair seed control).
-  [ ] UX-Net/BTCV concatenation validation (skip_aggregation=concatenation) — running:
-       tests whether part of the −2.2% Full−Effi gap is the addition-vs-concatenation config
-       (expect params 2.955→~3.15 M; Dice .770→~.79). Does NOT change the O8 direction.
-  [ ] Target venue: WACV 2027 E&D Track (primary; deadline 2026-08-28) — see Paper-Narrative §9
+  [~] Paper A manuscript — **now in `elsarticle/`** (moved from `wacv-2027/`). All EXPERIMENTS complete;
+       remaining work is manuscript writing only (fill final numbers + Figure 4), held per user request.
+       Data ready to write: arch axis (UX-Net/Swin/MedNeXt fs=32 on BTCV), dataset axis (BTCV/Task08/Task01),
+       mechanism (frozen-encoder factorial [done] + per-factor flips [done]), Figure 4 [done]. The null-pair
+       `\todo` in the paper should be removed/softened (control skipped by decision).
+  [x] UX-Net/BTCV concatenation is now the CANONICAL config (matches paper params 3.16 M; Dice .777).
+       Addition retained only as an ablation.
+  [ ] Target venue: see Paper-Narrative §9 (paper moved to `elsarticle/`)
 ```

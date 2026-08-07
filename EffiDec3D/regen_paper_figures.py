@@ -21,6 +21,7 @@ import matplotlib.ticker as mticker
 REPO = Path(__file__).resolve().parent.parent          # .../AdaDec3D
 RESULTS = REPO / "results"
 FIGS = REPO / "elsarticle" / "figures"
+DPI = 200                                               # crisper than the 150 obs default
 
 # (results dir, paper figures dir, backbone label, color)
 CELLS = [
@@ -47,12 +48,14 @@ def regen_h1(r, out_png):
                 fmt="none", ecolor="black", capsize=4, lw=1.2, zorder=4)
     ax.axhline(0, color="black", lw=.7, ls=":")
     ax.set_xticks([0, 1, 2])
-    ax.set_xticklabels(["$R_{+}$", "$R_{-}$", "$R_{\\mathrm{net}}$"])
+    ax.set_xticklabels(["$R_{+}$", "$R_{-}$", "$R_{\\mathrm{net}}$"], fontsize=15)
     ax.set_xlim(-0.6, 2.6)
-    ax.set_ylabel("flip rate"); ax.set_title("H1: global decoder flip rates")
+    ax.set_ylabel("flip rate", fontsize=13); ax.set_title("H1: global decoder flip rates", fontsize=13)
+    ax.tick_params(axis="y", labelsize=11)
     fmt = mticker.ScalarFormatter(useMathText=True); fmt.set_powerlimits((0, 0))
     ax.yaxis.set_major_formatter(fmt)
-    fig.tight_layout(); fig.savefig(out_png, dpi=150); plt.close(fig)
+    ax.yaxis.get_offset_text().set_fontsize(11)
+    fig.tight_layout(); fig.savefig(out_png, dpi=DPI); plt.close(fig)
 
 
 def declutter(ax, xs, ys, labels, fig, fontsize=8):
@@ -93,21 +96,24 @@ def regen_anatomy(r, out_png):
     axs[0].bar(xs + 0.2, neg_m, 0.4, color="firebrick", alpha=.7, label="negative")
     axs[0].plot(xs, net_m, "b-o", ms=3, label="net")
     axs[0].axhline(0, color="k", lw=.6, ls=":")
-    axs[0].set_xticks(xs); axs[0].set_xticklabels(names, rotation=45, ha="right")
-    axs[0].set_ylabel("flip rate (union fg)")
-    axs[0].set_title("(a) Per-organ decoder benefit"); axs[0].legend()
-    axs[1].scatter(size, net_m, s=32, color="steelblue", zorder=3,
+    axs[0].set_xticks(xs); axs[0].set_xticklabels(names, rotation=45, ha="right", fontsize=10)
+    axs[0].set_ylabel("flip rate (union fg)", fontsize=12)
+    axs[0].tick_params(axis="y", labelsize=10)
+    axs[0].set_title("(a) Per-organ decoder benefit", fontsize=13); axs[0].legend(fontsize=11)
+    axs[1].scatter(size, net_m, s=38, color="steelblue", zorder=3,
                    edgecolor="white", linewidth=0.5)
     axs[1].set_xscale("log"); axs[1].axhline(0, color="k", lw=.6, ls=":")
-    axs[1].set_xlabel("organ size (voxels, log)"); axs[1].set_ylabel("net flip rate")
-    axs[1].set_title(f"(b) Size vs. benefit (Spearman ${rho:.2f}$)")
+    axs[1].set_xlabel("organ size (voxels, log)", fontsize=12)
+    axs[1].set_ylabel("net flip rate", fontsize=12)
+    axs[1].tick_params(labelsize=10)
+    axs[1].set_title(f"(b) Size vs. benefit (Spearman ${rho:.2f}$)", fontsize=13)
     finite = [s for s in size if np.isfinite(s) and s > 0]
     if finite:
         axs[1].set_xlim(min(finite) / 1.6, max(finite) * 2.4)
     ymin, ymax = min(net_m), max(net_m); pad = 0.12 * (ymax - ymin + 1e-9)
     axs[1].set_ylim(ymin - pad, ymax + pad)
-    declutter(axs[1], size, net_m, names, fig, fontsize=8)
-    fig.tight_layout(); fig.savefig(out_png, dpi=150); plt.close(fig)
+    declutter(axs[1], size, net_m, names, fig, fontsize=10)
+    fig.tight_layout(); fig.savefig(out_png, dpi=DPI); plt.close(fig)
 
 
 def regen_concentration_merged(out_png):
@@ -130,20 +136,115 @@ def regen_concentration_merged(out_png):
     ax.axvline(5, color="0.4", lw=.6, ls=":", zorder=1)
     ax.text(6, 72, r"$K_{80}\leq 5\%$", fontsize=9)
     ax.set_xlim(0, 50); ax.set_ylim(0, 103)
-    ax.set_xlabel("Fraction of regions given the full decoder (%)")
-    ax.set_ylabel("Positive net-gain covered (%)")
+    ax.set_xlabel("Fraction of regions given the full decoder (%)", fontsize=12)
+    ax.set_ylabel("Positive net-gain covered (%)", fontsize=12)
+    ax.tick_params(labelsize=11)
     ax.grid(True, ls=":", lw=.5, alpha=.5)
-    ax.legend(loc="center right", fontsize=8, framealpha=.9)
+    ax.legend(loc="center", bbox_to_anchor=(0.63, 0.70), fontsize=10, framealpha=.95)
     # zoomed inset on the 5--10% separation
-    axins = inset_axes(ax, width="42%", height="40%", loc="lower right", borderpad=1.1)
+    axins = inset_axes(ax, width="42%", height="38%", loc="lower right", borderpad=1.1)
     for bud, y, color, ls, mk in curves:
         axins.plot(bud, y, ls=ls, marker=mk, ms=5, lw=1.8, color=color)
     axins.set_xlim(4.4, 10.6); axins.set_ylim(96.8, 100.35)
     axins.grid(True, ls=":", lw=.4, alpha=.5)
     axins.tick_params(labelsize=7)
-    axins.set_title("zoom: 5--10\\%", fontsize=7)
+    axins.set_title("zoom: 5-10%", fontsize=7)
     mark_inset(ax, axins, loc1=2, loc2=3, fc="none", ec="0.55", lw=0.8)
-    fig.tight_layout(); fig.savefig(out_png, dpi=150); plt.close(fig)
+    fig.tight_layout(); fig.savefig(out_png, dpi=DPI); plt.close(fig)
+
+
+def regen_recovery_merged(out_png):
+    """Figure 8: entropy- vs random-guided macro-Dice gap recovery for all three backbones
+    on one single-column axis, normalized to percent of the full-minus-efficient Dice gap.
+    Solid = entropy-guided routing (colour per backbone); dashed = random baseline."""
+    from matplotlib.lines import Line2D
+    markers = ["o", "s", "^"]
+    fig, ax = plt.subplots(figsize=(5.2, 4.1))
+    for (cell_results, _, label, color), mk in zip(CELLS, markers):
+        rr = load(cell_results)["R_recovery"]
+        effi, full = rr["effi_dice"], rr["full_dice"]
+        gap = full - effi
+        bud = [0] + list(rr["budgets_pct"])
+        ent = [0.0] + [(d - effi) / gap * 100 for d in rr["entropy"]["dice_mean"]]
+        rnd = [0.0] + [(d - effi) / gap * 100 for d in rr["random"]["dice_mean"]]
+        ax.plot(bud, ent, "-", marker=mk, ms=5, lw=2.0, color=color, zorder=3)
+        ax.plot(bud, rnd, "--", marker=mk, ms=4, lw=1.4, color=color, alpha=.55, zorder=2)
+    ax.axhline(100, color="0.35", ls=":", lw=.9)
+    ax.text(0.6, 103, "full decoder (100% gap)", fontsize=9, color="0.3")
+    ax.axvline(20, color="0.6", ls=":", lw=.7)
+    ax.set_xlim(0, 30); ax.set_ylim(0, 118)
+    ax.set_xlabel("Spatial budget routed to full decoder (%)", fontsize=12)
+    ax.set_ylabel("Macro-Dice gap recovered (%)", fontsize=12)
+    ax.tick_params(labelsize=11)
+    ax.grid(True, ls=":", lw=.5, alpha=.5)
+    handles = [Line2D([0], [0], color=c, lw=2.2, marker=m)
+               for (_, _, _, c), m in zip(CELLS, markers)]
+    handles += [Line2D([0], [0], color="0.45", lw=2, ls="-"),
+                Line2D([0], [0], color="0.45", lw=1.5, ls="--")]
+    labels = [lab for _, _, lab, _ in CELLS] + ["entropy-guided", "random"]
+    ax.legend(handles, labels, fontsize=11, loc="center right", framealpha=.95)
+    fig.tight_layout(); fig.savefig(out_png, dpi=DPI); plt.close(fig)
+
+
+def regen_h1_merged(out_png):
+    """Figure 3: global flip rates for all three backbones in one grouped-bar panel.
+    Grouped by quantity (R+, R-, R_net); one bar per backbone. R_net carries the
+    subject-bootstrap 95% CI, making the net-neutrality (CI crosses 0) visible against
+    the much larger bidirectional activity (R+ ~ R-)."""
+    cats = ["$R_{+}$", "$R_{-}$", "$R_{\\mathrm{net}}$"]
+    x = np.arange(3); width = 0.26
+    fig, ax = plt.subplots(figsize=(5.4, 4.0))
+    ax.yaxis.grid(True, ls=":", lw=.5, alpha=.6, zorder=0)
+    for i, (cell_results, _, label, color) in enumerate(CELLS):
+        o5 = load(cell_results)["O5"]
+        net = o5["subject_net_rate_mean"]; ci = o5["subject_net_rate_ci"]
+        vals = [o5["mean_positive_rate"], o5["mean_negative_rate"], net]
+        off = (i - 1) * width
+        ax.bar(x + off, vals, width, color=color, label=label,
+               edgecolor="black", linewidth=0.5, zorder=3)
+        ax.errorbar(x[2] + off, net, yerr=[[net - ci[0]], [ci[1] - net]],
+                    fmt="none", ecolor="black", capsize=3, lw=1.0, zorder=4)
+    ax.axhline(0, color="black", lw=.7, ls=":")
+    ax.set_xticks(x); ax.set_xticklabels(cats, fontsize=15)
+    ax.set_ylabel("flip rate", fontsize=13); ax.tick_params(axis="y", labelsize=11)
+    fmt = mticker.ScalarFormatter(useMathText=True); fmt.set_powerlimits((0, 0))
+    ax.yaxis.set_major_formatter(fmt); ax.yaxis.get_offset_text().set_fontsize(11)
+    ax.set_title("Global decoder flip rates: activity vs. net gain", fontsize=12)
+    ax.legend(fontsize=10, framealpha=.95)
+    fig.tight_layout(); fig.savefig(out_png, dpi=DPI); plt.close(fig)
+
+
+def regen_boundary_merged(out_png):
+    """Figure 4: boundary-resolved decoder benefit for all three backbones on one figure,
+    split into the paper's two quantities -- (a) net gain and (b) activity (P+N) -- versus
+    distance to the ground-truth boundary. One line per backbone; net panel carries the
+    subject-bootstrap 95% CI."""
+    markers = ["o", "s", "^"]
+    fig, axs = plt.subplots(1, 2, figsize=(9.6, 3.9), sharex=True)
+    bins = None
+    for (cell_results, _, label, color), mk in zip(CELLS, markers):
+        hb = load(cell_results)["H2_boundary"]
+        bins = hb["distance_bins"]
+        x = np.arange(len(bins))
+        netf = hb["net_rate"]; ci = hb["net_rate_ci"]
+        net = [v * 100 for v in netf]
+        yerr = [[(netf[i] - ci[i][0]) * 100 for i in range(len(x))],
+                [(ci[i][1] - netf[i]) * 100 for i in range(len(x))]]
+        act = [(p + q) * 100 for p, q in zip(hb["positive_rate"], hb["negative_rate"])]
+        axs[0].errorbar(x, net, yerr=yerr, marker=mk, ms=6, lw=2.0, color=color,
+                        capsize=3, label=label, zorder=3)
+        axs[1].plot(x, act, marker=mk, ms=6, lw=2.0, color=color, label=label, zorder=3)
+    axs[0].axhline(0, color="k", lw=.7, ls=":")
+    axs[0].set_title("(a) Net gain  $R_{+}\\!-\\!R_{-}$", fontsize=13)
+    axs[1].set_title("(b) Activity  $R_{+}\\!+\\!R_{-}$", fontsize=13)
+    axs[0].set_ylabel("rate (%)", fontsize=12)
+    for ax in axs:
+        ax.set_xticks(np.arange(len(bins))); ax.set_xticklabels(bins, fontsize=11)
+        ax.set_xlabel("distance to GT boundary (voxels)", fontsize=12)
+        ax.tick_params(labelsize=10)
+        ax.grid(True, ls=":", lw=.5, alpha=.5)
+    axs[0].legend(fontsize=11, framealpha=.95)
+    fig.tight_layout(); fig.savefig(out_png, dpi=DPI); plt.close(fig)
 
 
 if __name__ == "__main__":
@@ -154,3 +255,9 @@ if __name__ == "__main__":
         print(f"[{label}] H1 + O_anatomy -> figures/{cell_figs}/")
     regen_concentration_merged(FIGS / "concentration_merged.png")
     print("merged concentration -> figures/concentration_merged.png")
+    regen_recovery_merged(FIGS / "recovery_merged.png")
+    print("merged recovery -> figures/recovery_merged.png")
+    regen_boundary_merged(FIGS / "boundary_merged.png")
+    print("merged boundary -> figures/boundary_merged.png")
+    regen_h1_merged(FIGS / "h1_merged.png")
+    print("merged H1 -> figures/h1_merged.png")

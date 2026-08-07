@@ -38,28 +38,19 @@ Evaluating voxel-level prediction shifts between matched $E_0$ and $E_1$ decoder
 
 Subject-mean All-Volume net gain rates $R_{\text{net}}^{\text{all}}$ across models are: $+0.046\%$ (95\% CI: $[-0.020\%, +0.110\%]$) for 3D UX-Net, $-0.001\%$ (95\% CI: $[-0.045\%, +0.040\%]$) for SwinUNETR, and $+0.052\%$ (95\% CI: $[-0.010\%, +0.108\%]$) for MedNeXt-M-K3. Evaluated over the Foreground-Union domain $\Omega_{\text{fg}}$, net gain rates are $R_{\text{net}}^{\text{fg}} = +0.381\%$ for 3D UX-Net, $-0.008\%$ for SwinUNETR, and $+0.446\%$ for MedNeXt-M-K3. Across the three evaluated model pairs, subject-bootstrap confidence intervals for global net gain included zero, indicating no statistically detectable directional shift. In all models, positive voxel corrections $P(v)$ are largely offset by negative degradations $N(v)$.
 
+% --- Figure 3: Global flip rates, three backbones on one axis ---
+\begin{figure}[tb]
+\centering
+\includegraphics[width=0.86\columnwidth]{figures/h1_merged.png}
+\caption{Global flip rates for all three backbones under Full ($E_0$) vs. Efficient ($E_1$) decoders, grouped by quantity. Positive corrections $R_{+}$ and negative degradations $R_{-}$ are large and comparable (bidirectional activity), whereas the net gain $R_{\text{net}}$ is near zero with a subject-bootstrap $95\%$ CI that includes zero for every backbone.}
+\label{fig:global_flips}
+\end{figure}
+
+% --- Figure 4: Boundary-resolved net gain vs. activity (three backbones merged) ---
 \begin{figure*}[tb]
 \centering
-% --- Figure 3: Global Flips ---
-\begin{tabular}{@{}c@{\hspace{1mm}}c@{\hspace{1mm}}c@{}}
-\includegraphics[width=0.28\textwidth]{figures/obs-uxnet-concat/H1_global_flips.png} &
-\includegraphics[width=0.28\textwidth]{figures/obs-swin-concat/H1_global_flips.png} &
-\includegraphics[width=0.28\textwidth]{figures/obs-mednext/H1_global_flips.png} \\
-(a) 3D UX-Net Global Flips & (b) SwinUNETR Global Flips & (c) MedNeXt-M-K3 Global Flips \\
-\end{tabular}
-\caption{Voxel-level net gain rates across 3D UX-Net, SwinUNETR, and MedNeXt-M-K3 backbones under Full ($E_0$) vs. Efficient ($E_1$) decoders.}
-\label{fig:global_flips}
-
-\vspace{1.5em}
-
-% --- Figure 4: Boundary Flips ---
-\begin{tabular}{@{}c@{\hspace{1mm}}c@{\hspace{1mm}}c@{}}
-\includegraphics[width=0.33\textwidth]{figures/obs-uxnet-concat/H2_boundary.png} &
-\includegraphics[width=0.33\textwidth]{figures/obs-swin-concat/H2_boundary.png} &
-\includegraphics[width=0.33\textwidth]{figures/obs-mednext/H2_boundary.png} \\
-(a) 3D UX-Net Boundary Flips & (b) SwinUNETR Boundary Flips & (c) MedNeXt-M-K3 Boundary Flips \\
-\end{tabular}
-\caption{Spatial ground-truth boundary concentration of prediction flips across the three evaluated backbones.}
+\includegraphics[width=0.86\textwidth]{figures/boundary_merged.png}
+\caption{Boundary-resolved decoder benefit versus distance to the ground-truth boundary, for all three backbones: (a) net gain $R_{+}-R_{-}$ (with subject-bootstrap $95\%$ CIs) and (b) correctness activity $R_{+}+R_{-}$. Activity is sharply concentrated at the boundary and decays into organ interiors for every backbone, while the net gain stays small and its CI includes zero beyond the innermost band.}
 \label{fig:boundary_flips}
 \end{figure*}
 
@@ -133,15 +124,16 @@ Boundary Net Gain (\%) & $-0.020$ & $+0.033$ & $-0.004$ \\
 
 Figure \ref{fig:concentration} presents oracle benefit concentration curves. Across the three BTCV backbone pairs, the top 5\% of spatial blocks captured at least 80\% of positive gain ($K_{80} \le 5\%$), and the top 10\% captured up to 99.98\%.
 
+% --- Figure 6: Concentration (three backbones on one color-coded axis, single column) ---
+\begin{figure}[tb]
+\centering
+\includegraphics[width=0.92\columnwidth]{figures/concentration_merged.png}
+\caption{Oracle positive-gain concentration for the three backbones (inset: zoom on the $5$--$10\%$ separation). All satisfy $K_{80}\le5\%$; the gray dashed line is the random baseline.}
+\label{fig:concentration}
+\end{figure}
+
 \begin{figure*}[tb]
 \centering
-% --- Figure 6: Concentration (three backbones on one color-coded axis) ---
-\includegraphics[width=0.6\textwidth]{figures/concentration_merged.png}
-\caption{Oracle positive-gain concentration for the three backbones on a single color-coded axis. The gray dashed line is the random-selection baseline. In all three architectures the positive net gain is heavily concentrated, satisfying $K_{80} \le 5\%$: the top $5\%$ of spatial blocks already cover $\ge 97\%$ of the total positive gain, and the top $10\%$ cover essentially all of it.}
-\label{fig:concentration}
-
-\vspace{1.5em}
-
 % --- Figure 7: Flip Density ---
 \begin{tabular}{@{}c@{\hspace{1mm}}c@{\hspace{1mm}}c@{}}
 \includegraphics[width=0.33\textwidth]{figures/obs-uxnet-concat/O3_entropy_by_flip.png} &
@@ -152,18 +144,15 @@ Figure \ref{fig:concentration} presents oracle benefit concentration curves. Acr
 \caption{Conditional entropy density distributions for positive corrections ($P$) and negative degradations ($N$).}
 \label{fig:flip_density}
 
-\vspace{1.5em}
-
-% --- Figure 8: Macro Recovery ---
-\begin{tabular}{@{}c@{\hspace{1mm}}c@{\hspace{1mm}}c@{}}
-\includegraphics[width=0.33\textwidth]{figures/obs-uxnet-concat/R_recovery.png} &
-\includegraphics[width=0.33\textwidth]{figures/obs-swin-concat/R_recovery.png} &
-\includegraphics[width=0.33\textwidth]{figures/obs-mednext/R_recovery.png} \\
-(a) 3D UX-Net Macro Recovery & (b) SwinUNETR Macro Recovery & (c) MedNeXt-M-K3 Macro Recovery \\
-\end{tabular}
-\caption{Signal-guided retrospective macro-Dice trajectories under output hybridization at increasing spatial budgets.}
-\label{fig:macro_recovery}
 \end{figure*}
+
+% --- Figure 8: Macro Recovery (three backbones merged, single column) ---
+\begin{figure}[tb]
+\centering
+\includegraphics[width=0.92\columnwidth]{figures/recovery_merged.png}
+\caption{Macro-Dice gap recovery under output hybridization for the three backbones, as a percentage of the full-minus-efficient Dice gap. Solid = entropy-guided routing, dashed = random baseline. Entropy-guided routing recovers the full gap by a $20\%$ budget for all three backbones, versus ${\sim}20\%$ for random selection.}
+\label{fig:macro_recovery}
+\end{figure}
 
 We evaluate whether cheap inference-time signals can locate regions where decoder computation alters correctness (Location AUROC) and whether they can further discriminate the direction of those changes (Direction AUROC) (Table \ref{tab:predictability} and Figure \ref{fig:flip_density}):
 \begin{itemize}

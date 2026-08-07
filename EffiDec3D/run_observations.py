@@ -433,9 +433,11 @@ def O3_unc_error_corr(val_loader, effi, full=None):
             if ent_by[_nm]:
                 plt.hist(np.concatenate(ent_by[_nm]), bins=50, density=True,
                          histtype="step", lw=1.6, color=_col, label=_nm)
-        plt.xlabel("efficient-model entropy"); plt.ylabel("density")
-        plt.title("O3: entropy by flip class (pos vs neg overlap $\\Rightarrow$ direction hard)")
-        plt.legend(); plt.tight_layout()
+        plt.xlabel("efficient-model entropy", fontsize=12); plt.ylabel("density", fontsize=12)
+        plt.tick_params(labelsize=11)
+        plt.title("O3: entropy by flip class (pos vs neg overlap $\\Rightarrow$ direction hard)",
+                  fontsize=11)
+        plt.legend(fontsize=12); plt.tight_layout()
         plt.savefig(f"{OBS_DIR}/O3_entropy_by_flip.png", dpi=150); plt.close()
     save_obs("O3", {
         # primary: entropy predicts positive flips (needs full pair)
@@ -537,12 +539,15 @@ def O5_decoder_gain(val_loader, effi, full):
                 yerr=[[net_mean - nr_ci[0]], [nr_ci[1] - net_mean]],
                 fmt="none", ecolor="black", capsize=4, lw=1.2, zorder=4)
     ax.axhline(0, color="black", lw=.7, ls=":")
-    ax.set_xticks([0, 1, 2]); ax.set_xticklabels(["$R_{+}$", "$R_{-}$", "$R_{\\mathrm{net}}$"])
+    ax.set_xticks([0, 1, 2])
+    ax.set_xticklabels(["$R_{+}$", "$R_{-}$", "$R_{\\mathrm{net}}$"], fontsize=15)
     ax.set_xlim(-0.6, 2.6)
-    ax.set_ylabel("flip rate"); ax.set_title("H1: global decoder flip rates")
+    ax.set_ylabel("flip rate", fontsize=13); ax.set_title("H1: global decoder flip rates", fontsize=13)
+    ax.tick_params(axis="y", labelsize=11)
     fmt = mticker.ScalarFormatter(useMathText=True); fmt.set_powerlimits((0, 0))
     ax.yaxis.set_major_formatter(fmt)                 # scientific notation (shared x10^-3 offset)
-    fig.tight_layout(); fig.savefig(f"{OBS_DIR}/H1_global_flips.png", dpi=150); plt.close(fig)
+    ax.yaxis.get_offset_text().set_fontsize(11)
+    fig.tight_layout(); fig.savefig(f"{OBS_DIR}/H1_global_flips.png", dpi=200); plt.close(fig)
     save_obs("O5", {"mean_positive_rate": mean_pos, "mean_negative_rate": mean_neg,
                     "subject_pos_rate_mean": mean_pos, "subject_neg_rate_mean": mean_neg,
                     "subject_net_rate_mean": float(net_rate.mean()),      # GAIN = P - N
@@ -1181,22 +1186,24 @@ def O_anatomy(val_loader, effi, full):
     axs[0].bar(xs + 0.2, neg_m, 0.4, color="firebrick", alpha=.7, label="negative")
     axs[0].plot(xs, net_m, "b-o", ms=3, label="net")
     axs[0].axhline(0, color="k", lw=.6, ls=":")
-    axs[0].set_xticks(xs); axs[0].set_xticklabels(names, rotation=45, ha="right")
-    axs[0].set_ylabel("flip rate (union fg)")
-    axs[0].set_title("(a) Per-organ decoder benefit"); axs[0].legend()
-    axs[1].scatter(size, net_m, s=32, color="steelblue", zorder=3,
+    axs[0].set_xticks(xs); axs[0].set_xticklabels(names, rotation=45, ha="right", fontsize=10)
+    axs[0].set_ylabel("flip rate (union fg)", fontsize=12)
+    axs[0].tick_params(axis="y", labelsize=10)
+    axs[0].set_title("(a) Per-organ decoder benefit", fontsize=13); axs[0].legend(fontsize=11)
+    axs[1].scatter(size, net_m, s=38, color="steelblue", zorder=3,
                    edgecolor="white", linewidth=0.5)
     axs[1].set_xscale("log"); axs[1].axhline(0, color="k", lw=.6, ls=":")
-    axs[1].set_xlabel("organ size (voxels, log)"); axs[1].set_ylabel("net flip rate")
-    axs[1].set_title(f"(b) Size vs.\\ benefit (Spearman ${rho:.2f}$)")
+    axs[1].set_xlabel("organ size (voxels, log)", fontsize=12); axs[1].set_ylabel("net flip rate", fontsize=12)
+    axs[1].tick_params(labelsize=10)
+    axs[1].set_title(f"(b) Size vs.\\ benefit (Spearman ${rho:.2f}$)", fontsize=13)
     # Widen right margin so labels near the largest organs are not clipped, then place
     # labels off their markers with leaders and push overlapping labels apart (the dot
     # never occludes the first letter; no manual re-annotation needed).
     finite = [s for s in size if np.isfinite(s) and s > 0]
     if finite:
         axs[1].set_xlim(min(finite) / 1.6, max(finite) * 2.4)
-    _declutter_labels(axs[1], size, net_m, names, fig, fontsize=8)
-    fig.tight_layout(); fig.savefig(f"{OBS_DIR}/O_anatomy.png", dpi=150); plt.close(fig)
+    _declutter_labels(axs[1], size, net_m, names, fig, fontsize=10)
+    fig.tight_layout(); fig.savefig(f"{OBS_DIR}/O_anatomy.png", dpi=200); plt.close(fig)
     save_obs("O_anatomy", {
         "organ": names, "positive_rate": pos_m, "negative_rate": neg_m, "net_rate": net_m,
         "organ_size": size, "dice_delta_full_minus_effi": ddice, "size_net_spearman": rho,

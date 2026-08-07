@@ -154,8 +154,8 @@ We benchmark whether cheap inference-time signals (predictive entropy and TTA mu
 \label{fig:predictability}
 \end{figure}
 
-\subsubsection{Macro-Metric Performance Recovery ($R_{\text{recovery}}$)}
-Figure \ref{fig:macro_recovery} presents the macro-metric Dice recovery curves $R_{\text{recovery}}(k)$ under entropy-guided block routing:
+\subsubsection{Macro-Metric Performance Recovery ($R_{\text{rec}}$)}
+Figure \ref{fig:macro_recovery} presents the macro-metric Dice recovery curves $R_{\text{rec}}(k)$ under entropy-guided block routing:
 \begin{itemize}
     \item At a \textbf{5\% block budget}, entropy-guided routing recovers \textbf{60\% of the full decoder's Dice gap} over $E_1$ for 3D UX-Net (compared to 8\% for random selection).
     \item At a \textbf{20\% block budget}, entropy-guided routing achieves \textbf{100\% recovery of the macro Dice gap} across both 3D UX-Net and SwinUNETR (vs. 17--20\% for random selection).
@@ -167,7 +167,7 @@ Figure \ref{fig:macro_recovery} presents the macro-metric Dice recovery curves $
 \vspace{-2pt}{\small (a) 3D UX-Net Macro Dice Recovery} \\[4pt]
 \includegraphics[width=0.82\columnwidth]{figures/obs-swin-concat/R_recovery.png} \\
 \vspace{-2pt}{\small (b) SwinUNETR Macro Dice Recovery}
-\caption{Macro-metric Dice recovery curves ($R_{\text{recovery}}$) under entropy-guided vs. random selective routing.}
+\caption{Macro-metric Dice recovery curves ($R_{\text{rec}}$) under entropy-guided vs. random selective routing.}
 \label{fig:macro_recovery}
 \end{figure}
 

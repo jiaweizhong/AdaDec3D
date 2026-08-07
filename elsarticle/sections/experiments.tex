@@ -24,7 +24,7 @@ We evaluate matched decoder pairs across three representative 3D medical image s
 \end{tabular*}
 \end{table*}
 
-\textit{Architectural \& FLOP Profiling Protocol}: All computational complexity metrics (FLOPs/MACs) were measured using MONAI's `fvcore` profiling utility on a single 3D patch input tensor of shape $1 \times C \times 96 \times 96 \times 96$. To prevent cross-table confusion, we explicitly distinguish two specific 3D UX-Net full configurations evaluated in this study:
+\paragraph{Architectural and FLOP Profiling Protocol.} All computational complexity metrics (FLOPs/MACs) were measured using the fvcore profiling utility on a single 3D patch input tensor of shape $1 \times C \times 96 \times 96 \times 96$. To prevent cross-table confusion, we explicitly distinguish two specific 3D UX-Net full configurations evaluated in this study:
 \begin{enumerate}
     \item \textbf{End-to-End Reference Configuration} (Table \ref{tab:main_results}): Trained end-to-end with default MONAI training pipelines containing auxiliary deep-supervision heads (53.01M params / 578.74 GMac).
     \item \textbf{Frozen-Encoder Factorial Configuration} (Table \ref{tab:factorial}): Evaluates the standalone decoder pathway with auxiliary heads detached under fixed unpadded patch profiling ($96\times96\times96$, 46.72M params / 657.76 GMac).
@@ -69,4 +69,6 @@ All models were implemented in PyTorch using an NVIDIA RTX 5090 GPU with CUDA 12
 \subsection{Data Splits and Model Selection}
 \label{sec:data_splits}
 
-Full and efficient configurations used identical subject-level training, validation, and test partitions. Model checkpoints were selected exclusively according to validation macro-Dice, and all subsequent characterization analyses were performed on held-out test subjects. Confidence intervals were estimated by subject-level bootstrap resampling over the held-out test set.
+Every matched pair was trained and evaluated on identical subject-level training, validation, and test partitions, and partitioning was performed at the level of whole volumes so that no subject's sub-volumes leaked across splits. This shared-partition constraint is not a convenience but a requirement of the characterization: because our analysis is a \emph{paired} voxel-level comparison between the full and efficient decoders, any discrepancy in the underlying data split would confound decoder-attributed correctness changes with data-attributed variance. Holding the split fixed ensures that every flip we measure reflects a difference in decoder computation on the same input, not a difference in which subjects each model saw.
+
+Model checkpoints were selected exclusively by validation macro-Dice rather than training loss, which avoids selecting an overfit iterate, and all subsequent characterization analyses were computed strictly on held-out test subjects that were never used for training or checkpoint selection. Confidence intervals were estimated by subject-level paired bootstrap resampling ($1000$ resamples) over the held-out test set: the same subjects are resampled jointly for both decoders, preserving the within-subject correlation that a paired comparison exploits, so the reported intervals reflect subject-level variability rather than the artificially narrow bounds that voxel-count pooling would produce.

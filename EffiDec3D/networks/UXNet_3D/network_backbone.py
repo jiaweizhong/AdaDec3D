@@ -177,6 +177,70 @@ class ProjectionHead(nn.Module):
 #         return out
 
 
+class SeparableConv3d(nn.Module):
+    """Depthwise-separable 3D convolution: a depthwise k x k x k conv (groups=in_channels)
+    followed by a pointwise 1 x 1 x 1 conv. Factorizes a dense conv's cost from
+    O(k^3 * C_in * C_out) to O(k^3 * C_in) + O(C_in * C_out) without changing the input
+    or output channel width -- i.e. it reduces compute while preserving capacity."""
+
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1):
+        super().__init__()
+        padding = kernel_size // 2
+        self.depthwise = nn.Conv3d(in_channels, in_channels, kernel_size=kernel_size,
+                                   stride=stride, padding=padding, groups=in_channels, bias=False)
+        self.pointwise = nn.Conv3d(in_channels, out_channels, kernel_size=1, stride=1, bias=False)
+
+    def forward(self, x):
+        return self.pointwise(self.depthwise(x))
+
+
+class SepUnetBasicBlock(nn.Module):
+    """Two separable conv -> instance-norm -> LeakyReLU layers; a drop-in analog of
+    MONAI's UnetBasicBlock where each dense convolution is factorized (Section on the
+    depthwise-separable decoder intervention). Matches the norm/activation used
+    throughout the UX-Net decoder (norm_name='instance')."""
+
+    def __init__(self, spatial_dims, in_channels, out_channels, kernel_size=3, stride=1,
+                 norm_name: Union[Tuple, str] = "instance"):
+        super().__init__()
+        self.conv1 = SeparableConv3d(in_channels, out_channels, kernel_size, stride)
+        self.norm1 = nn.InstanceNorm3d(out_channels, affine=True)
+        self.conv2 = SeparableConv3d(out_channels, out_channels, kernel_size, 1)
+        self.norm2 = nn.InstanceNorm3d(out_channels, affine=True)
+        self.act = nn.LeakyReLU(negative_slope=0.01, inplace=True)
+
+    def forward(self, x):
+        x = self.act(self.norm1(self.conv1(x)))
+        x = self.act(self.norm2(self.conv2(x)))
+        return x
+
+
+class SeparableUnetrUpBlock(nn.Module):
+    """Upsampling block mirroring MONAI's UnetrUpBlock (transposed conv -> concatenate
+    skip -> conv block) but with the refinement convolutions replaced by depthwise-
+    separable convolutions. The (small) transposed upsampling conv is kept dense for
+    stability; the two 3x3x3 refinement convs -- the bulk of decoder FLOPs -- are
+    factorized. Skip aggregation is concatenation, matching the full UXNET decoder."""
+
+    def __init__(self, spatial_dims, in_channels, out_channels, kernel_size,
+                 upsample_kernel_size, norm_name: Union[Tuple, str] = "instance"):
+        super().__init__()
+        self.transp_conv = get_conv_layer(
+            spatial_dims, in_channels, out_channels,
+            kernel_size=upsample_kernel_size, stride=upsample_kernel_size,
+            conv_only=True, is_transposed=True,
+        )
+        self.conv_block = SepUnetBasicBlock(
+            spatial_dims, out_channels + out_channels, out_channels,
+            kernel_size=kernel_size, stride=1, norm_name=norm_name,
+        )
+
+    def forward(self, inp, skip):
+        out = self.transp_conv(inp)
+        out = torch.cat((out, skip), dim=1)
+        return self.conv_block(out)
+
+
 class UXNET(nn.Module):
 
     def __init__(
@@ -390,6 +454,35 @@ class UXNET(nn.Module):
         # feat = self.conv_proj(dec4)
         
         return self.out(out)
+
+class UXNET_SepDec(UXNET):
+    """UX-Net with a depthwise-separable (factorized-convolution) decoder.
+
+    This is a *capacity-preserving, compute-reducing* efficient decoder whose
+    lightweighting logic differs from EffiDec3D: the encoder, the full set of
+    high-resolution decoder stages, and every channel width are kept identical to
+    the full UXNET (E0), and only the dense decoder convolutions are replaced by
+    depthwise + pointwise factorizations (SeparableUnetrUpBlock / SepUnetBasicBlock).
+    EffiDec3D instead *removes* capacity (channel reduction + high-resolution stage
+    omission). Comparing E0 vs. this variant tests whether the paper's
+    characterization findings depend on the specific EffiDec3D pruning or hold under
+    a structurally different decoder-lightweighting mechanism.
+
+    Because __init__ reuses the full UXNET encoder/forward unchanged and only swaps
+    the decoder modules, a full-UXNET (E0) checkpoint's encoder weights load into
+    this class with strict=False for a frozen-encoder comparison as well.
+    """
+
+    def __init__(self, **kwargs):
+        norm_name = kwargs.get("norm_name", "instance")
+        super().__init__(**kwargs)
+        sd = self.spatial_dims
+        fs = self.feat_size
+        self.decoder5 = SeparableUnetrUpBlock(sd, self.hidden_size, fs[3], 3, 2, norm_name)
+        self.decoder4 = SeparableUnetrUpBlock(sd, fs[3], fs[2], 3, 2, norm_name)
+        self.decoder3 = SeparableUnetrUpBlock(sd, fs[2], fs[1], 3, 2, norm_name)
+        self.decoder2 = SeparableUnetrUpBlock(sd, fs[1], fs[0], 3, 2, norm_name)
+        self.decoder1 = SepUnetBasicBlock(sd, fs[0], fs[0], kernel_size=3, stride=1, norm_name=norm_name)
 
 class UXNET_EffiDec3D(nn.Module):
 

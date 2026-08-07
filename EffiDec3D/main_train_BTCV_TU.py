@@ -15,7 +15,7 @@ from monai.transforms import AsDiscrete
 from monai.networks.nets import UNETR, SwinUNETR
 from networks.swin_unetr_effidec3d import SwinUNETR as SwinUNETRv2
 from networks.MedNeXt.mednextv1.create_mednext_v1 import create_mednext_v1
-from networks.UXNet_3D.network_backbone import UXNET, UXNET_EffiDec3D
+from networks.UXNet_3D.network_backbone import UXNET, UXNET_EffiDec3D, UXNET_SepDec
 from networks.swin_unetr_effidec3d import SwinUNETR_EffiDec3D
 from networks.MedNeXt.mednextv1.create_mednextv1_effidec3d import create_mednextv1_effidec3d
 
@@ -203,6 +203,18 @@ elif args.network == 'MedNeXt_M_EffiDec3D':
         n_channels=args.feature_size,
         kernel_size=3,
         deep_supervision=args.ds #True
+    ).to(device)
+
+## 3D UX-Net with depthwise-separable decoder (different-logic efficient decoder E1')
+elif args.network == '3DUXNET_SepDec':
+    model = UXNET_SepDec(
+        in_chans=args.n_channels, #1
+        out_chans=out_classes,
+        depths=[2, 2, 2, 2],
+        feat_size=[48, 96, 192, 384],
+        drop_path_rate=0,
+        layer_scale_init_value=1e-6,
+        spatial_dims=3,
     ).to(device)
 
 ## 3D UX-Net

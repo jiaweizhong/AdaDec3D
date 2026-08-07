@@ -6,7 +6,9 @@ In this section, we present observational characterization findings across our t
 \subsection{Accuracy--Computation Trade-off on BTCV}
 \label{sec:results_cross_arch}
 
-Table \ref{tab:main_results} summarizes aggregate computational complexity and segmentation performance under standard end-to-end model training across three 3D backbones on BTCV CT. For each backbone, we evaluate the standard Full decoder ($E_0$) against an Efficient baseline ($E_1$) implementing the parameter reduction strategy of EffiDec3D \cite{effidec3d}. Across all three backbones, $E_1$ achieves substantial FLOP reductions (up to 91.4\% in 3D UX-Net) while retaining competitive Mean Dice scores (e.g., MedNeXt-M-K3 $E_0$ achieves 82.61\% Mean Dice vs. 81.35\% for $E_1$, while $E_1$ reduces inference latency from 27.8 ms to 12.9 ms).
+Table \ref{tab:main_results} summarizes aggregate computational complexity and segmentation performance under standard end-to-end training across three 3D backbones on BTCV CT. For each backbone, we evaluate the standard Full decoder ($E_0$) against an Efficient baseline ($E_1$) implementing the parameter reduction strategy of EffiDec3D \cite{effidec3d}. The macroscopic picture is consistent across all three architectures: $E_1$ removes the large majority of decoder cost---up to a $91.4\%$ FLOP reduction and a $5\times$ latency reduction for 3D UX-Net---while the Mean Dice penalty stays within $1.45$ points ($79.18\rightarrow77.73$ for 3D UX-Net, $80.48\rightarrow79.49$ for SwinUNETR, $82.61\rightarrow81.35$ for MedNeXt-M-K3), and boundary error (HD95) even improves for two of the three backbones.
+
+Read at face value, this table is the standard justification for decoder pruning: the extra computation looks nearly free to remove. Yet a Mean Dice difference of one point is a single scalar averaged over millions of voxels, and it says nothing about how many predictions the full decoder actually changed, in which direction, or where. The remainder of this section opens up that scalar. We show that behind these near-identical Dice scores the decoder performs a large amount of spatially structured correctness reorganization whose net effect is statistically indistinguishable from zero---the central observation that the aggregate view conceals.
 
 \begin{table*}[tb]
 \centering
@@ -32,7 +34,7 @@ Table \ref{tab:main_results} summarizes aggregate computational complexity and s
 \subsection{Correctness Activity and Net Gain across Architectures}
 \label{sec:results_activity}
 
-Evaluating voxel-level prediction shifts between matched $E_0$ and $E_1$ decoders reveals substantial gross correctness activity $R_{\text{act}} = R_{\text{pos}} + R_{\text{neg}}$, whereas the net directional gain $R_{\text{net}} = R_{\text{pos}} - R_{\text{neg}}$ remains substantially smaller due to bidirectional cancellation (Figure \ref{fig:global_flips}).
+Evaluating voxel-level prediction shifts between matched $E_0$ and $E_1$ decoders reveals substantial gross correctness activity $R_{\text{act}} = R_{+} + R_{-}$, whereas the net directional gain $R_{\text{net}} = R_{+} - R_{-}$ remains substantially smaller due to bidirectional cancellation (Figure \ref{fig:global_flips}).
 
 Subject-mean All-Volume net gain rates $R_{\text{net}}^{\text{all}}$ across models are: $+0.046\%$ (95\% CI: $[-0.020\%, +0.110\%]$) for 3D UX-Net, $-0.001\%$ (95\% CI: $[-0.045\%, +0.040\%]$) for SwinUNETR, and $+0.052\%$ (95\% CI: $[-0.010\%, +0.108\%]$) for MedNeXt-M-K3. Evaluated over the Foreground-Union domain $\Omega_{\text{fg}}$, net gain rates are $R_{\text{net}}^{\text{fg}} = +0.381\%$ for 3D UX-Net, $-0.008\%$ for SwinUNETR, and $+0.446\%$ for MedNeXt-M-K3. Across the three evaluated model pairs, subject-bootstrap confidence intervals for global net gain included zero, indicating no statistically detectable directional shift. In all models, positive voxel corrections $P(v)$ are largely offset by negative degradations $N(v)$.
 
@@ -64,13 +66,11 @@ Subject-mean All-Volume net gain rates $R_{\text{net}}^{\text{all}}$ across mode
 \subsection{Spatial Heterogeneity}
 \label{sec:results_heterogeneity}
 
-\subsubsection{Physical Ground-Truth Boundary Concentration}
-Stratifying correctness activity $A_{\text{corr}}(v)$ by physical Euclidean distance $d_{GT}(v)$ to true ground-truth anatomical boundaries shows that correctness changes peak sharply within a 0--2 mm physical distance band (Figure \ref{fig:boundary_flips}). Both positive corrections and negative degradations decrease rapidly in organ interiors ($d_{GT} > 8\text{ mm}$).
+The near-zero net gain of Section~\ref{sec:results_activity} is not the signature of a decoder that does little; it is the signature of intense but spatially confined activity. Two complementary stratifications---by physical distance to the anatomical boundary and by organ---localize where that activity lives, and both point to the same place.
 
+Stratifying correctness activity $A_{\text{corr}}(v)$ by physical Euclidean distance $d_{GT}(v)$ to the true ground-truth boundary (Figure~\ref{fig:boundary_flips}) reveals a sharp peak within the innermost $0$--$2$~mm band and a rapid outward decay. Both positive corrections and negative degradations fall steeply across the $2$--$4$ and $4$--$8$~mm bands and are almost absent in homogeneous organ interiors ($d_{GT} > 8$~mm). The extra decoder computation therefore acts almost entirely in the thin transition zone around structure surfaces---exactly where partial-volume mixing makes voxel labeling ambiguous---while leaving confidently labeled interiors untouched. The pattern holds for all three backbones.
 
-
-\subsubsection{Anatomical Structure Volatility}
-Anatomical analysis (Figure \ref{fig:heterogeneity_anatomy}) demonstrates that small, morphologically complex organs exhibit high flip volatility. The left and right adrenal glands show positive correction rates of 16.2\%/16.9\% in 3D UX-Net, 14.4\%/14.8\% in SwinUNETR, and 12.3\%/14.0\% in MedNeXt-M-K3. Conversely, large structures like the liver remain highly stable ($<3\%$ correctness activity).
+The organ-level breakdown (Figure~\ref{fig:heterogeneity_anatomy}) tells the same story along an anatomical axis. Small, morphologically complex structures with a high surface-to-volume ratio exhibit the largest correctness activity: the left and right adrenal glands reach positive-correction rates of $16.2\%/16.9\%$ in 3D UX-Net, $14.4\%/14.8\%$ in SwinUNETR, and $12.3\%/14.0\%$ in MedNeXt-M-K3. Large, compact structures such as the liver remain nearly inert (${<}3\%$ activity), because their volume is dominated by interior rather than surface. Boundary proximity and small-complex-organ membership are thus two views of one geometric fact: decoder computation is spent where the foreground is mostly surface and saved where it is mostly interior.
 
 \begin{figure*}[tb]
 \centering
@@ -135,14 +135,9 @@ Figure \ref{fig:concentration} presents oracle benefit concentration curves. Acr
 
 \begin{figure*}[tb]
 \centering
-% --- Figure 6: Concentration ---
-\begin{tabular}{@{}c@{\hspace{1mm}}c@{\hspace{1mm}}c@{}}
-\includegraphics[width=0.33\textwidth]{figures/obs-uxnet-concat/O_pareto_oracle.png} &
-\includegraphics[width=0.33\textwidth]{figures/obs-swin-concat/O_pareto_oracle.png} &
-\includegraphics[width=0.33\textwidth]{figures/obs-mednext/O_pareto_oracle.png} \\
-(a) 3D UX-Net Oracle Concentration & (b) SwinUNETR Oracle Concentration & (c) MedNeXt-M-K3 Oracle Concentration \\
-\end{tabular}
-\caption{Oracle positive-gain concentration curves across backbones. The dashed line represents the random selection baseline. In all three architectures, the positive gain is heavily skewed, satisfying $K_{80} \le 5\%$.}
+% --- Figure 6: Concentration (three backbones on one color-coded axis) ---
+\includegraphics[width=0.6\textwidth]{figures/concentration_merged.png}
+\caption{Oracle positive-gain concentration for the three backbones on a single color-coded axis. The gray dashed line is the random-selection baseline. In all three architectures the positive net gain is heavily concentrated, satisfying $K_{80} \le 5\%$: the top $5\%$ of spatial blocks already cover $\ge 97\%$ of the total positive gain, and the top $10\%$ cover essentially all of it.}
 \label{fig:concentration}
 
 \vspace{1.5em}
@@ -195,11 +190,10 @@ MedNeXt-M-K3 & 0.907 & 0.556 \\
 
 
 
-\subsubsection{Signal-Guided Retrospective Hybrid Recovery}
-Figure \ref{fig:macro_recovery} presents retrospective macro-Dice trajectories under output hybridization using various predictive signals:
+\paragraph{Signal-guided retrospective recovery.} Although entropy cannot tell a correction from a degradation, it locates activity well enough that concentrating full-decoder computation on the highest-entropy blocks recovers the macro-Dice gap. Figure~\ref{fig:macro_recovery} presents retrospective macro-Dice trajectories under output hybridization using various predictive signals:
 \begin{itemize}
     \item At a \textbf{5\% block budget}, entropy-guided output substitution recovers \textbf{60\% of the full decoder's Dice gap} over $E_1$ for 3D UX-Net (vs. 8\% for random selection).
-    \item At a \textbf{20\% block budget}, entropy-guided output substitution achieves \textbf{full recovery of the macro-Dice gap} for 3D UX-Net and SwinUNETR, while recovery remained partial for MedNeXt-M-K3 (vs. 17--20\% for random selection).
+    \item At a \textbf{20\% block budget}, entropy-guided output substitution achieves \textbf{full recovery of the macro-Dice gap} across all three backbones---3D UX-Net, SwinUNETR, and MedNeXt-M-K3 (entropy recovery $\ge 100\%$, vs. 17--20\% for random selection).
 \end{itemize}
 
 

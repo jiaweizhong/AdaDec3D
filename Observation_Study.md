@@ -538,6 +538,49 @@ concentration/predictability finding holds across the matrix. (`run_observations
 still supports single-model runs for optional non-EffiDec3D controls, but those are
 not part of the aligned matrix.)
 
+### Intervention axis — different-logic efficient decoder (depthwise-separable)  ⏳ TO RUN
+
+**Why (reviewer point).** The whole L-shape uses a *single* decoder-lightening logic:
+EffiDec3D's **capacity removal** (channels 384→48 + high-resolution stage omission). A
+skeptic can argue net-neutrality / boundary-localization / direction-unpredictability are
+artifacts of *that specific pruning*. This cell adds a **structurally different** efficient
+decoder to show the characterization is about decoder computation in general.
+
+**Design.** `UXNET_SepDec` (F8 in [MODIFICATIONS.md](MODIFICATIONS.md)) is a
+**capacity-preserving, compute-reducing** decoder: it keeps the encoder, *all*
+high-resolution decoder stages, and *every* channel width identical to the full UXNET (E0),
+and only factorizes each dense decoder convolution into **depthwise + pointwise** (a dense
+192→192 3×3×3 conv drops 995K→42K params, 23.7× fewer). This is orthogonal to EffiDec3D:
+capacity is untouched, only per-conv cost falls.
+
+- **Anchor cell only:** UX-Net / BTCV (the same cell the factorial anchors).
+- **E0 member = the existing full 3DUXNET checkpoint** (reused, no retrain). Pair key
+  `3DUXNET_SEP` maps `FULL_NETWORK→3DUXNET`, `EFFI_NETWORK→3DUXNET_SepDec`.
+- **Hypothesis / pass criteria:** the three headline findings **replicate** — H1 net rate CI
+  crosses 0 (net-neutral), H2 activity peaks 0–2 vox (boundary-localized), P1 location AUROC
+  ≫ direction AUROC (unpredictable direction). If they replicate, the finding is
+  decoder-logic-agnostic; report alongside the L-shape as a robustness cell (not a new axis).
+
+**Run (5090):**
+```bash
+cd /root/AdaDec3D/EffiDec3D && git pull
+# E1' — depthwise-separable decoder (E0 full 3DUXNET already trained; do NOT retrain it)
+python main_train_BTCV_TU.py --root /root/autodl-tmp/btcv-synapse \
+  --output /root/output/E1_uxnet_sepdec --dataset BTCV13 --network 3DUXNET_SepDec \
+  --channels 48 96 192 384 --ds False --n_channels 1 --mode train --pretrain False \
+  --batch_size 1 --crop_sample 4 --lr 0.001 --optim AdamW --max_iter 45000 \
+  --eval_step 250 --val_batch 1 --gpu 0 --cache_rate 1.0 --num_workers 4 --overlap 0.7
+# Observations: full (E0=3DUXNET) vs. separable E1'
+python run_observations.py --network 3DUXNET_SEP --dataset BTCV13 \
+  --root /root/autodl-tmp/btcv-synapse --output /root/output --obs_dir /root/obs-uxnet-sepdec \
+  --skip_aggregation concatenation
+```
+Optional: `python profile_macs.py` analog / fvcore on `3DUXNET_SepDec` to report the
+decoder-FLOP reduction for the paper's efficiency claim.
+
+**Results:** ⏳ pending — fill H1 net/CI, H2 boundary peak, P1 location vs. direction AUROC,
+and R recovery from `/root/obs-uxnet-sepdec/results.json` once the run completes.
+
 **Next backbone — SwinUNETR (2nd matched, O8 axis).** Ready-made one-command runner
 `run_E0_E1_swin.sh` (proven clone of `run_E0_E1.sh`): 1 Full + 1 EffiDec3D seed on
 BTCV13, same 45k/lr1e-3/overlap0.7 protocol, standard Spacingd pipeline. Checkpoints

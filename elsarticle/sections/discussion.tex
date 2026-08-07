@@ -26,6 +26,18 @@ These findings do not directly prescribe a specific adaptive decoder architectur
 
 Together, these requirements establish an opportunity bound that motivates globally lightweight decoders that activate local refinement only when its expected benefit justifies its cost.
 
+\subsection{Clinical Stratification of Decoder Utility}
+\label{sec:clinical_stratification}
+The spatial heterogeneity we observe is not clinically uniform: it maps onto a stratification of anatomical structures whose segmentation errors carry very different clinical consequences. Reading our per-organ and boundary-resolved results through this lens yields three tiers with distinct implications for where decoder computation should be spent.
+
+\textbf{Tier 1 --- large compact organs (e.g., liver, spleen, kidneys).} These structures are volume-dominated rather than surface-dominated, and show negligible correctness activity ($<3\%$) under decoder simplification. For clinical tasks defined over their bulk---organ volumetry, steatosis or lesion-load quantification, and organ-at-risk delineation for radiotherapy where the interior dominates the contour---the efficient decoder is effectively equivalent to the full one. Here the latency savings can be taken safely, which is directly relevant to time-constrained intraoperative and high-throughput screening settings.
+
+\textbf{Tier 2 --- small, thin, or morphologically complex structures (e.g., adrenal glands, gallbladder, hepatic vessels).} These exhibit the highest correctness activity (adrenal positive-correction rates up to $16.9\%$), and it is concentrated in the $0$--$2$~mm boundary band. Clinically these are exactly the structures where a one- or two-voxel boundary shift changes a decision: tumor-margin definition for resection planning, vessel-wall delineation for catheter navigation and perfusion territory mapping, and small-gland localization for functional assessment. For these tasks the full decoder's boundary corrections are where its value lives, and a fixed efficient decoder should not be deployed without the boundary-targeted refinement (or entropy-guided routing) that recovers exactly this contribution.
+
+\textbf{Tier 3 --- tasks where more computation is not safer.} On MSD08 HepaticVessel the efficient decoder slightly \emph{outperformed} the full decoder, a reminder that added capacity is not monotonically beneficial and can inject boundary noise on already-thin structures. Clinically this argues against a reflexive ``use the largest model'' policy: for some vascular and lesion targets the conservative efficient prediction is preferable, and refinement should be gated on demonstrated expected gain rather than applied by default.
+
+Crucially, the population-level net-neutrality we report (Section~\ref{sec:results_activity}) means that at the level of aggregate, cohort-averaged accuracy the efficient decoder is clinically non-inferior in our evaluations; the stratification above governs \emph{which structures and which tasks} nonetheless warrant the extra computation. This separation---safe global simplification, targeted local refinement---is the practical clinical takeaway of the characterization.
+
 \subsection{Limitations}
 \label{sec:limitations}
 

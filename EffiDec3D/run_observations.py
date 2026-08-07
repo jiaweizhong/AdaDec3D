@@ -67,14 +67,17 @@ CLASS_NAMES = list(BTCV13_NAMES)
 # full-vs-efficient comparison, all O1-O11). CONTROL_BACKBONES are OPTIONAL, off-
 # matrix, full-only (single-model observations, no O5/O9/O11) -- kept for ad-hoc
 # checks, never for decoder-causal claims. See module docstring.
-MATCHED_BACKBONES = {"3DUXNET", "SwinUNETR", "SwinUNETRv2", "MedNeXt"}
+MATCHED_BACKBONES = {"3DUXNET", "SwinUNETR", "SwinUNETRv2", "MedNeXt", "3DUXNET_SEP"}
 CONTROL_BACKBONES = {"UNETR", "nnUNet"}  # optional / off-matrix
 # main_train_BTCV_TU.py --network string per role (== output subfolder name).
+# "3DUXNET_SEP" is the different-logic ablation: the E0 member is the *same* full
+# 3DUXNET checkpoint, paired against a depthwise-separable decoder (UXNET_SepDec).
 EFFI_NETWORK = {"3DUXNET": "3DUXNET_EffiDec3D", "SwinUNETR": "SwinUNETR_EffiDec3D",
-                "SwinUNETRv2": "SwinUNETRv2_EffiDec3D", "MedNeXt": "MedNeXt_M_EffiDec3D"}
+                "SwinUNETRv2": "SwinUNETRv2_EffiDec3D", "MedNeXt": "MedNeXt_M_EffiDec3D",
+                "3DUXNET_SEP": "3DUXNET_SepDec"}
 FULL_NETWORK = {"3DUXNET": "3DUXNET", "SwinUNETR": "SwinUNETR",
                 "SwinUNETRv2": "SwinUNETRv2", "MedNeXt": "MedNeXt_M",
-                "UNETR": "UNETR", "nnUNet": "nnUNet"}
+                "UNETR": "UNETR", "nnUNet": "nnUNet", "3DUXNET_SEP": "3DUXNET"}
 DEFAULT_FEATURE_SIZE = {"SwinUNETR": 48, "SwinUNETRv2": 48, "UNETR": 16, "MedNeXt": 48}
 
 ROI = (96, 96, 96)
@@ -116,6 +119,17 @@ def build_model(network, role, out_classes, device, img_size=(96, 96, 96),
                 feat_size=[48, 96, 192, 384], n_decoder_channels=n_decoder_channels,
                 drop_path_rate=0, layer_scale_init_value=1e-6, spatial_dims=3,
                 skip_aggregation=skip_aggregation, resolution_factor=resolution_factor)
+        else:
+            m = UXNET(in_chans=ic, out_chans=out_classes, depths=[2, 2, 2, 2],
+                feat_size=[48, 96, 192, 384], drop_path_rate=0,
+                layer_scale_init_value=1e-6, spatial_dims=3)
+    elif network == "3DUXNET_SEP":
+        # Different-logic efficient decoder: full E0 (dense) vs. depthwise-separable E1'.
+        from networks.UXNet_3D.network_backbone import UXNET, UXNET_SepDec
+        if role == "effi":
+            m = UXNET_SepDec(in_chans=ic, out_chans=out_classes, depths=[2, 2, 2, 2],
+                feat_size=[48, 96, 192, 384], drop_path_rate=0,
+                layer_scale_init_value=1e-6, spatial_dims=3)
         else:
             m = UXNET(in_chans=ic, out_chans=out_classes, depths=[2, 2, 2, 2],
                 feat_size=[48, 96, 192, 384], drop_path_rate=0,
@@ -523,7 +537,7 @@ def O5_decoder_gain(val_loader, effi, full):
                 yerr=[[net_mean - nr_ci[0]], [nr_ci[1] - net_mean]],
                 fmt="none", ecolor="black", capsize=4, lw=1.2, zorder=4)
     ax.axhline(0, color="black", lw=.7, ls=":")
-    ax.set_xticks([0, 1, 2]); ax.set_xticklabels(["$R_{pos}$", "$R_{neg}$", "$R_{net}$"])
+    ax.set_xticks([0, 1, 2]); ax.set_xticklabels(["$R_{+}$", "$R_{-}$", "$R_{\\mathrm{net}}$"])
     ax.set_xlim(-0.6, 2.6)
     ax.set_ylabel("flip rate"); ax.set_title("H1: global decoder flip rates")
     fmt = mticker.ScalarFormatter(useMathText=True); fmt.set_powerlimits((0, 0))
@@ -1083,6 +1097,38 @@ def O_pareto(val_loader, effi, full, block_size=16, halo=4):
           f"({len(rec['oracle'])} subjects)")
 
 
+def _declutter_labels(ax, xs, ys, labels, fig, fontsize=8):
+    """Annotate scatter points with labels offset off their markers (so a marker never
+    covers the first letter) and iteratively push overlapping labels apart vertically,
+    drawing a thin leader line back to each point. A lightweight, dependency-free stand-in
+    for adjustText that keeps the size-vs-benefit panel legible."""
+    texts = []
+    for x, y, lab in zip(xs, ys, labels):
+        if not (np.isfinite(x) and np.isfinite(y)):
+            continue
+        t = ax.annotate(lab, xy=(x, y), xytext=(7, 0), textcoords="offset points",
+                        fontsize=fontsize, ha="left", va="center",
+                        arrowprops=dict(arrowstyle="-", lw=0.5, color="0.55",
+                                        shrinkA=0, shrinkB=3))
+        t.set_clip_on(False)
+        texts.append(t)
+    fig.canvas.draw()
+    r = fig.canvas.get_renderer()
+    for _ in range(400):
+        bbs = [t.get_window_extent(r) for t in texts]
+        moved = False
+        for i in range(len(texts)):
+            for j in range(i + 1, len(texts)):
+                if bbs[i].overlaps(bbs[j]):
+                    hi, lo = (i, j) if bbs[i].y0 >= bbs[j].y0 else (j, i)
+                    xh, yh = texts[hi].xyann; texts[hi].xyann = (xh, yh + 1.2)
+                    xl, yl = texts[lo].xyann; texts[lo].xyann = (xl, yl - 1.2)
+                    moved = True
+        if not moved:
+            break
+        fig.canvas.draw()
+
+
 def O_anatomy(val_loader, effi, full):
     """H2-B: per-organ decoder benefit on the union(GT, Full, Effi) foreground.
 
@@ -1138,12 +1184,18 @@ def O_anatomy(val_loader, effi, full):
     axs[0].set_xticks(xs); axs[0].set_xticklabels(names, rotation=45, ha="right")
     axs[0].set_ylabel("flip rate (union fg)")
     axs[0].set_title("(a) Per-organ decoder benefit"); axs[0].legend()
-    axs[1].scatter(size, net_m, color="steelblue")
-    for i, n in enumerate(names):
-        axs[1].annotate(n, (size[i], net_m[i]), fontsize=7)
+    axs[1].scatter(size, net_m, s=32, color="steelblue", zorder=3,
+                   edgecolor="white", linewidth=0.5)
     axs[1].set_xscale("log"); axs[1].axhline(0, color="k", lw=.6, ls=":")
     axs[1].set_xlabel("organ size (voxels, log)"); axs[1].set_ylabel("net flip rate")
     axs[1].set_title(f"(b) Size vs.\\ benefit (Spearman ${rho:.2f}$)")
+    # Widen right margin so labels near the largest organs are not clipped, then place
+    # labels off their markers with leaders and push overlapping labels apart (the dot
+    # never occludes the first letter; no manual re-annotation needed).
+    finite = [s for s in size if np.isfinite(s) and s > 0]
+    if finite:
+        axs[1].set_xlim(min(finite) / 1.6, max(finite) * 2.4)
+    _declutter_labels(axs[1], size, net_m, names, fig, fontsize=8)
     fig.tight_layout(); fig.savefig(f"{OBS_DIR}/O_anatomy.png", dpi=150); plt.close(fig)
     save_obs("O_anatomy", {
         "organ": names, "positive_rate": pos_m, "negative_rate": neg_m, "net_rate": net_m,

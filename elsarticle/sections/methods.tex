@@ -50,12 +50,12 @@ Defining voxel correctness indicators $C_f(v) = \mathbf{1}[\hat{y}_f(v) = y(v)]$
 \subsection{Subject-Level Rate Formulations and Evaluated Domains}
 \label{sec:rates}
 
-To aggregate voxel-level indicators into global rates for subject $i$, we define the subject-level positive correction rate $R_{\text{pos}}^{(i)}$, negative degradation rate $R_{\text{neg}}^{(i)}$, gross correctness activity rate $R_{\text{act}}^{(i)}$, and net gain rate $R_{\text{net}}^{(i)}$ over an evaluation domain $\Omega_i$:
+To aggregate voxel-level indicators into global rates for subject $i$, we define the subject-level positive correction rate $R_{+}^{(i)}$, negative degradation rate $R_{-}^{(i)}$, gross correctness activity rate $R_{\text{act}}^{(i)}$, and net gain rate $R_{\text{net}}^{(i)}$ over an evaluation domain $\Omega_i$:
 \begin{equation}
-R_{\text{pos}}^{(i)} = \frac{1}{|\Omega_i|} \sum_{v \in \Omega_i} P_i(v), \quad R_{\text{neg}}^{(i)} = \frac{1}{|\Omega_i|} \sum_{v \in \Omega_i} N_i(v)
+R_{+}^{(i)} = \frac{1}{|\Omega_i|} \sum_{v \in \Omega_i} P_i(v), \quad R_{-}^{(i)} = \frac{1}{|\Omega_i|} \sum_{v \in \Omega_i} N_i(v)
 \end{equation}
 \begin{equation}
-R_{\text{act}}^{(i)} = R_{\text{pos}}^{(i)} + R_{\text{neg}}^{(i)}, \quad R_{\text{net}}^{(i)} = R_{\text{pos}}^{(i)} - R_{\text{neg}}^{(i)}
+R_{\text{act}}^{(i)} = R_{+}^{(i)} + R_{-}^{(i)}, \quad R_{\text{net}}^{(i)} = R_{+}^{(i)} - R_{-}^{(i)}
 \end{equation}
 
 We evaluate rates across two explicit spatial domains $\Omega_i$:
@@ -79,7 +79,7 @@ Directional effect & Net Gain $G(v)$ & Where does the decoder improve correctnes
 Benefit concentration & Oracle $K_{80}$ & How spatially concentrated is positive net gain? \\
 Activity predictability & Location AUROC & Can cheap signals detect where correctness changes occur? \\
 Gain predictability & Direction AUROC & Can cheap signals distinguish beneficial from harmful changes? \\
-Retrospective recovery & Retrospective Hybrid $R_{\text{recovery}}(k)$ & How much of the full decoder's Dice gap is recovered by output hybridization? \\
+Retrospective recovery & Retrospective Hybrid $R_{\text{rec}}(k)$ & How much of the full decoder's Dice gap is recovered by output hybridization? \\
 Multi-sample uncertainty & TTA Mutual Info $I(v)$ & Does multi-view epistemic disagreement resolve direction predictability? \\
 \bottomrule
 \end{tabular*}
@@ -88,63 +88,82 @@ Multi-sample uncertainty & TTA Mutual Info $I(v)$ & Does multi-view epistemic di
 \subsection{Characterization Metrics and Spatial Partitioning}
 \label{sec:formulations}
 
-We evaluate decoder contribution across three core analytical axes (Table \ref{tab:framework_summary}):
+The voxel indicators of Section~\ref{sec:framework} and the subject-level rates of Section~\ref{sec:rates} quantify \emph{how much} the decoder changes and \emph{in which net direction}. They do not yet say \emph{where} those changes land, \emph{how concentrated} the beneficial ones are, or \emph{whether} either property can be anticipated before the full decoder is ever run. This section develops the measures that answer these questions. We organize them along the three characterization axes summarized in Table~\ref{tab:framework_summary}: the \textbf{spatial heterogeneity} of correctness change relative to anatomy, the \textbf{concentration} of positive net gain across space, and the inference-time \textbf{predictability} of both the location and the direction of change.
+
+All three axes are computed on a shared spatial substrate that makes measurements comparable across datasets with heterogeneous voxel spacings: a physical ground-truth boundary-distance stratification (Section~\ref{sec:boundary_dist}) and a physically normalized block partition (Section~\ref{sec:blocks}). We then define the concentration measure $K_{80}$ (Section~\ref{sec:k80}) and the uncertainty-based predictability scores (Section~\ref{sec:predictability}). Finally, two analyses complement the axes and connect them back to practice: a retrospective output-space hybridization (Section~\ref{sec:recovery}) that upper-bounds the macro-metric benefit recoverable by localized decoding, and a factorial decomposition (Section~\ref{sec:factorial}) that attributes the observed effects to the two decoder factors of Section~\ref{sec:interventions}. Unless stated otherwise, block-level metrics are computed within each subject and summarized across subjects, with $95\%$ confidence intervals from subject-level clustered bootstrap resampling.
 
 \subsubsection{Physical Ground-Truth Anatomical Boundary Distance}
-To prevent circularity from model prediction boundaries, spatial distance analysis is anchored strictly to the \textbf{Ground-Truth Anatomical Boundary} using physical Euclidean distances. Incorporating dataset voxel spacings $\mathbf{D} = \text{diag}(s_x, s_y, s_z)$, physical distance $d_{GT}(v)$ is defined by:
+\label{sec:boundary_dist}
+The first axis asks how correctness change distributes relative to anatomy, and specifically whether it clusters at structure margins rather than in homogeneous interiors. Answering this requires a distance reference that is both anatomically meaningful and free of circularity. We therefore anchor all distance analysis strictly to the \textbf{ground-truth anatomical boundary}: measuring distance from a model's own predicted boundary would be circular, because that boundary is itself an output of the decoder under study and would shift with the very intervention we are characterizing. We further measure distance in physical millimeters rather than voxels. A fixed two-voxel neighborhood spans different physical extents across datasets with anisotropic spacing, so voxel-indexed bands would not describe a comparable anatomical margin from one modality to another. Incorporating the dataset voxel spacings $\mathbf{D} = \text{diag}(s_x, s_y, s_z)$, the physical boundary distance $d_{GT}(v)$ is
 \begin{equation}
-d_{GT}(v) = \min_{u \in \partial S_{GT}} \| \mathbf{D} (x_v - x_u) \|_2
+d_{GT}(v) = \min_{u \in \partial S_{GT}} \| \mathbf{D} (x_v - x_u) \|_2 ,
 \end{equation}
-where $\partial S_{GT}$ represents the boundary voxel set of ground-truth annotations $\bigcup_{c} (y(v)=c)$. Correctness activity $A_{\text{corr}}(v)$ and net gain $G(v)$ are stratified across physical distance bands ($0\text{--}2\text{ mm}, 2\text{--}4\text{ mm}, 4\text{--}8\text{ mm}, >8\text{ mm}$).
+where $\partial S_{GT}$ is the boundary voxel set of the ground-truth annotation $\bigcup_{c} (y(v)=c)$. We stratify correctness activity $A_{\text{corr}}(v)$ and net gain $G(v)$ across the physical distance bands $0\text{--}2$, $2\text{--}4$, $4\text{--}8$, and $>8\text{ mm}$. The innermost band captures the immediate partial-volume interface where segmentation ambiguity concentrates; the outermost band captures the homogeneous organ interior, where a correctness change would indicate a qualitatively different, non-boundary effect. Reporting activity and net gain separately per band lets us test not only \emph{whether} the decoder is active near boundaries but whether that activity translates into a directional benefit there.
 
-\subsubsection{Spatial Block Construction and Physical Scale}
-For block-level spatial analysis, volumes are resampled to dataset-specific target spacings (BTCV: $1.5 \times 1.5 \times 2.0\text{ mm}^3$; MSD01: $1.0 \times 1.0 \times 1.0\text{ mm}^3$; MSD08: $0.8 \times 0.8 \times 1.5\text{ mm}^3$). To ensure cross-dataset comparability, block dimensions are constructed to match physical dimensions of approximately $24 \times 24 \times 24\text{ mm}$ (BTCV: $16 \times 16 \times 12$ voxels; MSD01: $24 \times 24 \times 24$ voxels; MSD08: $30 \times 30 \times 16$ voxels). Block activity $A_{\text{corr}}(r) = \mathbf{1}[\sum_{v \in b_r} A_{\text{corr}}(v) > 0]$ detects active blocks. For directional utility classification, blocks with non-zero net gain $G(r) = \sum_{v \in b_r} G(v) \neq 0$ are evaluated for direction AUROC, excluding zero-gain blocks. Block-level metrics ($K_{80}$, Location AUROC, Direction AUROC) were computed within each subject and summarized across subjects, with confidence intervals estimated using clustered bootstrap resampling at the subject level.
-
-\subsubsection{Positive Gain Concentration ($K_{80}$)}
-Sorting blocks by $G(r)$, oracle coverage is defined by:
+\subsubsection{Physically Normalized Spatial Block Partition}
+\label{sec:blocks}
+Individual correction and degradation events are sparse and spatially clustered, which makes the single voxel a noisy unit for the concentration and predictability analyses that follow. We therefore aggregate voxels into contiguous cubic blocks and treat the block as the unit of analysis. To keep a block anatomically comparable across datasets, volumes are resampled to dataset-specific target spacings (BTCV: $1.5 \times 1.5 \times 2.0\text{ mm}^3$; MSD01: $1.0 \times 1.0 \times 1.0\text{ mm}^3$; MSD08: $0.8 \times 0.8 \times 1.5\text{ mm}^3$) and block dimensions are chosen so that every block covers approximately the same physical volume of $24 \times 24 \times 24\text{ mm}$ (BTCV: $16 \times 16 \times 12$ voxels; MSD01: $24 \times 24 \times 24$ voxels; MSD08: $30 \times 30 \times 16$ voxels). A block $b_r$ is \emph{active} if it contains any correctness change,
 \begin{equation}
-Coverage(k) = \frac{\sum_{r=1}^{\lfloor (k/100) \cdot |B| \rfloor} \max(G(r), 0)}{\sum_{r=1}^{|B|} \max(G(r), 0)}
+A_{\text{corr}}(r) = \mathbf{1}\!\left[\textstyle\sum_{v \in b_r} A_{\text{corr}}(v) > 0\right],
 \end{equation}
-We record $K_{80}$, defined as the minimum percentage of spatial blocks required by an oracle selector to contain 80\% of the total positive decoder gain \cite{geifman2017selective}.
+and its \emph{directional} label is the sign of its aggregate net gain $G(r) = \sum_{v \in b_r} G(v)$. Direction analysis is restricted to blocks with $G(r) \neq 0$: a zero-gain block has no defined direction, and including such blocks would trivially inflate the majority class and obscure the actual difficulty of separating beneficial from harmful change. This active-versus-directional distinction is exactly what separates the location and direction predictability scores defined below.
 
-\subsubsection{Retrospective Output-Space Hybridization ($R_{\text{recovery}}$)}
-To evaluate whether boundary-localized decoder improvements account for macro-metric gains, we evaluate a retrospective output-space hybrid prediction $\hat{y}_k(v)$, which substitutes full decoder predictions $\hat{y}_f(v)$ into selected blocks $S_k$ while retaining efficient baseline predictions $\hat{y}_e(v)$ elsewhere:
+\subsubsection{Positive-Gain Concentration ($K_{80}$)}
+\label{sec:k80}
+A decoder can be net-neutral over the volume yet still harbor a small pocket of genuine, spatially concentrated benefit; the aggregate rates of Section~\ref{sec:rates} cannot distinguish that case from diffuse, uniformly distributed gain. The concentration axis quantifies this directly. Sorting blocks by descending net gain $G(r)$, the oracle coverage attained by the top $k\%$ of blocks is
+\begin{equation}
+\mathrm{Coverage}(k) = \frac{\sum_{r=1}^{\lfloor (k/100) \cdot |B| \rfloor} \max(G(r), 0)}{\sum_{r=1}^{|B|} \max(G(r), 0)} ,
+\end{equation}
+which accumulates only positive contributions so that degradations do not mask the recoverable gain. We report $K_{80}$, the minimum percentage of blocks an oracle selector must retain to reach $80\%$ coverage \cite{geifman2017selective}. A small $K_{80}$ means almost all of the decoder's useful work could in principle be reproduced by touching a tiny fraction of space, which is the necessary precondition for any budgeted adaptive decoder; a large $K_{80}$ would imply the benefit is too diffuse to route around.
+
+\subsubsection{Uncertainty Signals and Predictability Scores}
+\label{sec:predictability}
+Concentration establishes that a small region \emph{could} carry the benefit; predictability asks whether a cheap, single-pass signal available at inference time can actually \emph{find} that region without running the full decoder. We use the predictive Shannon entropy of the efficient baseline,
+\begin{equation}
+H(v) = -\sum_{c=1}^{C} p_c(v) \log p_c(v) ,
+\end{equation}
+as the canonical uncertainty signal \cite{shannon1948mathematical,gal2016dropout,guo2017calibration}, and reduce it to a block score $H(r)$ by volume averaging. To test whether multi-sample epistemic disagreement carries information that single-pass entropy misses, we additionally compute a Test-Time Augmentation Mutual Information (TTA-MI) score $I(r)$ over $K=8$ spatial view transformations:
+\begin{equation}
+H(r) = \frac{1}{|b_r|} \sum_{v \in b_r} H(v), \quad I(r) = \frac{1}{|b_r|} \sum_{v \in b_r} I(v) ,
+\end{equation}
+where $I(v) = H(\bar{p}(v)) - \frac{1}{K}\sum_{k=1}^K H(p_k(v))$; every augmented probability map is inverse-warped to the original image coordinate system before the ensemble mean and mutual information are formed. We then separate two questions that the literature routinely conflates. \textbf{Location predictability} (AUROC/AUPRC of $H(r)$ predicting $A_{\text{corr}}(r) > 0$) measures whether uncertainty finds \emph{where} correctness changes. \textbf{Direction predictability} (AUROC/AUPRC of $H(r)$ predicting $G(r) > 0$ on non-zero-gain blocks) \cite{cmig2025quality} measures whether it distinguishes \emph{beneficial} change from \emph{harmful} change. To expose \emph{why} the two can diverge, we also report the \textbf{conditional density overlap} between $p(H \mid P(v)=1)$ and $p(H \mid N(v)=1)$: corrections and degradations that share the same entropy distribution are, by construction, directionally indistinguishable from entropy alone.
+
+\subsubsection{Retrospective Output-Space Hybridization ($R_{\text{rec}}$)}
+\label{sec:recovery}
+The preceding axes describe the spatial structure of decoder benefit but do not, by themselves, establish that acting on that structure would recover the macro-level metric that practitioners optimize. This analysis closes that loop retrospectively. Given a selected block set $S_k$, we form a hybrid prediction that substitutes full-decoder outputs inside the selection while keeping the efficient baseline everywhere else:
 \begin{equation}
 \hat{y}_k(v) = \begin{cases}
 \hat{y}_f(v), & \text{if } v \in S_k \\
-\hat{y}_e(v), & \text{otherwise}
+\hat{y}_e(v), & \text{otherwise.}
 \end{cases}
 \end{equation}
-When $\text{Dice}(\hat{y}_f) - \text{Dice}(\hat{y}_e) > 0$, we measure retrospective Dice gap recovery fraction $R_{\text{recovery}}(k)$:
+When the full decoder holds a positive macro-Dice advantage, $\text{Dice}(\hat{y}_f) - \text{Dice}(\hat{y}_e) > 0$, we report the fraction of that gap recovered by the hybrid,
 \begin{equation}
-R_{\text{recovery}}(k) = \frac{\text{Dice}(\hat{y}_k) - \text{Dice}(\hat{y}_e)}{\text{Dice}(\hat{y}_f) - \text{Dice}(\hat{y}_e)}
+R_{\text{rec}}(k) = \frac{\text{Dice}(\hat{y}_k) - \text{Dice}(\hat{y}_e)}{\text{Dice}(\hat{y}_f) - \text{Dice}(\hat{y}_e)} ,
 \end{equation}
-If the full decoder gap is non-positive ($\text{Dice}(\hat{y}_f) \le \text{Dice}(\hat{y}_e)$), absolute Dice difference $\Delta \text{Dice}(k) = \text{Dice}(\hat{y}_k) - \text{Dice}(\hat{y}_e)$ is reported instead. Values $R_{\text{recovery}}(k) > 1.0$ indicate over-recovery and are retained unclipped.
-
-\subsubsection{Uncertainty Signals and Predictability Scores}
-We compute predictive Shannon entropy $H(v) = -\sum_{c=1}^{C} p_c(v) \log p_c(v)$ from efficient baseline probabilities \cite{shannon1948mathematical,gal2016dropout,guo2017calibration}. Block-level predictor scores $H(r)$ and Test-Time Augmentation Mutual Information (TTA-MI) $I(r)$ are defined by block volume means:
-\begin{equation}
-H(r) = \frac{1}{|b_r|} \sum_{v \in b_r} H(v), \quad I(r) = \frac{1}{|b_r|} \sum_{v \in b_r} I(v)
-\end{equation}
-where $I(v) = H(\bar{p}(v)) - \frac{1}{K}\sum_{k=1}^K H(p_k(v))$ over $K=8$ spatial view transformations. All TTA probability maps were inverse-warped to the original image coordinate system before computing ensemble means and mutual information. Predictability is benchmarked across: (i) \textbf{Location AUROC/AUPRC} ($H(r)$ predicting $A_{\text{corr}}(r) > 0$), (ii) \textbf{Direction AUROC/AUPRC} ($H(r)$ predicting $G(r) > 0$ on non-zero gain blocks) \cite{cmig2025quality}, and (iii) \textbf{Conditional Density Overlap} $p(H \mid P(v)=1)$ vs. $p(H \mid N(v)=1)$.
+which measures how much of the full decoder's benefit a $k\%$ spatial budget reproduces in output space, independent of runtime. Because the substitution is applied post hoc to precomputed outputs, $R_{\text{rec}}$ is an opportunity bound rather than a deployable speedup: it isolates \emph{how much benefit is spatially recoverable} from the separate systems question of \emph{how cheaply the region can be produced}. When the full decoder holds no positive advantage ($\text{Dice}(\hat{y}_f) \le \text{Dice}(\hat{y}_e)$, as on datasets where the two decoders tie), the ratio is undefined and we instead report the absolute difference $\Delta \text{Dice}(k) = \text{Dice}(\hat{y}_k) - \text{Dice}(\hat{y}_e)$. Values $R_{\text{rec}}(k) > 1.0$ indicate over-recovery, where the selected region alone exceeds the full-volume gap, and are retained unclipped.
 
 \subsubsection{Factorial Main Effects and Interaction Analysis}
-In our $2\times2$ decoder configuration grid, we quantify the channel main effect $\Delta_C$, stage main effect $\Delta_{RF}$, and channel-stage interaction $\Delta_{C \times RF}$ for any outcome metric $M$:
+\label{sec:factorial}
+The end-to-end pairs of Section~\ref{sec:interventions} confound the two decoder factors with each other and with encoder weights, so they cannot say whether the observed behavior is driven by channel width, by high-resolution stages, or by their interaction. The frozen shared-encoder $2\times2$ grid removes this confound: the encoder is held fixed while channel capacity $C \in \{C_{384}, C_{48}\}$ and resolution-stage retention $RF \in \{RF_1, RF_2\}$ are varied independently. For any outcome metric $M$, we decompose the four-cell grid into two main effects and one interaction. The channel main effect averages the change from reducing channels over both resolution settings,
 \begin{equation}
 \begin{split}
 \Delta_C = \frac{1}{2} \big( &M(C_{48}, RF_1) + M(C_{48}, RF_2) \\
-&- M(C_{384}, RF_1) - M(C_{384}, RF_2) \big)
+&- M(C_{384}, RF_1) - M(C_{384}, RF_2) \big) ,
 \end{split}
 \end{equation}
+and the resolution-stage main effect symmetrically averages the change from removing high-resolution stages over both channel settings,
 \begin{equation}
 \begin{split}
 \Delta_{RF} = \frac{1}{2} \big( &M(C_{384}, RF_2) + M(C_{48}, RF_2) \\
-&- M(C_{384}, RF_1) - M(C_{48}, RF_1) \big)
+&- M(C_{384}, RF_1) - M(C_{48}, RF_1) \big) .
 \end{split}
 \end{equation}
+Averaging each factor's effect over both levels of the other yields balanced, marginal estimates that are not biased by the specific setting of the nuisance factor. The interaction term measures how far the combined intervention departs from the sum of the two isolated effects,
 \begin{equation}
 \begin{split}
 \Delta_{C \times RF} = &M(C_{48}, RF_2) - M(C_{48}, RF_1) \\
-&- M(C_{384}, RF_2) + M(C_{384}, RF_1)
+&- M(C_{384}, RF_2) + M(C_{384}, RF_1) .
 \end{split}
 \end{equation}
+A near-zero $\Delta_{C \times RF}$ indicates the two factors act approximately additively --- channel and resolution reductions can be reasoned about independently --- whereas a large-magnitude interaction would signal that the factors must be co-designed. Applying this decomposition to the correctness-change metrics, rather than to Dice alone, attributes \emph{where in space} each factor exerts its effect, linking the factorial back to the spatial axes above.

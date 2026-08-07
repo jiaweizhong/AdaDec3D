@@ -136,6 +136,28 @@ additions. Line numbers are approximate and may drift as the code evolves.
   those checkpoints. Training already supported it via `--n_channels 4`
   (`in_chans=args.n_channels`); this threads the same choice through the observation path.
 
+### F8 — Depthwise-separable decoder (different-logic efficient decoder)  **[FEATURE]**
+- **File:** `networks/UXNet_3D/network_backbone.py` (`SeparableConv3d`, `SepUnetBasicBlock`,
+  `SeparableUnetrUpBlock`, `UXNET_SepDec`); `main_train_BTCV_TU.py` (`--network 3DUXNET_SepDec`
+  branch); `run_observations.py` (`3DUXNET_SEP` in `MATCHED_BACKBONES`/`EFFI_NETWORK`/
+  `FULL_NETWORK`, and a `build_model` branch).
+- **Why:** reviewer noted the decoder intervention was single-form (only EffiDec3D's
+  capacity *removal* — channel reduction + high-resolution stage omission). `UXNET_SepDec`
+  is a **different-logic** efficient decoder: it keeps the encoder, all high-resolution
+  decoder stages, and every channel width identical to the full UXNET (E0), and factorizes
+  each dense decoder convolution into depthwise + pointwise — a *capacity-preserving,
+  compute-reducing* mechanism. A dense 192→192 3×3×3 decoder conv drops from 995K to 42K
+  parameters (23.7× fewer).
+- **How it fits the pipeline:** `UXNET_SepDec` subclasses `UXNET` and only swaps the decoder
+  modules, so `forward()`/encoder are untouched and a full-UXNET (E0) checkpoint's encoder
+  loads with `strict=False`. The `3DUXNET_SEP` obs key reuses the **existing full 3DUXNET
+  checkpoint** as the E0 member (`FULL_NETWORK["3DUXNET_SEP"]="3DUXNET"`), paired against
+  the separable E1' (`3DUXNET_SepDec`). Trained end-to-end like the other E1 pairs; single
+  output (no deep supervision), mirroring the `3DUXNET` branch.
+- **Scope:** anchor cell only (UX-Net / BTCV) — tests whether the characterization findings
+  (net-neutral, boundary-localized, direction-unpredictable) hold under a structurally
+  different decoder-lightweighting logic, not just EffiDec3D pruning.
+
 ---
 
 ## Configuration choices for the matched-pair protocol

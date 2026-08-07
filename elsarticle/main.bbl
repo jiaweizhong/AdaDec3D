@@ -6,143 +6,81 @@
   \def\href#1#2{#2} \def\path#1{#1}\fi
 
 \bibitem{ronneberger2015u}
-O.~Ronneberger, P.~Fischer, T.~Brox, U-net: Convolutional networks for
-  biomedical image segmentation, in: International Conference on Medical image
-  computing and computer-assisted intervention, Springer, 2015, pp. 234--241.
+O.~Ronneberger, P.~Fischer, T.~Brox, U-net: Convolutional networks for biomedical image segmentation, in: International Conference on Medical image computing and computer-assisted intervention, Springer, 2015, pp. 234--241.
 
 \bibitem{cicek20163d}
-{\"O}.~{\c{C}}i{\c{c}}ek, A.~Abdulkadir, S.~S. Lienkamp, T.~Brox,
-  O.~Ronneberger, 3d u-net: learning dense volumetric segmentation from sparse
-  annotation, in: International conference on medical image computing and
-  computer-assisted intervention, Springer, 2016, pp. 424--432.
+{\"O}.~{\c{C}}i{\c{c}}ek, A.~Abdulkadir, S.~S. Lienkamp, T.~Brox, O.~Ronneberger, 3d u-net: learning dense volumetric segmentation from sparse annotation, in: International conference on medical image computing and computer-assisted intervention, Springer, 2016, pp. 424--432.
 
 \bibitem{hatamizadeh2022unetr}
-A.~Hatamizadeh, Y.~Tang, V.~Nath, D.~Yang, A.~Myronenko, B.~Landman, H.~R.
-  Roth, D.~Xu, Unetr: Transformers for 3d medical image segmentation, in: 2022
-  IEEE/CVF winter conference on applications of computer vision (WACV), Ieee,
-  2022, pp. 1748--1758.
+A.~Hatamizadeh, Y.~Tang, V.~Nath, D.~Yang, A.~Myronenko, B.~Landman, H.~R. Roth, D.~Xu, Unetr: Transformers for 3d medical image segmentation, in: 2022 IEEE/CVF winter conference on applications of computer vision (WACV), Ieee, 2022, pp. 1748--1758.
 
 \bibitem{hatamizadeh2022swin}
-A.~Hatamizadeh, V.~Nath, Y.~Tang, D.~Yang, H.~R. Roth, D.~Xu, Swin unetr: Swin
-  transformers for semantic segmentation of brain tumors in mri images, in:
-  International MICCAI brainlesion workshop, Springer, 2021, pp. 272--284.
+A.~Hatamizadeh, V.~Nath, Y.~Tang, D.~Yang, H.~R. Roth, D.~Xu, Swin unetr: Swin transformers for semantic segmentation of brain tumors in mri images, in: International MICCAI brainlesion workshop, Springer, 2021, pp. 272--284.
 
 \bibitem{lee20233d}
-H.~H. Lee, S.~Bao, Y.~Huo, B.~A. Landman, 3d ux-net: A large kernel volumetric
-  convnet modernizing hierarchical transformer for medical image segmentation,
-  in: International Conference on Learning Representations (ICLR), 2023.
+H.~H. Lee, S.~Bao, Y.~Huo, B.~A. Landman, 3d ux-net: A large kernel volumetric convnet modernizing hierarchical transformer for medical image segmentation, in: International Conference on Learning Representations (ICLR), 2023.
 
 \bibitem{roy2023mednext}
-S.~Roy, G.~Koehler, C.~Ulrich, M.~Baumgartner, J.~Petersen, F.~Isensee, P.~F.
-  Jaeger, K.~H. Maier-Hein, Mednext: transformer-driven scaling of convnets for
-  medical image segmentation, in: International conference on medical image
-  computing and computer-assisted intervention, Springer, 2023, pp. 405--415.
+S.~Roy, G.~Koehler, C.~Ulrich, M.~Baumgartner, J.~Petersen, F.~Isensee, P.~F. Jaeger, K.~H. Maier-Hein, Mednext: transformer-driven scaling of convnets for medical image segmentation, in: International conference on medical image computing and computer-assisted intervention, Springer, 2023, pp. 405--415.
 
 \bibitem{effidec3d}
-M.~M. Rahman, R.~Marculescu, Effidec3d: an optimized decoder for
-  high-performance and efficient 3d medical image segmentation, in: 2025
-  IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), IEEE,
-  2025, pp. 10435--10444.
+M.~M. Rahman, R.~Marculescu, Effidec3d: an optimized decoder for high-performance and efficient 3d medical image segmentation, in: 2025 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), IEEE, 2025, pp. 10435--10444.
 
 \bibitem{efficientmednext}
-M.~M. Rahman, M.~Munir, R.~Marculescu, Efficientmednext: Multi-receptive
-  dilated convolutions for medical image segmentation, in: International
-  Conference on Medical Image Computing and Computer-Assisted Intervention,
-  Springer, 2025, pp. 196--206.
+M.~M. Rahman, M.~Munir, R.~Marculescu, Efficientmednext: Multi-receptive dilated convolutions for medical image segmentation, in: International Conference on Medical Image Computing and Computer-Assisted Intervention, Springer, 2025, pp. 196--206.
 
 \bibitem{milletari2016v}
-F.~Milletari, N.~Navab, S.-A. Ahmadi, V-net: Fully convolutional neural
-  networks for volumetric medical image segmentation, in: 2016 fourth
-  international conference on 3D vision (3DV), Ieee, 2016, pp. 565--571.
+F.~Milletari, N.~Navab, S.-A. Ahmadi, V-net: Fully convolutional neural networks for volumetric medical image segmentation, in: 2016 fourth international conference on 3D vision (3DV), Ieee, 2016, pp. 565--571.
 
 \bibitem{isensee2021nnu}
-F.~Isensee, P.~F. Jaeger, S.~A. Kohl, J.~Petersen, K.~H. Maier-Hein, nnu-net: a
-  self-configuring method for deep learning-based biomedical image
-  segmentation, Nature methods 18~(2) (2021) 203--211.
+F.~Isensee, P.~F. Jaeger, S.~A. Kohl, J.~Petersen, K.~H. Maier-Hein, nnu-net: a self-configuring method for deep learning-based biomedical image segmentation, Nature methods 18~(2) (2021) 203--211.
 
 \bibitem{chen2021transunet}
-J.~Chen, Y.~Lu, Q.~Yu, X.~Luo, E.~Adeli, Y.~Wang, L.~Lu, A.~L. Yuille, Y.~Zhou,
-  Transunet: Transformers make strong encoders for medical image segmentation,
-  arXiv preprint arXiv:2102.04306 (2021).
+J.~Chen, Y.~Lu, Q.~Yu, X.~Luo, E.~Adeli, Y.~Wang, L.~Lu, A.~L. Yuille, Y.~Zhou, Transunet: Transformers make strong encoders for medical image segmentation, arXiv preprint arXiv:2102.04306 (2021).
 
 \bibitem{xie2021segformer}
-E.~Xie, W.~Wang, Z.~Yu, A.~Anandkumar, J.~M. Alvarez, P.~Luo, Segformer: Simple
-  and efficient design for semantic segmentation with transformers, Advances in
-  neural information processing systems 34 (2021) 12077--12090.
+E.~Xie, W.~Wang, Z.~Yu, A.~Anandkumar, J.~M. Alvarez, P.~Luo, Segformer: Simple and efficient design for semantic segmentation with transformers, Advances in neural information processing systems 34 (2021) 12077--12090.
 
 \bibitem{shaker2024unetrpp}
-A.~Shaker, M.~Maaz, H.~Rasheed, S.~Khan, M.-H. Yang, F.~S. Khan, Unetr++:
-  delving into efficient and accurate 3d medical image segmentation, IEEE
-  Transactions on Medical Imaging 43~(9) (2024) 3377--3390.
+A.~Shaker, M.~Maaz, H.~Rasheed, S.~Khan, M.-H. Yang, F.~S. Khan, Unetr++: delving into efficient and accurate 3d medical image segmentation, IEEE Transactions on Medical Imaging 43~(9) (2024) 3377--3390.
 
 \bibitem{jiang2024slimunetr}
-Y.~Pang, J.~Liang, T.~Huang, H.~Chen, Y.~Li, D.~Li, L.~Huang, Q.~Wang, Slim
-  unetr: Scale hybrid transformers to efficient 3d medical image segmentation
-  under limited computational resources, IEEE Transactions on Medical Imaging
-  43~(3) (2023) 994--1005.
+Y.~Pang, J.~Liang, T.~Huang, H.~Chen, Y.~Li, D.~Li, L.~Huang, Q.~Wang, Slim unetr: Scale hybrid transformers to efficient 3d medical image segmentation under limited computational resources, IEEE Transactions on Medical Imaging 43~(3) (2023) 994--1005.
 
 \bibitem{yu2018slimmable}
-J.~Yu, L.~Yang, N.~Xu, J.~Yang, T.~Huang, Slimmable neural networks, arXiv
-  preprint arXiv:1812.08928 (2018).
+J.~Yu, L.~Yang, N.~Xu, J.~Yang, T.~Huang, Slimmable neural networks, arXiv preprint arXiv:1812.08928 (2018).
 
 \bibitem{wang2021adaptive}
-Y.~Wang, Z.~Chen, H.~Jiang, S.~Song, Y.~Han, G.~Huang, Adaptive focus for
-  efficient video recognition, in: 2021 IEEE/CVF International Conference on
-  Computer Vision (ICCV), IEEE, 2021, pp. 16229--16238.
+Y.~Wang, Z.~Chen, H.~Jiang, S.~Song, Y.~Han, G.~Huang, Adaptive focus for efficient video recognition, in: 2021 IEEE/CVF International Conference on Computer Vision (ICCV), IEEE, 2021, pp. 16229--16238.
 
 \bibitem{gal2016dropout}
-Y.~Gal, Z.~Ghahramani, Dropout as a bayesian approximation: Representing model
-  uncertainty in deep learning, in: international conference on machine
-  learning, PMLR, 2016, pp. 1050--1059.
+Y.~Gal, Z.~Ghahramani, Dropout as a bayesian approximation: Representing model uncertainty in deep learning, in: international conference on machine learning, PMLR, 2016, pp. 1050--1059.
 
 \bibitem{lakshminarayanan2017simple}
-B.~Lakshminarayanan, A.~Pritzel, C.~Blundell, Simple and scalable predictive
-  uncertainty estimation using deep ensembles, Advances in neural information
-  processing systems 30 (2017).
+B.~Lakshminarayanan, A.~Pritzel, C.~Blundell, Simple and scalable predictive uncertainty estimation using deep ensembles, Advances in neural information processing systems 30 (2017).
 
 \bibitem{kendall2017uncertainties}
-A.~Kendall, Y.~Gal, What uncertainties do we need in bayesian deep learning for
-  computer vision?, Advances in neural information processing systems 30
-  (2017).
+A.~Kendall, Y.~Gal, What uncertainties do we need in bayesian deep learning for computer vision?, Advances in neural information processing systems 30 (2017).
 
 \bibitem{geifman2017selective}
-Y.~Geifman, R.~El-Yaniv, Selective classification for deep neural networks,
-  Advances in neural information processing systems 30 (2017).
+Y.~Geifman, R.~El-Yaniv, Selective classification for deep neural networks, Advances in neural information processing systems 30 (2017).
 
 \bibitem{shannon1948mathematical}
-C.~E. Shannon, A mathematical theory of communication, The Bell system
-  technical journal 27~(3) (1948) 379--423.
+C.~E. Shannon, A mathematical theory of communication, The Bell system technical journal 27~(3) (1948) 379--423.
 
 \bibitem{guo2017calibration}
-C.~Guo, G.~Pleiss, Y.~Sun, K.~Q. Weinberger, On calibration of modern neural
-  networks, in: International conference on machine learning, PMLR, 2017, pp.
-  1321--1330.
+C.~Guo, G.~Pleiss, Y.~Sun, K.~Q. Weinberger, On calibration of modern neural networks, in: International conference on machine learning, PMLR, 2017, pp. 1321--1330.
 
 \bibitem{cmig2025quality}
-O.~Sikha, M.~Riera-Mar{\'i}n, A.~Galdran, J.~Garc{\'i}a~L{\'o}pez,
-  J.~Rodr{\'i}guez-Comas, G.~Piella, M.~A. Gonz{\'a}lez~Ballester,
-  Uncertainty-aware segmentation quality prediction via deep learning bayesian
-  modeling: Comprehensive evaluation and interpretation on skin cancer and
-  liver segmentation, Computerized Medical Imaging and Graphics 123 (2025)
-  102547.
+O.~Sikha, M.~Riera-Mar{\'i}n, A.~Galdran, J.~Garc{\'i}a~L{\'o}pez, J.~Rodr{\'i}guez-Comas, G.~Piella, M.~A. Gonz{\'a}lez~Ballester, Uncertainty-aware segmentation quality prediction via deep learning bayesian modeling: Comprehensive evaluation and interpretation on skin cancer and liver segmentation, Computerized Medical Imaging and Graphics 123 (2025) 102547.
 
 \bibitem{landman2015btcv}
-B.~Landman, Z.~Xu, J.~Igelsias, M.~Styner, T.~Langerak, A.~Klein, Miccai
-  multi-atlas labeling challenge, in: Proc. MICCAI Workshop Multi-Atlas
-  Labeling, Vol.~2, 2015, p.~3.
+B.~Landman, Z.~Xu, J.~Igelsias, M.~Styner, T.~Langerak, A.~Klein, Miccai multi-atlas labeling challenge, in: Proc. MICCAI Workshop Multi-Atlas Labeling, Vol.~2, 2015, p.~3.
 
 \bibitem{bakas2018identifying}
-S.~Bakas, M.~Reyes, A.~Jakab, S.~Bauer, M.~Rempfler, A.~Crimi, R.~T. Shinohara,
-  C.~Berger, S.~M. Ha, M.~Rozycki, et~al., Identifying the best machine
-  learning algorithms for brain tumor segmentation, progression assessment, and
-  overall survival prediction in the brats challenge, arXiv preprint
-  arXiv:1811.02629 (2018).
+S.~Bakas, M.~Reyes, A.~Jakab, S.~Bauer, M.~Rempfler, A.~Crimi, R.~T. Shinohara, C.~Berger, S.~M. Ha, M.~Rozycki, et~al., Identifying the best machine learning algorithms for brain tumor segmentation, progression assessment, and overall survival prediction in the brats challenge, arXiv preprint arXiv:1811.02629 (2018).
 
 \bibitem{simpson2019large}
-A.~L. Simpson, M.~Antonelli, S.~Bakas, M.~Bilello, K.~Farahani,
-  B.~Van~Ginneken, A.~Kopp-Schneider, B.~A. Landman, G.~Litjens, B.~Menze,
-  et~al., A large annotated medical image dataset for the development and
-  evaluation of segmentation algorithms, arXiv preprint arXiv:1902.09063
-  (2019).
+A.~L. Simpson, M.~Antonelli, S.~Bakas, M.~Bilello, K.~Farahani, B.~Van~Ginneken, A.~Kopp-Schneider, B.~A. Landman, G.~Litjens, B.~Menze, et~al., A large annotated medical image dataset for the development and evaluation of segmentation algorithms, arXiv preprint arXiv:1902.09063 (2019).
 
 \end{thebibliography}

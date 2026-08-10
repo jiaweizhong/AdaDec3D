@@ -41,10 +41,10 @@ Crucially, the population-level net-neutrality we report (Section~\ref{sec:resul
 \subsection{Limitations}
 \label{sec:limitations}
 
-This study has several limitations. First, the controlled interventions follow the channel-reduction and high-resolution stage-omission principles of EffiDec3D, and factor-level attribution is performed only on 3D UX-Net and BTCV. Although the end-to-end observations are evaluated across multiple architectures and datasets, the factorial effects may differ under other decoder designs or efficiency interventions.
+While this study provides a comprehensive characterization of 3D decoder computation, three primary limitations should be noted:
 
-Second, the end-to-end full and efficient models are trained independently under matched protocols. The frozen shared-encoder experiment controls variation in feature representations, but independent decoder initialization and optimization trajectories may still contribute to prediction differences.
+First, our controlled interventions draw from architecture-preserving channel compression and stage omission templates (inspired by EffiDec3D and depthwise-separated decoder designs). Although validated across diverse CNN, ViT, and ConvNeXt backbones, future work may explore dynamic gating or non-uniform depth pruning.
 
-Third, the routing analysis is based on retrospective output-space hybridization. It therefore provides an opportunity bound on selective decoder allocation rather than demonstrating a deployable dynamic execution system or proportional reductions in runtime latency and hardware-level computation.
+Second, selective spatial recovery is established via retrospective output-space hybridization. This defines an empirical opportunity bound for localized allocation rather than demonstrating an integrated, hardware-level dynamic execution engine with real-time speedup.
 
-Finally, predictability is evaluated primarily using predictive entropy and TTA mutual information on three public benchmarks. Broader clinical cohorts and learned or feature-based utility predictors may reveal additional information about directional decoder gain.
+Third, inference-time predictability was evaluated using single-pass predictive entropy and multi-view TTA mutual information. Exploring learned neural routing heads or feature-space gating mechanisms may further help close the direction predictability gap.

@@ -10,26 +10,7 @@ Table \ref{tab:main_results} summarizes aggregate computational complexity and s
 
 Read at face value, this table is the standard justification for decoder pruning: the extra computation looks nearly free to remove. Yet a Mean Dice difference of one point is a single scalar averaged over millions of voxels, and it says nothing about how many predictions the full decoder actually changed, in which direction, or where. The remainder of this section opens up that scalar. We show that behind these near-identical Dice scores the decoder performs a large amount of spatially structured correctness reorganization whose net effect is statistically indistinguishable from zero---the central observation that the aggregate view conceals.
 
-\begin{table*}[tb]
-\centering
-\caption{Quantitative comparison of Full ($E_0$) vs. Efficient ($E_1$) decoders on the BTCV 13-organ dataset across three backbones (Cross-Architecture Consistency Axis).}
-\label{tab:main_results}
-\small
-\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}lcccccc}
-\toprule
-\textbf{Architecture} & \textbf{Variant} & \textbf{Params (M)} $\downarrow$ & \textbf{FLOPs (GMac)} $\downarrow$ & \textbf{Latency (ms)} $\downarrow$ & \textbf{Mean Dice (\%)} $\uparrow$ & \textbf{Mean HD95 (mm)} $\downarrow$ \\
-\midrule
-\multirow{2}{*}{\textbf{3D UX-Net}} & Full ($E_0$) & 53.01 & 578.74 & 40.6 & 79.18 & 9.04 \\
- & Effi ($E_1$) & 3.16 & 49.49 & 8.0 & 77.73 & 11.82 \\
-\midrule
-\multirow{2}{*}{\textbf{SwinUNETR}} & Full ($E_0$) & 62.19 & 308.24 & 37.0 & 80.48 & 8.88 \\
- & Effi ($E_1$) & 11.21 & 55.84 & 16.7 & 79.49 & 8.90 \\
-\midrule
-\multirow{2}{*}{\textbf{MedNeXt-M-K3}} & Full ($E_0$) & 17.56 & 106.34 & 27.8 & 82.61 & 7.25 \\
-& Efficient ($E_1$) & 5.80 & 49.54 & 12.9 & 81.35 & 6.77 \\
-\bottomrule
-\end{tabular*}
-\end{table*}
+
 
 \subsection{Correctness Activity and Net Gain across Architectures}
 \label{sec:results_activity}
@@ -84,7 +65,7 @@ Table \ref{tab:factorial} reports our $2\times2$ factorial configuration grid on
     \item \textbf{Channel Width Reduction ($C_{384} \rightarrow C_{48}$)}: Reducing decoder channels compresses parameter count by $95\%$ (46.7M $\rightarrow$ 2.2M) while exerting a spatially diffuse and net-neutral effect ($R_{\text{net}}^{\text{all}} = +0.027\%$, 95\% CI: $[-0.027\%, +0.083\%]$).
 \end{itemize}
 
-\begin{table*}[tb]
+\begin{table*}[t]
 \centering
 \caption{$2\times2$ Factorial analysis of decoder channel reduction ($C_{dec}$) and resolution scaling ($RF$) on 3D UX-Net and BTCV CT (Decoder-Isolated Factor Attribution Axis).}
 \label{tab:factorial}
@@ -193,7 +174,7 @@ MedNeXt-M-K3 & 0.907 & 0.556 \\
 To evaluate whether the observations discovered on BTCV generalize across imaging modalities and anatomical targets, Table~\ref{tab:cross_dataset} summarizes these metrics across all three datasets for the 3D UX-Net reference architecture.
 Across datasets, gross bidirectional correctness activity, positive-gain concentration (e.g., the strong concentration pattern persisted on MSD08 with $K_{80} \le 5\%$), and the activity--direction predictability gap remained observable. However, the magnitude and sign of net gain were task-dependent: on MSD08, the efficient decoder outperformed the full decoder, producing a negative foreground-union net gain.
 
-\begin{table*}[tb]
+\begin{table*}[t]
 \centering
 \caption{Cross-dataset generalization validation using 3D UX-Net across three clinical imaging datasets (Cross-Dataset Consistency Axis).}
 \label{tab:cross_dataset}

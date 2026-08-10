@@ -17,16 +17,16 @@
 \usepackage{placeins}    %% Provides \FloatBarrier to prevent figures from leaking into References
 
 %% Relax float placement limits to allow multi-panel figures inline
-\setcounter{topnumber}{4}
-\setcounter{bottomnumber}{4}
-\setcounter{totalnumber}{10}
-\setcounter{dbltopnumber}{4}
+\setcounter{topnumber}{5}
+\setcounter{bottomnumber}{5}
+\setcounter{totalnumber}{12}
+\setcounter{dbltopnumber}{5}
 \renewcommand{\topfraction}{0.95}
 \renewcommand{\bottomfraction}{0.95}
 \renewcommand{\dbltopfraction}{0.95}
 \renewcommand{\textfraction}{0.05}
-\renewcommand{\floatpagefraction}{0.8}
-\renewcommand{\dblfloatpagefraction}{0.8}
+\renewcommand{\floatpagefraction}{0.4}
+\renewcommand{\dblfloatpagefraction}{0.4}
 
 %% Journal name
 \journal{Computerized Medical Imaging and Graphics}
@@ -36,7 +36,7 @@
 \begin{frontmatter}
 
 %% Title, authors and addresses
-\title{A Voxel-Level Characterization of Decoder Computation in 3D Medical Image Segmentation}
+\title{Exploring Decoder Computation and Redundancy in 3D Medical Image Segmentation: A Voxel-Level Characterization Study}
 
 %% Authors
 \author[inst1]{Author One\corref{cor1}}
@@ -64,16 +64,16 @@
 
 %% Abstract
 \begin{abstract}
-Modern 3D medical image segmentation networks with vision transformers and large-kernel CNNs increasingly incorporate heavy multi-resolution decoders, assuming that dense decoding is universally necessary across the volumetric grid. Conversely, efficient alternatives simplify these decoding pathways based on macroscopic metrics. However, the locations, spatial conditions, and magnitudes to which extra decoder computation genuinely improves segmentation correctness remain uncharacterized. We present a systematic characterization of decoder computation in 3D medical image segmentation. We evaluate end-to-end full–efficient decoder pairs across three representative backbones on BTCV CT, examine cross-dataset consistency using 3D UX-Net across BTCV CT, MSD01 BrainTumour MRI, and MSD08 HepaticVessel CT, and perform controlled factor attribution using a frozen shared-encoder $2\times2$ factorial design on 3D UX-Net. Our characterization separates two quantities that aggregate metrics conflate: \textit{correctness activity}---where the decoder changes a voxel's correctness---and \textit{net gain}, the signed balance of corrections and degradations. The two diverge sharply. Across every backbone and dataset, added decoder capacity is highly active yet nearly net-neutral: large bidirectional activity, but a net shift statistically indistinguishable from zero. The residual gain is concentrated---an oracle captures $\ge\!80\%$ of it within the top $5\%$ of blocks ($K_{80}\!\le\!5\%$)---and confined to a thin anatomical-boundary band---the margins that govern surgical planning and radiotherapy targeting. Crucially, uncertainty predicts \textit{where} predictions change (location AUROC $0.865$--$0.913$) far better than \textit{whether} they improve (direction AUROC $0.520$--$0.591$); routing a $20\%$ budget to the full decoder then recovers the macro-Dice gap wherever one exists. Prediction difficulty and computational utility are thus related but distinct. Clinically, this clarifies when efficient decoders can be trusted for latency-critical intraoperative use and where computation must be spent to protect boundary-sensitive decisions, bounding what future adaptive decoders can achieve.
+Modern 3D medical image segmentation architectures increasingly incorporate heavy multi-resolution decoders, implicitly assuming that dense decoding computation is universally necessary across the volumetric grid. Conversely, efficient alternatives simplify these pathways based solely on global accuracy metrics. However, where, how much, and under what spatial conditions additional decoder computation genuinely improves segmentation correctness remains uncharacterized. We present a systematic characterization framework for 3D decoder computation, evaluating matched full--efficient decoder pairs across diverse architectural backbones, multi-modality datasets, and controlled $2\times2$ factorial factor attributions. Our framework formalizes the separation between two quantities that aggregate metrics conflate: \textit{correctness activity} (where the decoder alters a voxel's correctness) and \textit{directional net gain} (the signed balance of corrections and degradations). We demonstrate that the two diverge sharply: across architectures and modalities, added decoder capacity exhibits high gross activity yet is nearly net-neutral, with corrections and degradations largely cancelling out over the volume. The residual gain is highly concentrated ($K_{80} \le 5\%$) and confined to a narrow $0\text{--}2\text{~mm}$ anatomical boundary margin. Crucially, while predictive uncertainty reliably locates \textit{where} correctness changes occur ($\text{Location AUROC} \ge 0.86$), it provides weak directional discrimination for \textit{whether} predictions improve ($\text{Direction AUROC} \approx 0.52\text{--}0.59$), establishing that prediction difficulty and computational utility are related but distinct. Clinically, these findings provide a stratified deployment paradigm: globally lightweight decoders can be safely trusted for real-time intraoperative guidance and bulk organ segmentation, whereas heavy decoding capacity can be sparsely allocated to critical anatomical margins to safeguard high-risk surgical and radiotherapeutic decisions.
 \end{abstract}
 
 %% Highlights
 \begin{highlights}
-\item Characterizes the spatial contribution of additional decoder computation in 3D segmentation.
-\item Establishes the distinction between correctness activity (gross changes) and net gain (directional benefit).
-\item Demonstrates boundary-localized bidirectional correctness changes and highly concentrated positive gain ($K_{80} \le 5\%$).
-\item Demonstrates predictive uncertainty signals activity but provides weak directional discrimination.
-\item Evaluates retrospective output-space hybridization to recover macro Dice gaps without over-extrapolating runtime speedups.
+\item Characterizes spatial contribution of 3D decoder computation in medical segmentation.
+\item Formalizes voxel correctness activity versus directional net gain divergence.
+\item Reveals boundary-localized bidirectional activity and high gain concentration ($K_{80}\le5\%$).
+\item Uncovers Activity--Direction Gap: uncertainty signals activity, not net utility.
+\item Proposes a stratified clinical deployment paradigm for efficient 3D decoders.
 \end{highlights}
 
 %% Keywords
@@ -88,8 +88,7 @@ Modern 3D medical image segmentation networks with vision transformers and large
 \input{sections/related_work}
 \input{sections/methods}
 \input{sections/experiments}
-\input{sections/results}
-\input{sections/discussion}
+\input{sections/results_discussion}
 \FloatBarrier %% Force all figures to output before Conclusion
 \input{sections/conclusion}
 \FloatBarrier
@@ -125,14 +124,14 @@ This section provides supplementary qualitative visualizations for 3D UX-Net and
 \begin{figure*}[htbp]
 \centering
 \includegraphics[width=0.95\textwidth]{figures/obs-uxnet-concat/figure1_motivation.png}
-\caption{Supplementary Figure S1: Qualitative motivation visualization for 3D UX-Net on BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders.}
+\caption{Qualitative motivation visualization for 3D UX-Net on BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders.}
 \label{fig:supp_uxnet}
 \end{figure*}
 
 \begin{figure*}[htbp]
 \centering
 \includegraphics[width=0.95\textwidth]{figures/obs-mednext/figure1_motivation.png}
-\caption{Supplementary Figure S2: Qualitative motivation visualization for MedNeXt-M-K3 on BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders.}
+\caption{Qualitative motivation visualization for MedNeXt-M-K3 on BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders.}
 \label{fig:supp_mednext}
 \end{figure*}
 
@@ -142,13 +141,13 @@ Figure \ref{fig:supp_error_rate} visualizes the block-level spatial correlation 
 
 \begin{figure*}[htbp]
 \centering
-\begin{tabular}{ccc}
-\includegraphics[width=0.32\textwidth]{figures/obs-uxnet-concat/O3_unc_error.png} &
-\includegraphics[width=0.32\textwidth]{figures/obs-swin-concat/O3_unc_error.png} &
-\includegraphics[width=0.32\textwidth]{figures/obs-mednext/O3_unc_error.png} \\
-(a) 3D UX-Net Error Correlation & (b) SwinUNETR Error Correlation & (c) MedNeXt-M-K3 Error Correlation \\
+\begin{tabular}{@{}c@{\hspace{1mm}}c@{\hspace{1mm}}c@{}}
+\includegraphics[width=0.328\textwidth]{figures/obs-uxnet-concat/O3_unc_error.png} &
+\includegraphics[width=0.328\textwidth]{figures/obs-swin-concat/O3_unc_error.png} &
+\includegraphics[width=0.328\textwidth]{figures/obs-mednext/O3_unc_error.png} \\
+\vspace{-2pt}{\small (a) 3D UX-Net Error Correlation} & {\small (b) SwinUNETR Error Correlation} & {\small (c) MedNeXt-M-K3 Error Correlation} \\
 \end{tabular}
-\caption{Supplementary Figure S3: Correlation between mean predictive entropy and block-level error rate across backbones.}
+\caption{Correlation between mean predictive entropy and block-level error rate across backbones.}
 \label{fig:supp_error_rate}
 \end{figure*}
 

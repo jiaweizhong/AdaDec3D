@@ -1,41 +1,62 @@
 \section{Results and Discussion}
 \label{sec:results_discussion}
 
-In this section, we present observational characterization findings across three core analytical axes and discuss their scientific and architectural implications.
+In this section, we present empirical characterization findings across target backbones, clinical datasets, and intervention designs, synthesizing numerical findings directly with their architectural, statistical, and clinical implications.
 
-\subsection{Computational Trade-offs and Aggregate Benchmarks}
-\label{sec:tradeoffs}
+\subsection{Macro Trade-offs and Bidirectional Voxel Dynamics}
+\label{sec:results_macro}
 
-\textbf{Baseline Performance}: Table \ref{tab:main_results} summarizes the aggregate computational complexity and segmentation performance under standard end-to-end model training. Across all three backbones, the efficient decoder variant ($E_1$) achieves substantial FLOP reductions (up to 91.4\% in 3D UX-Net) while retaining competitive Mean Dice scores (e.g., MedNeXt-M-K3 $E_0$ achieves 83.74\% Mean Dice vs. 81.47\% for $E_1$, while $E_1$ reduces inference latency from 40.9 ms to 18.7 ms).
+Evaluating aggregate segmentation accuracy alongside computational complexity reveals a well-known engineering phenomenon: decoder simplification yields massive computational savings at minimal cost to macro-level Dice scores. As detailed in Table~\ref{tab:main_results}, replacing the full decoder ($E_0$) with an efficient baseline ($E_1$) removes up to $91.4\%$ of FLOPs and reduces inference latency by up to $5\times$ (3D UX-Net: $40.6\text{ ms} \rightarrow 8.0\text{ ms}$; SwinUNETR: $37.0\text{ ms} \rightarrow 16.7\text{ ms}$; MedNeXt-M-K3: $27.8\text{ ms} \rightarrow 12.9\text{ ms}$). Across all three backbones, the corresponding Mean Dice penalty remains within $1.45$ percentage points ($79.18\% \rightarrow 77.73\%$ for 3D UX-Net, $80.48\% \rightarrow 79.49\%$ for SwinUNETR, and $82.61\% \rightarrow 81.35\%$ for MedNeXt-M-K3), while boundary error (HD95) even shows slight numerical improvements for two of the three backbones.
 
-\begin{table*}[tb]
+\begin{figure}[tb]
 \centering
-\caption{Quantitative comparison of Full ($E_0$) vs. Efficient ($E_1$) decoders on the BTCV 13-organ dataset across three backbones.}
-\label{tab:main_results}
-\small
-\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}lcccccc}
-\toprule
-\textbf{Architecture} & \textbf{Variant} & \textbf{Params (M)} $\downarrow$ & \textbf{FLOPs (GMac)} $\downarrow$ & \textbf{Latency (ms)} $\downarrow$ & \textbf{Mean Dice (\%)} $\uparrow$ & \textbf{Mean HD95 (mm)} $\downarrow$ \\
-\midrule
-\multirow{2}{*}{\textbf{3D UX-Net}} & Full ($E_0$) & 53.01 & 578.74 & 40.6 & 79.18 & 9.04 \\
- & Effi ($E_1$) & 3.16 & 49.49 & 8.0 & 77.73 & 11.82 \\
-\midrule
-\multirow{2}{*}{\textbf{SwinUNETR}} & Full ($E_0$) & 62.19 & 308.24 & 37.0 & 80.48 & 8.88 \\
- & Effi ($E_1$) & 11.21 & 55.84 & 16.7 & 79.49 & 8.90 \\
-\midrule
-\multirow{2}{*}{\textbf{MedNeXt-M-K3}} & Full ($E_0$) & 39.32 & 230.87 & 40.9 & 83.74 & 5.77 \\
- & Effi ($E_1$) & 12.95 & 106.91 & 18.7 & 81.47 & 6.60 \\
-\bottomrule
-\end{tabular*}
-\end{table*}
+\includegraphics[width=0.86\columnwidth]{figures/h1_merged.png}
+\caption{Global flip rates ($R_{+}$, $N$, $R_{\text{net}}$) across backbones under Full ($E_0$) vs. Efficient ($E_1$) decoders on BTCV CT.}
+\label{fig:global_flips}
+\end{figure}
 
-\textbf{Factorial Factor Attribution}: In our decoder-isolated attribution analysis on 3D UX-Net with frozen shared encoders (Table \ref{tab:factorial}), we separate channel reduction ($C_{dec}$) from stage removal ($RF$). Reducing channels from 384 to 48 ($C_{48}, RF_1$) compresses parameters from 46.72M to 2.24M while maintaining a 79.80\% Mean Dice. Omitting the high-resolution stage ($C_{384}, RF_2$) reduces latency to 16.1 ms. Combining both ($C_{48}, RF_2$) yields the $E_1$ configuration (1.84M params, 49.49 GMac).
+Read at face value, these aggregate numbers appear to justify aggressive decoder pruning as a near-lossless optimization. However, a macro-averaged Dice score is a single scalar pooled over millions of voxels. Isolating voxel-level prediction shifts between matched decoder pairs exposes a fundamentally different underlying reality: macro-level metric stability masks extensive voxel-level prediction reorganization.
 
-Aggregate metrics confirm the overall efficiency-accuracy trade-off, but they do not reveal where additional decoder computation acts or helps across volumetric space.
+Evaluating voxel predictions demonstrates that decoder activity is governed by strong bidirectional cancellation ($P(v) \approx N(v)$), rendering aggregate net volume-wide gain statistically near-zero (Figure~\ref{fig:global_flips}). Positive voxel corrections $P(v)$ (where $E_0$ fixes an $E_1$ error) are substantially counterbalanced by negative degradations $N(v)$ (where $E_0$ degrades a correct $E_1$ prediction). Over the All-Volume domain ($\Omega_{\text{all}}$), subject-mean net gain rates $R_{\text{net}}^{\text{all}}$ remain minimal: $+0.046\%$ (95\% CI: $[-0.020\%, +0.110\%]$) for 3D UX-Net, $-0.001\%$ (95\% CI: $[-0.045\%, +0.040\%]$) for SwinUNETR, and $+0.052\%$ (95\% CI: $[-0.010\%, +0.108\%]$) for MedNeXt-M-K3. Even over the Foreground-Union domain ($\Omega_{\text{fg}}$), net gain rates stay small ($+0.381\%$ for 3D UX-Net, $-0.008\%$ for SwinUNETR, $+0.446\%$ for MedNeXt-M-K3), and all paired subject-bootstrap $95\%$ confidence intervals include zero. Rather than acting as a monotonic error corrector, high-capacity decoders perform spatial prediction reallocation whose net volume-wide effect is near-neutral.
 
-\begin{table*}[tb]
+\begin{figure*}[tb]
 \centering
-\caption{$2\times2$ Factorial analysis of decoder channel reduction ($C_{dec}$) and resolution scaling ($RF$) on 3D UX-Net (BTCV dataset).}
+\includegraphics[width=0.86\textwidth]{figures/boundary_merged.png}
+\caption{Boundary-resolved decoder benefit versus physical distance to ground-truth boundary ($d_{GT}$) across backbones: (a) net gain $R_{+}-R_{-}$, and (b) activity $R_{+}+R_{-}$.}
+\label{fig:boundary_flips}
+\end{figure*}
+
+\subsection{Spatial and Anatomical Heterogeneity}
+\label{sec:results_heterogeneity}
+
+The near-zero aggregate net gain is not the signature of an inert decoder, but of intense activity localized to specific spatial zones and anatomical structures. 
+
+\begin{figure*}[tb]
+\centering
+\includegraphics[width=1.0\textwidth]{figures/obs-uxnet-concat/O_anatomy.png} \\
+\vspace{-2pt}{\small (a) 3D UX-Net Organ-Level Flips} \\[3pt]
+\includegraphics[width=1.0\textwidth]{figures/obs-swin-concat/O_anatomy.png} \\
+\vspace{-2pt}{\small (b) SwinUNETR Organ-Level Flips} \\[3pt]
+\includegraphics[width=1.0\textwidth]{figures/obs-mednext/O_anatomy.png} \\
+\vspace{-2pt}{\small (c) MedNeXt-M-K3 Organ-Level Flips} \\
+\caption{Organ-level flip breakdown across backbones under Full ($E_0$) vs. Efficient ($E_1$) decoders (BTCV CT).}
+\label{fig:heterogeneity_anatomy}
+\end{figure*}
+
+Stratifying voxel correctness activity $A_{\text{corr}}(v)$ by physical Euclidean distance $d_{GT}(v)$ to the true ground-truth boundary (Figure~\ref{fig:boundary_flips}) shows a sharp peak within the innermost $0\text{--}2\text{ mm}$ boundary band, followed by rapid decay across $2\text{--}4\text{ mm}$ and $4\text{--}8\text{ mm}$, reaching virtual inactivity in homogeneous organ interiors ($d_{GT} > 8\text{ mm}$). Additional decoder computation is consumed almost exclusively in partial-volume transition zones where boundary ambiguity is highest. This spatial concentration confirms that feature representations within organ interiors are already well-resolved by the encoder, rendering high-resolution decoding pathways in interior regions computationally redundant.
+
+This spatial pattern translates directly into an anatomical scale effect across organs (Figure~\ref{fig:heterogeneity_anatomy}). Small, morphologically complex structures with high surface-to-volume ratios exhibit the highest activity rates: left and right adrenal glands reach positive correction rates up to $16.9\%$ in 3D UX-Net ($14.8\%$ in SwinUNETR, $14.0\%$ in MedNeXt-M-K3), alongside high correction rates for the gallbladder and esophagus. Conversely, large compact organs such as the liver, spleen, and kidneys remain nearly inert (${<}3\%$ activity) because their volume is dominated by interior voxels rather than boundary margins. Thus, anatomical scale directly dictates decoder workload.
+
+\paragraph{The Metric Weighting Paradox.} This anatomical separation resolves a key conceptual paradox: \emph{How can additional decoder computation improve macro-Dice while producing near-zero global voxel net gain?} Global voxel correctness is mathematically dominated by vast background regions and large organ interiors, where predictions are invariant to decoder capacity. In contrast, macro-averaged Dice weights all anatomical classes equally and is foreground-sensitive. Positive corrections concentrated on small, volatile structures (e.g., adrenal glands) exert a disproportionate impact on macro-Dice, even while global voxel shifts remain net-neutral across the full volumetric grid.
+
+\subsection{Architectural Drivers and Spatial Concentration}
+\label{sec:results_drivers}
+
+To disentangle the architectural drivers of these spatial shifts, Table~\ref{tab:factorial} and Table~\ref{tab:factorial_effects} report our frozen-encoder $2\times2$ factorial analysis on 3D UX-Net, isolating resolution scaling ($RF$) from feature channel capacity ($C_{\text{dec}}$). Holding the encoder strictly constant ensures that observed prediction shifts stem exclusively from decoder interventions rather than encoder weight adaptation.
+
+\begin{table*}[t]
+\centering
+\caption{$2\times2$ Factorial analysis of decoder channel reduction ($C_{dec}$) and resolution scaling ($RF$) on 3D UX-Net and BTCV CT (Decoder-Isolated Factor Attribution Axis).}
 \label{tab:factorial}
 \small
 \begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}lcccccc}
@@ -50,134 +71,122 @@ Effi ($C_{48}, RF_2$) & 48 & 2 & 1.84 & 49.49 & 8.0 & 78.35 \\
 \end{tabular*}
 \end{table*}
 
-\subsection{Spatial Heterogeneity and Boundary Localization}
-\label{sec:results_heterogeneity}
-
-\subsubsection{Global Correction-Degradation Balance}
-Evaluating voxel-level prediction shifts between matched $E_0$ and $E_1$ decoders reveals that positive corrections $P(v)$ and negative degradations $N(v)$ are comparable in magnitude across backbones and clinical datasets (Figure \ref{fig:heterogeneity}, left column). The subject-mean net gain $R_{net}$ remains small ($<0.1\%$) across all models: $+0.046\%$ (95\% CI: $[-0.020\%, +0.110\%]$) for 3D UX-Net, $-0.001\%$ (95\% CI: $[-0.045\%, +0.040\%]$) for SwinUNETR, and $+0.085\%$ (95\% CI: $[+0.024\%, +0.152\%]$) for MedNeXt-M-K3. Overall, positive voxel corrections are largely counterbalanced by negative degradations across global volumes.
-
-\subsubsection{Boundary Localization of Decoder Activity}
-Spatial stratification reveals that decoder activity $A(v) = P(v) + N(v)$ is concentrated near anatomical boundaries across datasets (Figure \ref{fig:heterogeneity}, right column). Error rates in boundary regions are $3.93\times$ higher than in organ interiors for 3D UX-Net and $4.67\times$ higher for MedNeXt-M-K3. Both positive corrections and negative degradations peak sharply within a 0--1 voxel boundary band, demonstrating that decoder capacity acts primarily at spatial transitions.
-
-\subsubsection{Factorial Attribution of Channel vs. Stage Interventions}
-Pairwise spatial flip distributions from our frozen shared-encoder factorial ablation on 3D UX-Net isolate the driving architectural mechanisms:
-\begin{itemize}
-    \item \textbf{High-Resolution Stage Removal ($RF_1 \rightarrow RF_2$)}: Removing the high-resolution stage accounts for the majority of compute reduction (657.8 GMac $\rightarrow$ 319.1 GMac). Retaining this high-resolution stage yields a net positive correction rate of $+0.033\%$ in the 0--1 voxel boundary band and $+0.031\%$ in the 1--2 voxel band (both $95\%$ CIs excluding zero), decaying to negative net values ($-0.011\%$) in organ interiors ($>4$ voxels). This establishes that high-resolution decoding stages specifically drive boundary refinement.
-    \item \textbf{Channel Width Reduction ($C_{384} \rightarrow C_{48}$)}: Reducing decoder channels compresses parameter count by $95\%$ (46.7M $\rightarrow$ 2.2M) while exerting a spatially diffuse and net-neutral effect ($R_{net} = +0.027\%$, 95\% CI: $[-0.027\%, +0.083\%]$). At the 0--1 voxel boundary, channel reduction produces a slight negative net rate ($-0.020\%$), confirming that channel width provides diffuse representation capacity without driving localized boundary resolution.
-\end{itemize}
-
-\subsubsection{Anatomical Volatility}
-Anatomical structure analysis (Figure \ref{fig:heterogeneity_anatomy}) demonstrates that small, morphologically complex organs exhibit high flip volatility. The left and right adrenal glands show positive correction rates of 16.2\%/16.9\% in 3D UX-Net, 14.4\%/14.8\% in SwinUNETR, and 18.3\%/10.4\% in MedNeXt-M-K3. Conversely, large structures like the liver remain highly stable ($<3\%$ Activity).
-
-\subsubsection{Discussion: Net-Neutrality and Boundary Dynamics}
-These characterization observations challenge the traditional assumption that high-capacity decoders uniformly enhance representation quality across the entire image volume. Instead, the global net-neutrality ($R_{net} < 0.1\%$) indicates that deep decoders reallocate predictions near ambiguous boundary voxels rather than systematically correcting errors. High-resolution stages specifically refine boundary detail, whereas channel capacity provides diffuse capacity. This implies that executing full-capacity decoding across smooth organ interiors is computationally redundant.
-
-\begin{figure*}[tb]
+\begin{table}[tb]
 \centering
-\begin{tabular}{cc}
-\includegraphics[width=0.42\textwidth]{figures/obs-uxnet-concat/H1_global_flips.png} &
-\includegraphics[width=0.42\textwidth]{figures/obs-uxnet-concat/H2_boundary.png} \\
-(a) 3D UX-Net Global Flips & (b) 3D UX-Net Boundary Flips \\[4pt]
-\includegraphics[width=0.42\textwidth]{figures/obs-swin-concat/H1_global_flips.png} &
-\includegraphics[width=0.42\textwidth]{figures/obs-swin-concat/H2_boundary.png} \\
-(c) SwinUNETR Global Flips & (d) SwinUNETR Boundary Flips \\[4pt]
-\includegraphics[width=0.42\textwidth]{figures/obs-mednext/O5_decoder_gain.png} &
-\includegraphics[width=0.42\textwidth]{figures/obs-mednext/O_boundary_flips.png} \\
-(e) MedNeXt-M-K3 Global Flips & (f) MedNeXt-M-K3 Boundary Flips \\
-\end{tabular}
-\caption{Voxel-level net gain (left column) and spatial boundary concentration (right column) across 3D UX-Net, SwinUNETR, and MedNeXt-M-K3 backbones.}
-\label{fig:heterogeneity}
-\end{figure*}
+\caption{Factor main effects ($\Delta_C, \Delta_{RF}$) and interaction ($\Delta_{C \times RF}$) across metrics on 3D UX-Net (BTCV CT).}
+\label{tab:factorial_effects}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}l c c c@{}}
+\toprule
+\textbf{Outcome Metric} & \textbf{Channel $\Delta_C$} & \textbf{Stage $\Delta_{RF}$} & \textbf{Interaction $\Delta_{C \times RF}$} \\
+\midrule
+Mean Dice (\%) & $-0.13$ & $-1.96$ & $+1.02$ \\
+Params (M) & $-44.48$ & $-0.40$ & $+0.00$ \\
+FLOPs (GMac) & $-269.61$ & $-338.66$ & $+0.00$ \\
+Boundary Net Gain (\%) & $-0.020$ & $+0.033$ & $-0.004$ \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
 
-\begin{figure*}[tb]
-\centering
-\includegraphics[width=0.85\textwidth]{figures/obs-uxnet-concat/O_anatomy.png} \\
-\vspace{-2pt}{\small (a) 3D UX-Net Organ-Level Flips} \\[4pt]
-\includegraphics[width=0.85\textwidth]{figures/obs-swin-concat/O_anatomy.png} \\
-\vspace{-2pt}{\small (b) SwinUNETR Organ-Level Flips} \\[4pt]
-\includegraphics[width=0.85\textwidth]{figures/obs-mednext/O_anatomy.png} \\
-\vspace{-2pt}{\small (c) MedNeXt-M-K3 Organ-Level Flips} \\
-\caption{Organ-level flip breakdown across backbones on the BTCV CT multi-organ dataset.}
-\label{fig:heterogeneity_anatomy}
-\end{figure*}
-
-\subsection{Spatial Concentration and Oracle Opportunity}
-\label{sec:results_concentration}
-
-Figure \ref{fig:concentration} presents oracle coverage curves evaluating the spatial concentration of positive net gain $G(r)$. Across all three architectures and datasets, an oracle selecting the top 5\% of blocks recovers 80\% of the full decoder's total positive net gain ($K_{80} = 5\%$). At a 10\% volume budget, oracle coverage reaches 99.98\%, reaching 100\% at 20\%.
-
-\subsubsection{Discussion: Diminishing Returns and Hybrid Routing}
-The extreme spatial concentration ($K_{80} = 5\%$) demonstrates that beneficial decoder effects are strictly localized. Outside this 5\% block subset, executing full decoder computation yields rapidly diminishing net returns. This establishes an oracle upper bound: if an inference engine could identify the top 5--10\% of critical boundary blocks, it could achieve full decoder accuracy while running an efficient baseline over 90\% of the volumetric grid, saving over 80\% of total decoding FLOPs.
+High-resolution stage retention ($RF_1 \rightarrow RF_2$) accounts for a major FLOP reduction ($657.8 \rightarrow 319.1\text{ GMac}$, $\Delta_{RF} = -338.66\text{ GMac}$) and controls spatial boundary refinement ($+0.033\%$ net gain in $0\text{--}2\text{ mm}$ band, decaying to $-0.011\%$ in interiors). Channel width reduction ($C_{384} \rightarrow C_{48}$) cuts parameter count by $95\%$ ($46.7\text{M} \rightarrow 2.2\text{M}$) while exerting a spatially diffuse, net-neutral effect ($\Delta_C = -0.020\%$). The near-zero interaction term ($\Delta_{C \times RF} = -0.004\%$) indicates that channel width and resolution scaling act approximately additively, allowing them to be decoupled in efficient decoder design.
 
 \begin{figure}[tb]
 \centering
-\includegraphics[width=0.82\columnwidth]{figures/obs-uxnet-concat/O_pareto.png} \\
-\vspace{-2pt}{\small (a) 3D UX-Net Concentration Curve} \\[4pt]
-\includegraphics[width=0.82\columnwidth]{figures/obs-swin-concat/O_pareto.png} \\
-\vspace{-2pt}{\small (b) SwinUNETR Concentration Curve} \\[4pt]
-\includegraphics[width=0.82\columnwidth]{figures/obs-mednext/O_pareto.png} \\
-\vspace{-2pt}{\small (c) MedNeXt-M-K3 Concentration Curve}
-\caption{Oracle benefit concentration curves ($K_{80}$) across 3D UX-Net, SwinUNETR, and MedNeXt-M-K3.}
+\includegraphics[width=0.92\columnwidth]{figures/concentration_merged.png}
+\caption{Oracle positive-gain concentration curves ($K_{80}$) across backbones.}
 \label{fig:concentration}
 \end{figure}
 
-\subsection{Inference-Time Predictability and Macro-Metric Recovery}
+Sorting spatial blocks by descending net gain (Figure~\ref{fig:concentration}) reveals that an oracle selector retaining just the top $5\%$ of spatial blocks captures at least $80\%$ of all positive net gain ($K_{80} \le 5\%$) across all three backbones, with the top $10\%$ capturing up to $99.98\%$. This confirms that the vast majority of decoder computation is spatially redundant, establishing the empirical precondition for budgeted, dynamic spatial decoding.
+
+\subsection{Inference-Time Predictability and Selective Recovery}
 \label{sec:results_predictability}
 
-We benchmark whether cheap inference-time signals (predictive entropy and TTA mutual information) can locate beneficial spatial regions prior to full decoder execution. Figure \ref{fig:predictability} and Figure \ref{fig:flip_density} reveal a fundamental divergence:
-\begin{itemize}
-    \item \textbf{Activity Prediction (Flip Location AUROC)}: Predictive entropy reliably identifies active blocks ($A(r) > 0$), achieving high location AUROCs of 0.900 for 3D UX-Net (AUPRC 0.371), 0.913 for SwinUNETR (AUPRC 0.351), and 0.931 for MedNeXt-M-K3.
-    \item \textbf{Directional Utility Prediction (Direction AUROC)}: Predictive entropy fails to distinguish positive corrections from negative degradations ($G(r) > 0$ vs. $G(r) < 0$), yielding direction AUROCs near random chance: 0.591 for 3D UX-Net (95\% CI: $[0.558, 0.624]$), 0.560 for SwinUNETR (95\% CI: $[0.514, 0.609]$), and 0.545 for MedNeXt-M-K3. 
-    \item \textbf{TTA Mutual Information Diagnostic (TTA-MI)}: Multi-sample epistemic disagreement $I(v)$ over $K=8$ spatial view transformations fails to resolve directional utility, yielding direction AUROCs of 0.539 for 3D UX-Net (95\% CI: $[0.50, 0.58]$) and 0.570 for SwinUNETR (95\% CI: $[0.53, 0.61]$).
-    \item \textbf{Conditional Density Overlap}: Figure \ref{fig:flip_density} visualizes the conditional entropy density distributions $p(H \mid P(v)=1)$ and $p(H \mid N(v)=1)$. Positive and negative flips exhibit nearly identical high-entropy distributions concentrated at anatomical boundaries.
-\end{itemize}
+While oracle concentration establishes that a small volume fraction \emph{could} carry decoder benefit, practical execution requires anticipating that benefit at inference time using cheap baseline signals.
 
-\begin{figure}[tb]
+\begin{table}[tb]
 \centering
-\includegraphics[width=0.82\columnwidth]{figures/obs-uxnet-concat/O3_entropy_by_flip.png} \\
-\vspace{-2pt}{\small (a) 3D UX-Net Flip Entropy Density} \\[4pt]
-\includegraphics[width=0.82\columnwidth]{figures/obs-swin-concat/O3_entropy_by_flip.png} \\
-\vspace{-2pt}{\small (b) SwinUNETR Flip Entropy Density}
-\caption{Conditional entropy density distributions for positive corrections ($P$) and negative degradations ($N$).}
+\caption{Inference-time predictability of block-level activity (Location AUROC) vs. directional utility (Direction AUROC) across backbones.}
+\label{tab:predictability}
+\small
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Backbone} & \textbf{Location AUROC} & \textbf{Direction AUROC} \\
+\midrule
+3D UX-Net & 0.900 & 0.591 \\
+SwinUNETR & 0.913 & 0.560 \\
+MedNeXt-M-K3 & 0.907 & 0.556 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure*}[tb]
+\centering
+\begin{tabular}{@{}c@{\hspace{1mm}}c@{\hspace{1mm}}c@{}}
+\includegraphics[width=0.328\textwidth]{figures/obs-uxnet-concat/O3_entropy_by_flip.png} &
+\includegraphics[width=0.328\textwidth]{figures/obs-swin-concat/O3_entropy_by_flip.png} &
+\includegraphics[width=0.328\textwidth]{figures/obs-mednext/O3_entropy_by_flip.png} \\
+\vspace{-2pt}{\small (a) 3D UX-Net Entropy Density} & {\small (b) SwinUNETR Entropy Density} & {\small (c) MedNeXt-M-K3 Entropy Density} \\
+\end{tabular}
+\caption{Conditional predictive entropy density distributions $p(H \mid P=1)$ vs. $p(H \mid N=1)$ across backbones.}
 \label{fig:flip_density}
-\end{figure}
+\end{figure*}
+
+As shown in Table~\ref{tab:predictability}, single-pass predictive Shannon entropy achieves high Location AUROC ($\ge 0.900\text{--}0.913$), reliably detecting active blocks. However, Direction AUROC drops to near-chance levels ($0.556\text{--}0.591$). Multi-sample epistemic disagreement via Test-Time Augmentation Mutual Information ($I(v)$) similarly yields modest direction AUROCs ($0.539\text{--}0.570$). Figure~\ref{fig:flip_density} exposes the physical cause: positive corrections $P(v)$ and negative degradations $N(v)$ share nearly identical conditional entropy distributions $p(H \mid P(v)=1) \approx p(H \mid N(v)=1)$, rendering them directionally indistinguishable from uncertainty alone. This exposes the fundamental \emph{Activity--Direction Predictability Gap}: predictive uncertainty identifies where computation alters predictions, but fails to predict whether those alterations will be beneficial or harmful.
 
 \begin{figure}[tb]
 \centering
-\includegraphics[width=0.82\columnwidth]{figures/obs-uxnet-concat/O3_unc_error.png} \\
-\vspace{-2pt}{\small (a) 3D UX-Net Predictability} \\[4pt]
-\includegraphics[width=0.82\columnwidth]{figures/obs-swin-concat/O3_unc_error.png} \\
-\vspace{-2pt}{\small (b) SwinUNETR Predictability} \\[4pt]
-\includegraphics[width=0.82\columnwidth]{figures/obs-mednext/O3_unc_error.png} \\
-\vspace{-2pt}{\small (c) MedNeXt-M-K3 Predictability}
-\caption{Inference-time block predictability (Location AUROC vs. Direction AUROC) across backbones.}
-\label{fig:predictability}
-\end{figure}
-
-\subsubsection{Macro-Metric Performance Recovery ($R_{\text{rec}}$)}
-Figure \ref{fig:macro_recovery} presents the macro-metric Dice recovery curves $R_{\text{rec}}(k)$ under entropy-guided block routing:
-\begin{itemize}
-    \item At a \textbf{5\% block budget}, entropy-guided routing recovers \textbf{60\% of the full decoder's Dice gap} over $E_1$ for 3D UX-Net (compared to 8\% for random selection).
-    \item At a \textbf{20\% block budget}, entropy-guided routing achieves \textbf{100\% recovery of the macro Dice gap} across both 3D UX-Net and SwinUNETR (vs. 17--20\% for random selection).
-\end{itemize}
-
-\begin{figure}[tb]
-\centering
-\includegraphics[width=0.82\columnwidth]{figures/obs-uxnet-concat/R_recovery.png} \\
-\vspace{-2pt}{\small (a) 3D UX-Net Macro Dice Recovery} \\[4pt]
-\includegraphics[width=0.82\columnwidth]{figures/obs-swin-concat/R_recovery.png} \\
-\vspace{-2pt}{\small (b) SwinUNETR Macro Dice Recovery}
-\caption{Macro-metric Dice recovery curves ($R_{\text{rec}}$) under entropy-guided vs. random selective routing.}
+\includegraphics[width=0.92\columnwidth]{figures/recovery_merged.png}
+\caption{Macro-Dice gap recovery trajectories under retrospective output hybridization across backbones.}
 \label{fig:macro_recovery}
 \end{figure}
 
-\subsubsection{Discussion: Difficulty vs. Utility Divergence and Design Directions}
-Why does predictive entropy predict flip locations ($>0.90$ AUROC) but fail to predict directional improvement ($\approx 0.55$ AUROC)? Predictive entropy measures task difficulty and spatial ambiguity, successfully locating boundary regions where predictions are volatile. However, entropy indicates region difficulty rather than whether a static full decoder possesses the correct inductive bias to fix the error. Executing additional decoder capacity on uncertain voxels is susceptible to shortcut learning dynamics \cite{geirhos2020shortcut} and equally likely to degrade a correct prediction as it is to fix an error. \textit{Prediction difficulty and computational utility are related but fundamentally distinct quantities.}
+Despite direction ambiguity, uncertainty locates activity well enough to guide spatial allocation. Under retrospective output-space hybridization (Figure~\ref{fig:macro_recovery}), substituting full decoder predictions in high-entropy blocks recovers $60\%$ of the full-volume Dice gap at a $5\%$ spatial budget, and achieves $\ge 100\%$ full gap recovery at a $20\%$ spatial budget across all backbones (versus only $17\text{--}20\%$ for random block selection). Crucially, because high-entropy spatial blocks concentrate the vast majority of gross correctness activity ($A_{\text{corr}}$), routing the full decoder to these candidate patches ensures that positive corrections $P(v)$ on volatile structures are captured within the retained $20\%$ spatial budget. This demonstrates that selectively routing computation to high-uncertainty regions can recover macroscopic performance while skipping heavy decoding across $80\%$ of the volumetric grid.
 
-Despite this directional unpredictability at the voxel level, entropy-guided routing recovers 100\% of the macro Dice gap on a 20\% budget. This reconciles the apparent paradox: while additional decoder capacity produces balanced voxel flips overall, the positive flips occur at Dice-sensitive boundary regions, allowing selective boundary decoding to fully recover macro segmentation performance.
+\subsection{Cross-Dataset Generalization}
+\label{sec:results_generalization}
 
-\textbf{Directions for Adaptive Decoder Design}:
+Table~\ref{tab:cross_dataset} validates these characterization findings across three clinical imaging datasets using the 3D UX-Net reference architecture.
+
+\begin{table*}[t]
+\centering
+\caption{Cross-dataset generalization validation using 3D UX-Net across three clinical imaging datasets (Cross-Dataset Consistency Axis).}
+\label{tab:cross_dataset}
+\footnotesize
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}lccccccccc}
+\toprule
+\textbf{Dataset} & \textbf{Full Dice} & \textbf{Effi Dice} & \textbf{Activity} & \textbf{Net Gain} & \textbf{Activity} & \textbf{Net Gain} & \textbf{Oracle} & \textbf{Location} & \textbf{Direction} \\
+ & \textbf{(\%)} & \textbf{(\%)} & \textbf{$R_{\text{act}}^{\text{all}}$ (\%)} & \textbf{$R_{\text{net}}^{\text{all}}$ (\%)} & \textbf{$R_{\text{act}}^{\text{fg}}$ (\%)} & \textbf{$R_{\text{net}}^{\text{fg}}$ (\%)} & \textbf{$K_{80}$} & \textbf{AUROC} & \textbf{AUROC} \\
+\midrule
+\textbf{BTCV CT} & 79.18 & 77.73 & 3.42 & $+0.046$ & 12.84 & $+0.381$ & $\le 5\%$ & 0.900 & 0.591 \\
+\textbf{MSD01 BrainTumour} & 75.55 & 74.95 & 0.46 & $+0.038$ & 18.10 & $+2.86$ & $\le 5\%$ & 0.869 & 0.558 \\
+\textbf{MSD08 HepaticVessel} & 57.51 & 58.63 & 0.20 & $-0.002$ & 22.99 & $-4.89$ & $\le 5\%$ & 0.865 & 0.520 \\
+\bottomrule
+\end{tabular*}
+\end{table*}
+
+High location AUROC ($0.865\text{--}0.900$), low direction AUROC ($0.520\text{--}0.591$), and extreme benefit concentration ($K_{80} \le 5\%$) persist consistently across multi-organ CT, multi-sequence brain MRI, and hepatic vascular CT. However, the sign and magnitude of net directional gain are task-dependent. On MSD08 HepaticVessel CT, the efficient decoder slightly outperforms the full decoder ($58.63\%$ vs. $57.51\%$ Dice; $R_{\text{net}}^{\text{fg}} = -4.89\%$). Because fine vascular structures possess extreme surface-to-volume ratios, additional decoder capacity in high-resolution stages can overfit ambiguous boundary noise. This critical finding proves that extra decoder computation is not monotonically beneficial, reinforcing the necessity of utility-gated dynamic computation.
+
+\subsection{Clinical Stratification and Decoder Design Principles}
+\label{sec:clinical_implications}
+
+Translating these characterization findings into clinical practice yields a clear anatomical stratification for decoder deployment. Large, compact organs (e.g., liver, spleen, kidneys) are dominated by interior voxels and exhibit minimal activity (${<}3\%$), meaning efficient decoders can be safely deployed to maximize inference throughput in high-throughput screening or intraoperative guidance workflows. Conversely, small, morphologically complex structures (e.g., adrenal glands, gallbladder, vessels) exhibit high boundary activity (up to $16.9\%$), requiring high-resolution decoder capacity or targeted entropy-guided refinement for precise resection planning and vessel delineation. Finally, on thin vascular networks (e.g., MSD08), additional decoder capacity can overfit boundary noise, proving that computation should be gated based on expected gain rather than applied uniformly by default.
+
+These empirical insights establish three practical principles for future dynamic 3D decoders:
 \begin{enumerate}
-    \item \textbf{Predict Expected Gain Rather Than Uncertainty}: Future routing policies should train auxiliary heads to directly predict net accuracy gain rather than reusing task uncertainty signals.
-    \item \textbf{Decouple Spatial Resolution from Channel Capacity}: Since high-resolution stages specifically refine boundaries while channel capacity provides diffuse representation, adaptive decoders should selectively allocate high-resolution upsampling paths near boundaries while maintaining narrow channel widths volume-wide.
+    \item \textbf{Separate activity localization from utility estimation}: Predictive uncertainty locates candidate regions effectively but cannot predict gain direction; routing policies must pair location proposals with directional gain estimators to prevent harmful degradations.
+    \item \textbf{Decouple globally shared decoding from local high-resolution refinement}: Channel capacity can be compressed globally with minimal spatial impact, whereas high-resolution stages should be selectively activated only on ambiguous boundary patches.
+    \item \textbf{Treat additional computation as a task-dependent intervention}: Dynamic execution should default to a lightweight base decoder, allocating heavy high-resolution refinement only when the expected directional gain exceeds computational execution overhead.
 \end{enumerate}
+
+\subsection{Limitations}
+\label{sec:limitations}
+
+While this study provides a comprehensive characterization of 3D decoder computation, three primary limitations should be noted:
+
+First, our controlled interventions draw from architecture-preserving channel compression and stage omission templates (inspired by EffiDec3D and depthwise-separated decoder designs). Although validated across diverse CNN, ViT, and ConvNeXt backbones, future work may explore dynamic gating or non-uniform depth pruning to examine whether unconstrained architecture search yields different spatial redundancy patterns.
+
+Second, selective spatial recovery is established via retrospective output-space hybridization. This defines an empirical opportunity bound for localized allocation rather than demonstrating an integrated, hardware-level dynamic execution engine with real-time runtime speedup and CUDA kernel acceleration.
+
+Third, inference-time predictability was evaluated using single-pass predictive entropy and multi-view TTA mutual information. Exploring learned neural routing heads or feature-space gating mechanisms may further help close the direction predictability gap by learning to discriminate positive corrections from negative degradations directly from feature activations.

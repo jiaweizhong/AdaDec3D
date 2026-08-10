@@ -6,69 +6,59 @@ This section describes the target 3D backbones, clinical datasets, evaluation ax
 \subsection{Target Architectures and Intervention Specifications}
 \label{sec:backbones}
 
-We evaluate matched decoder pairs across three representative 3D medical image segmentation backbones: a large-kernel CNN (3D UX-Net \cite{lee20233d}), a vision transformer (SwinUNETR \cite{hatamizadeh2022swin}), and a ConvNeXt-style network (MedNeXt-M-K3 \cite{roy2023mednext}). Interventions occur strictly within the decoder pathway (upsampling, skip fusion, and refinement) while keeping feature encoder architectures untouched. Table \ref{tab:backbone_specs} details the intervention specifications across backbones.
+We evaluate matched decoder pairs across three representative 3D medical image segmentation backbones covering distinct architectural paradigms: a large-kernel CNN (3D UX-Net \cite{lee20233d}), a vision transformer (SwinUNETR \cite{hatamizadeh2022swin}), and a ConvNeXt-style network (MedNeXt-M-K3 \cite{roy2023mednext}). Interventions occur strictly within the decoder pathway (upsampling, skip fusion, and refinement) while preserving identical encoder weights and feature dimensions. For each backbone, the efficient decoder baseline ($E_1$) implements a standardized capacity reduction: an $87.5\%$ feature channel compression ($C_{\text{full}} \rightarrow C_{\text{reduced}}$) and the omission of the highest-resolution skip-refinement stage (Stage 1), following the architecture-preserving principles of EffiDec3D \cite{effidec3d}. All parameters, FLOPs (profiled on a standardized $1 \times C \times 96 \times 96 \times 96$ patch), and volumetric inference latencies are summarized in Table~\ref{tab:main_results}.
 
 \begin{table*}[t]
 \centering
-\caption{Backbone decoder specifications and efficient intervention parameters.}
-\label{tab:backbone_specs}
-\small
-\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}lcccc}
+\caption{Comprehensive quantitative comparison of Full ($E_0$) vs. Efficient ($E_1$) decoders across three 3D backbones on the BTCV 13-organ CT dataset, detailing decoder architectural configurations, computational complexity, inference latency, and segmentation performance.}
+\label{tab:main_results}
+\footnotesize
+\setlength{\tabcolsep}{6pt}
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}llcccccc}
 \toprule
-\textbf{Architecture} & \textbf{Base Feature Size} & \textbf{Full Decoder ($E_0$)} & \textbf{Efficient Intervention ($E_1$)} \\
+\textbf{Architecture} & \textbf{Decoder Variant} & \textbf{Decoder Config} & \textbf{Params} & \textbf{FLOPs} & \textbf{Latency} & \textbf{Mean Dice} & \textbf{Mean HD95} \\
+ & & & \textbf{(M) $\downarrow$} & \textbf{(GMac) $\downarrow$} & \textbf{(ms) $\downarrow$} & \textbf{(\%) $\uparrow$} & \textbf{(mm) $\downarrow$} \\
 \midrule
-\textbf{3D UX-Net} \cite{lee20233d} & $C=48$ & $C_{384}$, $1\times$ resolution & $384 \rightarrow 48$ ($87.5\%$ cut), omit Stage 1 \\
-\textbf{SwinUNETR} \cite{hatamizadeh2022swin} & $C=48$ & $C_{384}$, $1\times$ resolution & $384 \rightarrow 48$ ($87.5\%$ cut), omit Stage 1 \\
-\textbf{MedNeXt-M-K3} \cite{roy2023mednext} & $C=32$ & $C_{256}$, $1\times$ resolution & $256 \rightarrow 32$ ($87.5\%$ cut), omit Stage 1 \\
+\multirow{2}{*}{\textbf{3D UX-Net} \cite{lee20233d}} & Full ($E_0$) & $C_{384}$, $1\times$ resolution & 53.01 & 578.74 & 40.6 & 79.18 & 9.04 \\
+ & Effi ($E_1$) & $C_{48}$, omit Stage 1 ($-87.5\%$) & 3.16 & 49.49 & 8.0 & 77.73 & 11.82 \\
+\midrule
+\multirow{2}{*}{\textbf{SwinUNETR} \cite{hatamizadeh2022swin}} & Full ($E_0$) & $C_{384}$, $1\times$ resolution & 62.19 & 308.24 & 37.0 & 80.48 & 8.88 \\
+ & Effi ($E_1$) & $C_{48}$, omit Stage 1 ($-87.5\%$) & 11.21 & 55.84 & 16.7 & 79.49 & 8.90 \\
+\midrule
+\multirow{2}{*}{\textbf{MedNeXt-M-K3} \cite{roy2023mednext}} & Full ($E_0$) & $C_{256}$, $1\times$ resolution & 17.56 & 106.34 & 27.8 & 82.61 & 7.25 \\
+ & Efficient ($E_1$) & $C_{32}$, omit Stage 1 ($-87.5\%$) & 5.80 & 49.54 & 12.9 & 81.35 & 6.77 \\
 \bottomrule
 \end{tabular*}
 \end{table*}
 
-\paragraph{Architectural and FLOP Profiling Protocol.} All computational complexity metrics (FLOPs/MACs) were measured using the fvcore profiling utility on a single 3D patch input tensor of shape $1 \times C \times 96 \times 96 \times 96$. To prevent cross-table confusion, we explicitly distinguish two specific 3D UX-Net full configurations evaluated in this study:
-\begin{enumerate}
-    \item \textbf{End-to-End Reference Configuration} (Table \ref{tab:main_results}): Trained end-to-end with default MONAI training pipelines containing auxiliary deep-supervision heads (53.01M params / 578.74 GMac).
-    \item \textbf{Frozen-Encoder Factorial Configuration} (Table \ref{tab:factorial}): Evaluates the standalone decoder pathway with auxiliary heads detached under fixed unpadded patch profiling ($96\times96\times96$, 46.72M params / 657.76 GMac).
-\end{enumerate}
-
 \subsection{Factorial Configurations}
 \label{sec:factorial_configs}
 
-To cleanly isolate the architectural mechanisms driving decoder activity, we perform a $2 \times 2$ factorial analysis on the 3D UX-Net backbone. By freezing the encoder and separating the decoding capacity along two structural axes (feature resolution and channel width), we evaluate whether performance and error variations originate from high-resolution spatial routing or abstract semantic capacity. Note that the factorial full configuration uses a separately instantiated decoder pathway to isolate these specific variables, and its FLOPs (657.76 GMac) are therefore not directly comparable with the tightly integrated end-to-end full configuration (578.74 GMac).
+To independently attribute decoder contributions to channel capacity versus spatial resolution scaling, we construct a $2 \times 2$ factorial grid on the 3D UX-Net backbone under a frozen, shared encoder. The grid crosses two channel capacity levels ($C_{384}$ vs. $C_{48}$) with two high-resolution stage retention levels ($RF_1$: retain full-resolution stage vs. $RF_2$: omit full-resolution stage). Note that while the end-to-end reference baseline (Table~\ref{tab:main_results}) incorporates auxiliary deep-supervision heads (578.74 GMac), the standalone factorial decoder isolates the decoding pathway with auxiliary heads detached (657.76 GMac under standalone patch profiling), enabling exact factor attribution without confounding loss terms.
 
-\noindent
-\textbf{End-to-End Reference Full} (Table~\ref{tab:backbone_specs}): The baseline symmetric architecture.
-
-\noindent
-\textbf{Factorial-Analysis Full} (Table~\ref{tab:factorial}): The isolated decoder pathway with all factorial features intact.
-
-\subsection{Clinical Datasets and Target Spacings}
+\subsection{Clinical Datasets and Characteristics}
 \label{sec:datasets}
 
-Experiments are conducted across three diverse 3D volumetric medical imaging datasets covering different anatomical regions and imaging modalities. Volumes are resampled to target spacings to match physical block side lengths of approximately $24\text{ mm}$:
+To evaluate decoder computation across diverse anatomical targets, clinical tasks, and imaging modalities, we conduct experiments on three representative 3D volumetric benchmarks:
 \begin{enumerate}
-    \item \textbf{BTCV Multi-Organ CT Dataset} \cite{landman2015btcv}: 30 abdominal CT scans (resampled to $1.5 \times 1.5 \times 2.0\text{ mm}^3$; block dimensions $16 \times 16 \times 12$ voxels) with manual annotations for 13 organ structures.
-    \item \textbf{MSD01 BrainTumour MRI Dataset} \cite{bakas2018identifying,simpson2019large}: 484 multi-modal 3D MRI volumes (resampled to $1.0 \times 1.0 \times 1.0\text{ mm}^3$; block dimensions $24 \times 24 \times 24$ voxels) with three foreground tumor classes.
-    \item \textbf{MSD08 HepaticVessel CT Dataset} \cite{simpson2019large}: 303 training volumes (resampled to $0.8 \times 0.8 \times 1.5\text{ mm}^3$; block dimensions $30 \times 30 \times 16$ voxels) focused on vascular and neoplastic structures.
+    \item \textbf{BTCV Abdominal Multi-Organ CT Benchmark} \cite{landman2015btcv}: Captures large-scale multi-class organ segmentation across 13 abdominal structures (30 CT volumes). It features diverse anatomical scales---ranging from large homogeneous organs (liver, spleen) to small, highly variable structures (adrenal glands, gallbladder)---with well-defined organ boundaries and organ-to-background interfaces.
+    \item \textbf{MSD01 Brain Tumour Multi-Modal MRI Benchmark} \cite{bakas2018identifying,simpson2019large}: Captures neuro-oncological tissue segmentation across 484 multi-sequence MRI volumes (FLAIR, T1, T1ce, T2). It encompasses three sub-regions (edema, non-enhancing core, enhancing tumor) characterized by diffuse, infiltrative margins and highly irregular spatial topologies.
+    \item \textbf{MSD08 Hepatic Vessel CT Benchmark} \cite{simpson2019large}: Captures fine-grained abdominal vascular segmentation across 303 CT volumes. It focuses on thin, tubular vessel branches and liver tumors, presenting extreme foreground sparsity, complex branching geometry, and high surface-area-to-volume ratios.
 \end{enumerate}
 
-\subsection{Experimental Evaluation Axes}
+Target voxel spacings ($1.5 \times 1.5 \times 2.0\text{~mm}^3$ for BTCV, $1.0 \times 1.0 \times 1.0\text{~mm}^3$ for MSD01, and $0.8 \times 0.8 \times 1.5\text{~mm}^3$ for MSD08) and physical spatial block partitioning follow the standardized protocol established in Section~\ref{sec:blocks} to maintain an invariant physical block footprint of approximately $24 \times 24 \times 24\text{~mm}^3$ across all modalities.
+
+\subsection{Evaluation Strategy and Experimental Axes}
 \label{sec:protocols}
 
-We evaluate decoder contribution along three complementary experimental axes rather than a full architecture-by-dataset Cartesian grid:
+To systematically map decoder contributions without evaluating an unconstrained, dense Cartesian product across all models and datasets, we organize our evaluation along three targeted experimental axes:
 \begin{enumerate}
-    \item \textbf{Cross-Architecture Consistency Axis}: Evaluates matched full ($E_0$) vs. efficient ($E_1$) decoders across three backbones (3D UX-Net, SwinUNETR, MedNeXt-M-K3) on the canonical BTCV multi-organ CT dataset to test architectural consistency.
-    \item \textbf{Cross-Dataset Consistency Axis}: Evaluates matched full ($E_0$) vs. efficient ($E_1$) decoders using a fixed canonical backbone (3D UX-Net) across three diverse datasets (BTCV CT, MSD01 BrainTumour MRI, and MSD08 HepaticVessel CT) to test modality and anatomical generalization.
-    \item \textbf{Decoder-Isolated Factor Attribution Axis}: Evaluates a $2\times2$ factorial intervention design ($E_0$, Channel-only, Stage-only, $E_1$) using a frozen shared 3D UX-Net encoder on BTCV CT. Holding encoder feature representations strictly constant ensures that prediction shifts are primarily attributable to specific decoder interventions (channel width vs. resolution scaling).
+    \item \textbf{Cross-Architecture Consistency Axis}: Evaluates matched full ($E_0$) vs. efficient ($E_1$) decoders across three distinct backbones (3D UX-Net, SwinUNETR, MedNeXt-M-K3) on the canonical BTCV CT dataset to establish architectural consistency across model families.
+    \item \textbf{Cross-Dataset Consistency Axis}: Evaluates matched decoder pairs using a fixed reference backbone (3D UX-Net) across three clinical benchmarks (BTCV CT, MSD01 Brain MRI, MSD08 Hepatic CT) to test generalization across imaging modalities and anatomical topologies.
+    \item \textbf{Decoder-Isolated Factor Attribution Axis}: Deconstructs decoder capacity into a $2\times2$ factorial grid ($C_{384}$ vs. $C_{48}$, $RF_1$ vs. $RF_2$) under a frozen shared 3D UX-Net encoder on BTCV CT, strictly isolating channel capacity from resolution scaling without confounding encoder weight shifts.
 \end{enumerate}
 
-\subsection{Training Protocols and Implementation Setup}
+\subsection{Implementation and Statistical Protocol}
 \label{sec:setup}
 
-All models were implemented in PyTorch using an NVIDIA RTX 5090 GPU with CUDA 12.8. Models were trained for 45,000 optimizer iterations using bfloat16 mixed precision and the AdamW optimizer (initial learning rate $1 \times 10^{-3}$ with cosine annealing, weight decay $1 \times 10^{-5}$) under a compound Dice-CrossEntropy loss function, evaluating every 250 iterations to match the EffiDec3D protocol. Sub-volume patches of $96 \times 96 \times 96$ voxels were extracted with an optimizer batch size of 1 volume per GPU, drawing 4 spatial crops per volume (yielding an effective batch size of 4 crops per optimization step). Standard 3D online data augmentations (random rotations, flips, intensity scaling) and dataset-specific intensity normalization were applied. Evaluation networks dynamically allocated a foreground sliding-window overlap of 0.7.
-
-\subsection{Data Splits and Model Selection}
-\label{sec:data_splits}
-
-Every matched pair was trained and evaluated on identical subject-level training, validation, and test partitions, and partitioning was performed at the level of whole volumes so that no subject's sub-volumes leaked across splits. This shared-partition constraint is not a convenience but a requirement of the characterization: because our analysis is a \emph{paired} voxel-level comparison between the full and efficient decoders, any discrepancy in the underlying data split would confound decoder-attributed correctness changes with data-attributed variance. Holding the split fixed ensures that every flip we measure reflects a difference in decoder computation on the same input, not a difference in which subjects each model saw.
-
-Model checkpoints were selected exclusively by validation macro-Dice rather than training loss, which avoids selecting an overfit iterate, and all subsequent characterization analyses were computed strictly on held-out test subjects that were never used for training or checkpoint selection. Confidence intervals were estimated by subject-level paired bootstrap resampling ($1000$ resamples) over the held-out test set: the same subjects are resampled jointly for both decoders, preserving the within-subject correlation that a paired comparison exploits, so the reported intervals reflect subject-level variability rather than the artificially narrow bounds that voxel-count pooling would produce.
+All models were implemented in PyTorch 2.6 with CUDA 12.8 using an NVIDIA RTX 5090 GPU. Training was conducted for 45,000 optimizer iterations using bfloat16 mixed precision, the AdamW optimizer (initial learning rate $1 \times 10^{-3}$ with cosine annealing, weight decay $1 \times 10^{-5}$), and a compound Dice-CrossEntropy loss function on $96 \times 96 \times 96$ voxel crops under standard 3D spatial augmentations. To guarantee exact paired comparisons, matched full and efficient decoders were trained and evaluated on identical subject-level volume splits. Model checkpoints were selected strictly by validation macro-Dice, and characterization metrics were evaluated on held-out test subjects, reporting population means with subject-level paired bootstrap $95\%$ confidence intervals ($1000$ resamples).

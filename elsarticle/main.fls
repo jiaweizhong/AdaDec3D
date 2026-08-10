@@ -1,8 +1,8 @@
-PWD c:/Users/jiawe/Repos/AdaDec3D/elsarticle
+PWD C:/Users/jiawe/Repos/AdaDec3D/elsarticle
 INPUT c:/texlive/2025/texmf.cnf
 INPUT c:/texlive/2025/texmf-dist/web2c/texmf.cnf
 INPUT c:/texlive/2025/texmf-var/web2c/pdftex/pdflatex.fmt
-INPUT c:/Users/jiawe/Repos/AdaDec3D/elsarticle/main.tex
+INPUT main.tex
 OUTPUT main.log
 INPUT c:/texlive/2025/texmf-dist/tex/latex/elsarticle/elsarticle.cls
 INPUT c:/texlive/2025/texmf-dist/tex/latex/elsarticle/elsarticle.cls
@@ -219,6 +219,8 @@ INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/txexa.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/txexa.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/t1xi.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/t1xr.tfm
+INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/t1xr.tfm
+INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/t1xr.tfm
 INPUT c:/texlive/2025/texmf-dist/tex/latex/txfonts/ts1txr.fd
 INPUT c:/texlive/2025/texmf-dist/tex/latex/txfonts/ts1txr.fd
 INPUT c:/texlive/2025/texmf-dist/tex/latex/txfonts/ts1txr.fd
@@ -243,7 +245,6 @@ INPUT c:/texlive/2025/texmf-dist/fonts/vf/public/txfonts/txr.vf
 INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/rtxptmr.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/rtxr.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/vf/public/txfonts/txr.vf
-INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/t1xr.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/t1xr.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/t1xi.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/txr.tfm
@@ -302,7 +303,6 @@ INPUT ./figures/Framework.jpg
 INPUT ./figures/Framework.jpg
 INPUT ./figures/Framework.jpg
 INPUT ./figures/Framework.jpg
-INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/t1xr.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/t1xb.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/t1xb.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/vf/public/txfonts/t1xb.vf
@@ -332,18 +332,18 @@ INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/txexa.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/t1xb.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/vf/public/txfonts/txmi.vf
 INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/rtxmi.tfm
-INPUT c:/texlive/2025/texmf-dist/fonts/vf/public/txfonts/t1xr.vf
-INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/rtxptmr.tfm
-INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/rtxr.tfm
-INPUT c:/texlive/2025/texmf-dist/fonts/vf/public/txfonts/txr.vf
-INPUT c:/texlive/2025/texmf-dist/fonts/vf/public/txfonts/txmi.vf
-INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/rtxmi.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/rtxptmri.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/vf/public/txfonts/txb.vf
 INPUT c:/texlive/2025/texmf-dist/fonts/vf/public/txfonts/txmi.vf
 INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/rtxmi.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/rtxptmri.tfm
+INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/t1xi.tfm
+INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/t1xi.tfm
+INPUT c:/texlive/2025/texmf-dist/fonts/vf/public/txfonts/txmi.vf
+INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/rtxmi.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/vf/public/txfonts/txr.vf
+INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/rtxptmr.tfm
+INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/rtxr.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/vf/public/txfonts/t1xb.vf
 INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/rtxptmb.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/rtxb.tfm
@@ -353,9 +353,8 @@ INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/rtxr.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/vf/public/txfonts/txmi.vf
 INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/rtxmi.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/rtxptmri.tfm
+INPUT c:/texlive/2025/texmf-dist/fonts/vf/public/txfonts/t1xr.vf
 INPUT c:/texlive/2025/texmf-dist/fonts/vf/public/txfonts/txr.vf
-INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/t1xi.tfm
-INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/t1xi.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/vf/public/txfonts/t1xi.vf
 INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/rtxi.tfm
 INPUT ./sections/experiments.tex
@@ -378,6 +377,7 @@ INPUT ./figures/boundary_merged.png
 INPUT ./figures/boundary_merged.png
 INPUT ./figures/boundary_merged.png
 INPUT ./figures/boundary_merged.png
+INPUT c:/texlive/2025/texmf-dist/fonts/vf/public/txfonts/txr.vf
 INPUT ./figures/obs-uxnet-concat/O_anatomy.png
 INPUT ./figures/obs-uxnet-concat/O_anatomy.png
 INPUT ./figures/obs-uxnet-concat/O_anatomy.png
@@ -418,8 +418,6 @@ INPUT ./figures/recovery_merged.png
 INPUT ./figures/recovery_merged.png
 INPUT ./figures/recovery_merged.png
 INPUT ./figures/recovery_merged.png
-INPUT c:/texlive/2025/texmf-dist/fonts/vf/public/txfonts/txmi.vf
-INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/rtxmi.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/t1xb.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/t1xb.tfm
 INPUT ./sections/discussion.tex
@@ -427,6 +425,8 @@ INPUT ./sections/discussion.tex
 INPUT ./sections/discussion.tex
 INPUT ./sections/discussion.tex
 INPUT sections/discussion.tex
+INPUT c:/texlive/2025/texmf-dist/fonts/vf/public/txfonts/txmi.vf
+INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/rtxmi.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/vf/public/txfonts/t1xb.vf
 INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/rtxptmb.tfm
 INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/txfonts/rtxb.tfm

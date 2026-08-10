@@ -25,118 +25,109 @@
 \citation{xie2021segformer}
 \citation{shaker2024unetrpp}
 \citation{jiang2024slimunetr}
-\citation{yu2018slimmable,wang2021adaptive}
-\citation{gal2016dropout,lakshminarayanan2017simple,kendall2017uncertainties}
+\citation{gal2016dropout,lakshminarayanan2017simple,kendall2017uncertainties,jungoreyes,uncertaintyreview}
+\citation{cmig2025clinical}
+\citation{cmig2025quality}
 \citation{effidec3d}
 \@writefile{toc}{\contentsline {section}{\numberline {2}Related Work}{2}{section.2}\protected@file@percent }
 \newlabel{sec:related}{{2}{2}{Related Work}{section.2}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Decoder Design in 3D Medical Image Segmentation}{2}{subsection.2.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Efficient Segmentation Architecture Design}{2}{subsection.2.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Model Characterization and Uncertainty Quantification}{2}{subsection.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Model Characterization and Prediction Reliability}{2}{subsection.2.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {3}Methods: A Characterization Framework}{2}{section.3}\protected@file@percent }
 \newlabel{sec:methods}{{3}{2}{Methods: A Characterization Framework}{section.3}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Controlled Decoder Interventions}{2}{subsection.3.1}\protected@file@percent }
 \newlabel{sec:interventions}{{3.1}{2}{Controlled Decoder Interventions}{subsection.3.1}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Overview of the decoder computation characterization framework across Step 1 (Controlled Interventions), Step 2 (Voxel Correctness Activity $A_{\text  {corr}}(v)$ and Net Gain $G(v)$), and Step 3 (Three Characterization Axes).}}{3}{figure.1}\protected@file@percent }
-\newlabel{fig:framework}{{1}{3}{Overview of the decoder computation characterization framework across Step 1 (Controlled Interventions), Step 2 (Voxel Correctness Activity $A_{\text {corr}}(v)$ and Net Gain $G(v)$), and Step 3 (Three Characterization Axes)}{figure.1}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Overview of the decoder computation characterization framework, encompassing controlled decoder interventions (Step 1), voxel-level activity and net gain formalization (Step 2), and the three characterization axes (Step 3).}}{3}{figure.1}\protected@file@percent }
+\newlabel{fig:framework}{{1}{3}{Overview of the decoder computation characterization framework, encompassing controlled decoder interventions (Step 1), voxel-level activity and net gain formalization (Step 2), and the three characterization axes (Step 3)}{figure.1}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Voxel-Level Correctness Activity Framework}{3}{subsection.3.2}\protected@file@percent }
 \newlabel{sec:framework}{{3.2}{3}{Voxel-Level Correctness Activity Framework}{subsection.3.2}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Subject-Level Rate Formulations and Evaluated Domains}{3}{subsection.3.3}\protected@file@percent }
-\newlabel{sec:rates}{{3.3}{3}{Subject-Level Rate Formulations and Evaluated Domains}{subsection.3.3}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Characterization Metrics and Spatial Partitioning}{3}{subsection.3.4}\protected@file@percent }
-\newlabel{sec:formulations}{{3.4}{3}{Characterization Metrics and Spatial Partitioning}{subsection.3.4}{}}
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.1}Physical Ground-Truth Anatomical Boundary Distance}{3}{subsubsection.3.4.1}\protected@file@percent }
-\newlabel{sec:boundary_dist}{{3.4.1}{3}{Physical Ground-Truth Anatomical Boundary Distance}{subsubsection.3.4.1}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Qualitative illustration of correctness activity and directional gain for SwinUNETR on BTCV CT dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders (see Supplementary Figures S1 and S2 for 3D UX-Net and MedNeXt-M-K3).}}{4}{figure.2}\protected@file@percent }
-\newlabel{fig:motivation}{{2}{4}{Qualitative illustration of correctness activity and directional gain for SwinUNETR on BTCV CT dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders (see Supplementary Figures S1 and S2 for 3D UX-Net and MedNeXt-M-K3)}{figure.2}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Overview of characterization objectives and evaluation measures.}}{4}{table.1}\protected@file@percent }
-\newlabel{tab:framework_summary}{{1}{4}{Overview of characterization objectives and evaluation measures}{table.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Global Rates and Evaluation Domains}{3}{subsection.3.3}\protected@file@percent }
+\newlabel{sec:rates}{{3.3}{3}{Global Rates and Evaluation Domains}{subsection.3.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Characterization Metrics and Evaluation Protocol}{3}{subsection.3.4}\protected@file@percent }
+\newlabel{sec:formulations}{{3.4}{3}{Characterization Metrics and Evaluation Protocol}{subsection.3.4}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.1}Anatomical Boundary Stratification}{3}{subsubsection.3.4.1}\protected@file@percent }
+\newlabel{sec:boundary_dist}{{3.4.1}{3}{Anatomical Boundary Stratification}{subsubsection.3.4.1}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.2}Spatial Block Partitioning}{3}{subsubsection.3.4.2}\protected@file@percent }
+\newlabel{sec:blocks}{{3.4.2}{3}{Spatial Block Partitioning}{subsubsection.3.4.2}{}}
 \citation{geifman2017selective}
 \citation{shannon1948mathematical,gal2016dropout,guo2017calibration}
 \citation{cmig2025quality}
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.2}Physically Normalized Spatial Block Partition}{5}{subsubsection.3.4.2}\protected@file@percent }
-\newlabel{sec:blocks}{{3.4.2}{5}{Physically Normalized Spatial Block Partition}{subsubsection.3.4.2}{}}
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.3}Positive-Gain Concentration ($K_{80}$)}{5}{subsubsection.3.4.3}\protected@file@percent }
-\newlabel{sec:k80}{{3.4.3}{5}{Positive-Gain Concentration ($K_{80}$)}{subsubsection.3.4.3}{}}
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.4}Uncertainty Signals and Predictability Scores}{5}{subsubsection.3.4.4}\protected@file@percent }
-\newlabel{sec:predictability}{{3.4.4}{5}{Uncertainty Signals and Predictability Scores}{subsubsection.3.4.4}{}}
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.5}Retrospective Output-Space Hybridization ($R_{\text  {rec}}$)}{5}{subsubsection.3.4.5}\protected@file@percent }
-\newlabel{sec:recovery}{{3.4.5}{5}{Retrospective Output-Space Hybridization ($R_{\text {rec}}$)}{subsubsection.3.4.5}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Qualitative illustration of correctness activity and directional gain for SwinUNETR on BTCV CT dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders (see Supplementary Figures S1 and S2 for 3D UX-Net and MedNeXt-M-K3).}}{4}{figure.2}\protected@file@percent }
+\newlabel{fig:motivation}{{2}{4}{Qualitative illustration of correctness activity and directional gain for SwinUNETR on BTCV CT dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders (see Supplementary Figures S1 and S2 for 3D UX-Net and MedNeXt-M-K3)}{figure.2}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Overview of analysis objectives, evaluation metrics, scientific focus, and section references.}}{4}{table.1}\protected@file@percent }
+\newlabel{tab:framework_summary}{{1}{4}{Overview of analysis objectives, evaluation metrics, scientific focus, and section references}{table.1}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.3}Gain Concentration ($K_{80}$)}{4}{subsubsection.3.4.3}\protected@file@percent }
+\newlabel{sec:k80}{{3.4.3}{4}{Gain Concentration ($K_{80}$)}{subsubsection.3.4.3}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.4}Predictability Scores}{4}{subsubsection.3.4.4}\protected@file@percent }
+\newlabel{sec:predictability}{{3.4.4}{4}{Predictability Scores}{subsubsection.3.4.4}{}}
 \citation{lee20233d}
 \citation{hatamizadeh2022swin}
 \citation{roy2023mednext}
+\citation{effidec3d}
 \citation{lee20233d}
 \citation{hatamizadeh2022swin}
 \citation{roy2023mednext}
 \citation{landman2015btcv}
 \citation{bakas2018identifying,simpson2019large}
 \citation{simpson2019large}
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.6}Factorial Main Effects and Interaction Analysis}{6}{subsubsection.3.4.6}\protected@file@percent }
-\newlabel{sec:factorial}{{3.4.6}{6}{Factorial Main Effects and Interaction Analysis}{subsubsection.3.4.6}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {4}Experimental Setup}{6}{section.4}\protected@file@percent }
-\newlabel{sec:experiments}{{4}{6}{Experimental Setup}{section.4}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Target Architectures and Intervention Specifications}{6}{subsection.4.1}\protected@file@percent }
-\newlabel{sec:backbones}{{4.1}{6}{Target Architectures and Intervention Specifications}{subsection.4.1}{}}
-\@writefile{toc}{\contentsline {paragraph}{Architectural and FLOP Profiling Protocol.}{6}{section*.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Factorial Configurations}{6}{subsection.4.2}\protected@file@percent }
-\newlabel{sec:factorial_configs}{{4.2}{6}{Factorial Configurations}{subsection.4.2}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Clinical Datasets and Target Spacings}{6}{subsection.4.3}\protected@file@percent }
-\newlabel{sec:datasets}{{4.3}{6}{Clinical Datasets and Target Spacings}{subsection.4.3}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Experimental Evaluation Axes}{6}{subsection.4.4}\protected@file@percent }
-\newlabel{sec:protocols}{{4.4}{6}{Experimental Evaluation Axes}{subsection.4.4}{}}
-\citation{effidec3d}
-\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Backbone decoder specifications and efficient intervention parameters.}}{7}{table.2}\protected@file@percent }
-\newlabel{tab:backbone_specs}{{2}{7}{Backbone decoder specifications and efficient intervention parameters}{table.2}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}Training Protocols and Implementation Setup}{7}{subsection.4.5}\protected@file@percent }
-\newlabel{sec:setup}{{4.5}{7}{Training Protocols and Implementation Setup}{subsection.4.5}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.6}Data Splits and Model Selection}{7}{subsection.4.6}\protected@file@percent }
-\newlabel{sec:data_splits}{{4.6}{7}{Data Splits and Model Selection}{subsection.4.6}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {5}Results}{7}{section.5}\protected@file@percent }
-\newlabel{sec:results}{{5}{7}{Results}{section.5}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Accuracy--Computation Trade-off on BTCV}{7}{subsection.5.1}\protected@file@percent }
-\newlabel{sec:results_cross_arch}{{5.1}{7}{Accuracy--Computation Trade-off on BTCV}{subsection.5.1}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Correctness Activity and Net Gain across Architectures}{7}{subsection.5.2}\protected@file@percent }
-\newlabel{sec:results_activity}{{5.2}{7}{Correctness Activity and Net Gain across Architectures}{subsection.5.2}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Quantitative comparison of Full ($E_0$) vs. Efficient ($E_1$) decoders on the BTCV 13-organ dataset across three backbones (Cross-Architecture Consistency Axis).}}{8}{table.3}\protected@file@percent }
-\newlabel{tab:main_results}{{3}{8}{Quantitative comparison of Full ($E_0$) vs. Efficient ($E_1$) decoders on the BTCV 13-organ dataset across three backbones (Cross-Architecture Consistency Axis)}{table.3}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Global flip rates for all three backbones under Full ($E_0$) vs. Efficient ($E_1$) decoders, grouped by quantity. Positive corrections $R_{+}$ and negative degradations $R_{-}$ are large and comparable (bidirectional activity), whereas the net gain $R_{\text  {net}}$ is near zero with a subject-bootstrap $95\%$ CI that includes zero for every backbone.}}{8}{figure.3}\protected@file@percent }
-\newlabel{fig:global_flips}{{3}{8}{Global flip rates for all three backbones under Full ($E_0$) vs. Efficient ($E_1$) decoders, grouped by quantity. Positive corrections $R_{+}$ and negative degradations $R_{-}$ are large and comparable (bidirectional activity), whereas the net gain $R_{\text {net}}$ is near zero with a subject-bootstrap $95\%$ CI that includes zero for every backbone}{figure.3}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Spatial Heterogeneity}{8}{subsection.5.3}\protected@file@percent }
-\newlabel{sec:results_heterogeneity}{{5.3}{8}{Spatial Heterogeneity}{subsection.5.3}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Frozen-Encoder Factor Attribution}{8}{subsection.5.4}\protected@file@percent }
-\newlabel{sec:results_factorial}{{5.4}{8}{Frozen-Encoder Factor Attribution}{subsection.5.4}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}Gain Concentration and Predictability}{8}{subsection.5.5}\protected@file@percent }
-\newlabel{sec:results_predictability}{{5.5}{8}{Gain Concentration and Predictability}{subsection.5.5}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Boundary-resolved decoder benefit versus distance to the ground-truth boundary, for all three backbones: (a) net gain $R_{+}-R_{-}$ (with subject-bootstrap $95\%$ CIs) and (b) correctness activity $R_{+}+R_{-}$. Activity is sharply concentrated at the boundary and decays into organ interiors for every backbone, while the net gain stays small and its CI includes zero beyond the innermost band.}}{9}{figure.4}\protected@file@percent }
-\newlabel{fig:boundary_flips}{{4}{9}{Boundary-resolved decoder benefit versus distance to the ground-truth boundary, for all three backbones: (a) net gain $R_{+}-R_{-}$ (with subject-bootstrap $95\%$ CIs) and (b) correctness activity $R_{+}+R_{-}$. Activity is sharply concentrated at the boundary and decays into organ interiors for every backbone, while the net gain stays small and its CI includes zero beyond the innermost band}{figure.4}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces $2\times 2$ Factorial analysis of decoder channel reduction ($C_{dec}$) and resolution scaling ($RF$) on 3D UX-Net and BTCV CT (Decoder-Isolated Factor Attribution Axis).}}{9}{table.4}\protected@file@percent }
-\newlabel{tab:factorial}{{4}{9}{$2\times 2$ Factorial analysis of decoder channel reduction ($C_{dec}$) and resolution scaling ($RF$) on 3D UX-Net and BTCV CT (Decoder-Isolated Factor Attribution Axis)}{table.4}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Factor main effects ($\Delta _C, \Delta _{RF}$) and interaction ($\Delta _{C \times RF}$) across metrics on 3D UX-Net (BTCV CT).}}{9}{table.5}\protected@file@percent }
-\newlabel{tab:factorial_effects}{{5}{9}{Factor main effects ($\Delta _C, \Delta _{RF}$) and interaction ($\Delta _{C \times RF}$) across metrics on 3D UX-Net (BTCV CT)}{table.5}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Inference-time predictability of block-level correctness activity (Location AUROC) and directional utility (Direction AUROC) across evaluated backbones.}}{9}{table.6}\protected@file@percent }
-\newlabel{tab:predictability}{{6}{9}{Inference-time predictability of block-level correctness activity (Location AUROC) and directional utility (Direction AUROC) across evaluated backbones}{table.6}{}}
-\@writefile{toc}{\contentsline {paragraph}{Signal-guided retrospective recovery.}{9}{section*.2}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Organ-level flip breakdown across backbones on the BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders.}}{10}{figure.5}\protected@file@percent }
-\newlabel{fig:heterogeneity_anatomy}{{5}{10}{Organ-level flip breakdown across backbones on the BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders}{figure.5}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.6}Cross-Dataset Replication}{10}{subsection.5.6}\protected@file@percent }
-\newlabel{sec:results_cross_dataset}{{5.6}{10}{Cross-Dataset Replication}{subsection.5.6}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Oracle positive-gain concentration for the three backbones (inset: zoom on the $5$--$10\%$ separation). All satisfy $K_{80}\le 5\%$; the gray dashed line is the random baseline.}}{11}{figure.6}\protected@file@percent }
-\newlabel{fig:concentration}{{6}{11}{Oracle positive-gain concentration for the three backbones (inset: zoom on the $5$--$10\%$ separation). All satisfy $K_{80}\le 5\%$; the gray dashed line is the random baseline}{figure.6}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {6}Discussion}{11}{section.6}\protected@file@percent }
-\newlabel{sec:discussion}{{6}{11}{Discussion}{section.6}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Decoder Activity versus Net Benefit}{11}{subsection.6.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Coexistence of Small Voxel Net Gain and Macro Dice Improvement}{11}{subsection.6.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Implications for Adaptive Decoder Design}{11}{subsection.6.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.4}Clinical Stratification of Decoder Utility}{11}{subsection.6.4}\protected@file@percent }
-\newlabel{sec:clinical_stratification}{{6.4}{11}{Clinical Stratification of Decoder Utility}{subsection.6.4}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Conditional entropy density distributions for positive corrections ($P$) and negative degradations ($N$).}}{12}{figure.7}\protected@file@percent }
-\newlabel{fig:flip_density}{{7}{12}{Conditional entropy density distributions for positive corrections ($P$) and negative degradations ($N$)}{figure.7}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces Cross-dataset generalization validation using 3D UX-Net across three clinical imaging datasets (Cross-Dataset Consistency Axis).}}{12}{table.7}\protected@file@percent }
-\newlabel{tab:cross_dataset}{{7}{12}{Cross-dataset generalization validation using 3D UX-Net across three clinical imaging datasets (Cross-Dataset Consistency Axis)}{table.7}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Macro-Dice gap recovery under output hybridization for the three backbones, as a percentage of the full-minus-efficient Dice gap. Solid = entropy-guided routing, dashed = random baseline. Entropy-guided routing recovers the full gap by a $20\%$ budget for all three backbones, versus ${\sim }20\%$ for random selection.}}{12}{figure.8}\protected@file@percent }
-\newlabel{fig:macro_recovery}{{8}{12}{Macro-Dice gap recovery under output hybridization for the three backbones, as a percentage of the full-minus-efficient Dice gap. Solid = entropy-guided routing, dashed = random baseline. Entropy-guided routing recovers the full gap by a $20\%$ budget for all three backbones, versus ${\sim }20\%$ for random selection}{figure.8}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.5}Limitations}{12}{subsection.6.5}\protected@file@percent }
-\newlabel{sec:limitations}{{6.5}{12}{Limitations}{subsection.6.5}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.5}Retrospective Dice Recovery ($R_{\text  {rec}}$)}{5}{subsubsection.3.4.5}\protected@file@percent }
+\newlabel{sec:recovery}{{3.4.5}{5}{Retrospective Dice Recovery ($R_{\text {rec}}$)}{subsubsection.3.4.5}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.6}Factorial Factor Attribution}{5}{subsubsection.3.4.6}\protected@file@percent }
+\newlabel{sec:factorial}{{3.4.6}{5}{Factorial Factor Attribution}{subsubsection.3.4.6}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4}Experimental Setup}{5}{section.4}\protected@file@percent }
+\newlabel{sec:experiments}{{4}{5}{Experimental Setup}{section.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Target Architectures and Intervention Specifications}{5}{subsection.4.1}\protected@file@percent }
+\newlabel{sec:backbones}{{4.1}{5}{Target Architectures and Intervention Specifications}{subsection.4.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Factorial Configurations}{5}{subsection.4.2}\protected@file@percent }
+\newlabel{sec:factorial_configs}{{4.2}{5}{Factorial Configurations}{subsection.4.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Clinical Datasets and Characteristics}{5}{subsection.4.3}\protected@file@percent }
+\newlabel{sec:datasets}{{4.3}{5}{Clinical Datasets and Characteristics}{subsection.4.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Evaluation Strategy and Experimental Axes}{5}{subsection.4.4}\protected@file@percent }
+\newlabel{sec:protocols}{{4.4}{5}{Evaluation Strategy and Experimental Axes}{subsection.4.4}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Comprehensive quantitative comparison of Full ($E_0$) vs. Efficient ($E_1$) decoders across three 3D backbones on the BTCV 13-organ CT dataset, detailing decoder architectural configurations, computational complexity, inference latency, and segmentation performance.}}{6}{table.2}\protected@file@percent }
+\newlabel{tab:main_results}{{2}{6}{Comprehensive quantitative comparison of Full ($E_0$) vs. Efficient ($E_1$) decoders across three 3D backbones on the BTCV 13-organ CT dataset, detailing decoder architectural configurations, computational complexity, inference latency, and segmentation performance}{table.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}Implementation and Statistical Protocol}{6}{subsection.4.5}\protected@file@percent }
+\newlabel{sec:setup}{{4.5}{6}{Implementation and Statistical Protocol}{subsection.4.5}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5}Results and Discussion}{6}{section.5}\protected@file@percent }
+\newlabel{sec:results_discussion}{{5}{6}{Results and Discussion}{section.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Macro Trade-offs and Bidirectional Voxel Dynamics}{6}{subsection.5.1}\protected@file@percent }
+\newlabel{sec:results_macro}{{5.1}{6}{Macro Trade-offs and Bidirectional Voxel Dynamics}{subsection.5.1}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Global flip rates ($R_{+}$, $N$, $R_{\text  {net}}$) across backbones under Full ($E_0$) vs. Efficient ($E_1$) decoders on BTCV CT.}}{6}{figure.3}\protected@file@percent }
+\newlabel{fig:global_flips}{{3}{6}{Global flip rates ($R_{+}$, $N$, $R_{\text {net}}$) across backbones under Full ($E_0$) vs. Efficient ($E_1$) decoders on BTCV CT}{figure.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Spatial and Anatomical Heterogeneity}{6}{subsection.5.2}\protected@file@percent }
+\newlabel{sec:results_heterogeneity}{{5.2}{6}{Spatial and Anatomical Heterogeneity}{subsection.5.2}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Boundary-resolved decoder benefit versus physical distance to ground-truth boundary ($d_{GT}$) across backbones: (a) net gain $R_{+}-R_{-}$, and (b) activity $R_{+}+R_{-}$.}}{7}{figure.4}\protected@file@percent }
+\newlabel{fig:boundary_flips}{{4}{7}{Boundary-resolved decoder benefit versus physical distance to ground-truth boundary ($d_{GT}$) across backbones: (a) net gain $R_{+}-R_{-}$, and (b) activity $R_{+}+R_{-}$}{figure.4}{}}
+\@writefile{toc}{\contentsline {paragraph}{The Metric Weighting Paradox.}{7}{section*.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Architectural Drivers and Spatial Concentration}{7}{subsection.5.3}\protected@file@percent }
+\newlabel{sec:results_drivers}{{5.3}{7}{Architectural Drivers and Spatial Concentration}{subsection.5.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Inference-Time Predictability and Selective Recovery}{7}{subsection.5.4}\protected@file@percent }
+\newlabel{sec:results_predictability}{{5.4}{7}{Inference-Time Predictability and Selective Recovery}{subsection.5.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Organ-level flip breakdown across backbones under Full ($E_0$) vs. Efficient ($E_1$) decoders (BTCV CT).}}{8}{figure.5}\protected@file@percent }
+\newlabel{fig:heterogeneity_anatomy}{{5}{8}{Organ-level flip breakdown across backbones under Full ($E_0$) vs. Efficient ($E_1$) decoders (BTCV CT)}{figure.5}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces $2\times 2$ Factorial analysis of decoder channel reduction ($C_{dec}$) and resolution scaling ($RF$) on 3D UX-Net and BTCV CT (Decoder-Isolated Factor Attribution Axis).}}{9}{table.3}\protected@file@percent }
+\newlabel{tab:factorial}{{3}{9}{$2\times 2$ Factorial analysis of decoder channel reduction ($C_{dec}$) and resolution scaling ($RF$) on 3D UX-Net and BTCV CT (Decoder-Isolated Factor Attribution Axis)}{table.3}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Factor main effects ($\Delta _C, \Delta _{RF}$) and interaction ($\Delta _{C \times RF}$) across metrics on 3D UX-Net (BTCV CT).}}{9}{table.4}\protected@file@percent }
+\newlabel{tab:factorial_effects}{{4}{9}{Factor main effects ($\Delta _C, \Delta _{RF}$) and interaction ($\Delta _{C \times RF}$) across metrics on 3D UX-Net (BTCV CT)}{table.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Oracle positive-gain concentration curves ($K_{80}$) across backbones.}}{9}{figure.6}\protected@file@percent }
+\newlabel{fig:concentration}{{6}{9}{Oracle positive-gain concentration curves ($K_{80}$) across backbones}{figure.6}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Inference-time predictability of block-level activity (Location AUROC) vs. directional utility (Direction AUROC) across backbones.}}{9}{table.5}\protected@file@percent }
+\newlabel{tab:predictability}{{5}{9}{Inference-time predictability of block-level activity (Location AUROC) vs. directional utility (Direction AUROC) across backbones}{table.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}Cross-Dataset Generalization}{9}{subsection.5.5}\protected@file@percent }
+\newlabel{sec:results_generalization}{{5.5}{9}{Cross-Dataset Generalization}{subsection.5.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.6}Clinical Stratification and Decoder Design Principles}{9}{subsection.5.6}\protected@file@percent }
+\newlabel{sec:clinical_implications}{{5.6}{9}{Clinical Stratification and Decoder Design Principles}{subsection.5.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.7}Limitations}{9}{subsection.5.7}\protected@file@percent }
+\newlabel{sec:limitations}{{5.7}{9}{Limitations}{subsection.5.7}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Conditional predictive entropy density distributions $p(H \mid P=1)$ vs. $p(H \mid N=1)$ across backbones.}}{10}{figure.7}\protected@file@percent }
+\newlabel{fig:flip_density}{{7}{10}{Conditional predictive entropy density distributions $p(H \mid P=1)$ vs. $p(H \mid N=1)$ across backbones}{figure.7}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Cross-dataset generalization validation using 3D UX-Net across three clinical imaging datasets (Cross-Dataset Consistency Axis).}}{10}{table.6}\protected@file@percent }
+\newlabel{tab:cross_dataset}{{6}{10}{Cross-dataset generalization validation using 3D UX-Net across three clinical imaging datasets (Cross-Dataset Consistency Axis)}{table.6}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Macro-Dice gap recovery trajectories under retrospective output hybridization across backbones.}}{10}{figure.8}\protected@file@percent }
+\newlabel{fig:macro_recovery}{{8}{10}{Macro-Dice gap recovery trajectories under retrospective output hybridization across backbones}{figure.8}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6}Conclusion}{10}{section.6}\protected@file@percent }
+\newlabel{sec:conclusion}{{6}{10}{Conclusion}{section.6}{}}
 \bibstyle{elsarticle-num}
 \bibdata{refs}
 \bibcite{ronneberger2015u}{{1}{}{{}}{{}}}
@@ -145,8 +136,6 @@
 \bibcite{hatamizadeh2022swin}{{4}{}{{}}{{}}}
 \bibcite{lee20233d}{{5}{}{{}}{{}}}
 \bibcite{roy2023mednext}{{6}{}{{}}{{}}}
-\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{13}{section.7}\protected@file@percent }
-\newlabel{sec:conclusion}{{7}{13}{Conclusion}{section.7}{}}
 \bibcite{effidec3d}{{7}{}{{}}{{}}}
 \bibcite{efficientmednext}{{8}{}{{}}{{}}}
 \bibcite{milletari2016v}{{9}{}{{}}{{}}}
@@ -155,24 +144,25 @@
 \bibcite{xie2021segformer}{{12}{}{{}}{{}}}
 \bibcite{shaker2024unetrpp}{{13}{}{{}}{{}}}
 \bibcite{jiang2024slimunetr}{{14}{}{{}}{{}}}
-\bibcite{yu2018slimmable}{{15}{}{{}}{{}}}
-\bibcite{wang2021adaptive}{{16}{}{{}}{{}}}
-\bibcite{gal2016dropout}{{17}{}{{}}{{}}}
-\bibcite{lakshminarayanan2017simple}{{18}{}{{}}{{}}}
-\bibcite{kendall2017uncertainties}{{19}{}{{}}{{}}}
-\bibcite{geifman2017selective}{{20}{}{{}}{{}}}
-\bibcite{shannon1948mathematical}{{21}{}{{}}{{}}}
-\bibcite{guo2017calibration}{{22}{}{{}}{{}}}
-\bibcite{cmig2025quality}{{23}{}{{}}{{}}}
-\bibcite{landman2015btcv}{{24}{}{{}}{{}}}
-\bibcite{bakas2018identifying}{{25}{}{{}}{{}}}
-\bibcite{simpson2019large}{{26}{}{{}}{{}}}
+\bibcite{gal2016dropout}{{15}{}{{}}{{}}}
+\bibcite{lakshminarayanan2017simple}{{16}{}{{}}{{}}}
+\bibcite{kendall2017uncertainties}{{17}{}{{}}{{}}}
+\bibcite{jungoreyes}{{18}{}{{}}{{}}}
+\bibcite{uncertaintyreview}{{19}{}{{}}{{}}}
+\bibcite{cmig2025clinical}{{20}{}{{}}{{}}}
+\bibcite{cmig2025quality}{{21}{}{{}}{{}}}
+\bibcite{geifman2017selective}{{22}{}{{}}{{}}}
+\bibcite{shannon1948mathematical}{{23}{}{{}}{{}}}
+\bibcite{guo2017calibration}{{24}{}{{}}{{}}}
+\bibcite{landman2015btcv}{{25}{}{{}}{{}}}
+\bibcite{bakas2018identifying}{{26}{}{{}}{{}}}
+\bibcite{simpson2019large}{{27}{}{{}}{{}}}
 \providecommand\NAT@force@numbers{}\NAT@force@numbers
 \@writefile{toc}{\let\numberline\tmptocnumberline}
-\@writefile{lof}{\contentsline {figure}{\numberline {S1}{\ignorespaces Supplementary Figure S1: Qualitative motivation visualization for 3D UX-Net on BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders.}}{16}{figure.1}\protected@file@percent }
-\newlabel{fig:supp_uxnet}{{S1}{16}{Supplementary Figure S1: Qualitative motivation visualization for 3D UX-Net on BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders}{figure.1}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {S2}{\ignorespaces Supplementary Figure S2: Qualitative motivation visualization for MedNeXt-M-K3 on BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders.}}{17}{figure.2}\protected@file@percent }
-\newlabel{fig:supp_mednext}{{S2}{17}{Supplementary Figure S2: Qualitative motivation visualization for MedNeXt-M-K3 on BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders}{figure.2}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {S3}{\ignorespaces Supplementary Figure S3: Correlation between mean predictive entropy and block-level error rate across backbones.}}{18}{figure.3}\protected@file@percent }
-\newlabel{fig:supp_error_rate}{{S3}{18}{Supplementary Figure S3: Correlation between mean predictive entropy and block-level error rate across backbones}{figure.3}{}}
-\gdef \@abspage@last{19}
+\@writefile{lof}{\contentsline {figure}{\numberline {S1}{\ignorespaces Qualitative motivation visualization for 3D UX-Net on BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders.}}{14}{figure.1}\protected@file@percent }
+\newlabel{fig:supp_uxnet}{{S1}{14}{Qualitative motivation visualization for 3D UX-Net on BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders}{figure.1}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {S2}{\ignorespaces Qualitative motivation visualization for MedNeXt-M-K3 on BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders.}}{15}{figure.2}\protected@file@percent }
+\newlabel{fig:supp_mednext}{{S2}{15}{Qualitative motivation visualization for MedNeXt-M-K3 on BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders}{figure.2}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {S3}{\ignorespaces Correlation between mean predictive entropy and block-level error rate across backbones.}}{15}{figure.3}\protected@file@percent }
+\newlabel{fig:supp_error_rate}{{S3}{15}{Correlation between mean predictive entropy and block-level error rate across backbones}{figure.3}{}}
+\gdef \@abspage@last{16}

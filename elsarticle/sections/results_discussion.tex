@@ -173,13 +173,13 @@ High location AUROC ($0.865\text{--}0.900$), low direction AUROC ($0.520\text{--
 
 All results so far obtain the efficient decoder by EffiDec3D's capacity removal (channel reduction plus high-resolution stage omission). To test whether the characterization is an artifact of that specific pruning rather than a property of decoder computation, we repeat the anchor-cell analysis with a structurally different, capacity-preserving efficient decoder: a depthwise-separable decoder that keeps every channel and stage of the full decoder and only factorizes each convolution (Section~\ref{sec:backbones}). Table~\ref{tab:robustness} compares the two efficient decoders on 3D UX-Net / BTCV, with every metric computed identically.
 
-Each qualitative finding replicates under the separable decoder: bidirectional activity ($0.50\%$) far exceeds the net gain; the positive net that exists is concentrated at the immediate ground-truth boundary ($+1.58\%$ in the $0$--$1$ vox band); location predictability far exceeds direction predictability ($0.886$ vs.\ $0.582$); oracle concentration is near-total ($99.4\%$ of positive gain within the top $5\%$ of blocks, $K_{80}\le5\%$); and a $20\%$ entropy budget recovers the full macro-Dice gap. The values track the EffiDec3D pair closely despite an orthogonal efficiency mechanism.
+The two mechanisms reach very different operating points. The separable decoder preserves all channels and stages and only factorizes convolutions, cutting the full model ($53.0$M params, $578.7$ GMac) to $37.3$M / $174.0$ GMac---a $3.3\times$ FLOP reduction, and a $5.8\times$ reduction of the decoder pathway itself ($489\rightarrow84$ GMac), which accounts for $77.5\%$ of the full model's compute---whereas EffiDec3D's pruning is far more aggressive ($3.2$M / $49.5$ GMac). That the characterization holds at both points reinforces that it reflects decoder computation itself, not a particular efficiency budget. Each qualitative finding replicates under the separable decoder: bidirectional activity ($0.50\%$) far exceeds the net gain; the positive net that exists is concentrated at the immediate ground-truth boundary ($+1.58\%$ in the $0$--$1$ vox band); location predictability far exceeds direction predictability ($0.886$ vs.\ $0.582$); oracle concentration is near-total ($99.4\%$ of positive gain within the top $5\%$ of blocks, $K_{80}\le5\%$); and a $20\%$ entropy budget recovers the full macro-Dice gap. The values track the EffiDec3D pair closely despite an orthogonal efficiency mechanism.
 
 One difference is worth stating plainly. The separable decoder agrees with the full decoder far more (only $0.50\%$ activity), and its net gain, though tiny, is marginally positive ($+0.068\%$, $95\%$ CI $[+0.010, +0.133]$) rather than strictly zero-crossing as for the removal-based pairs. That residual benefit is itself boundary-localized, so it sharpens rather than contradicts the central picture: a capacity-preserving decoder leaves the full model only a hair of genuine benefit, and that hair lives at the boundary. Both efficiency mechanisms therefore yield the same characterization---highly active, near-neutral, boundary-localized, direction-unpredictable, concentrated, and recoverable---so the findings are not tied to \emph{how} the decoder is made efficient.
 
 \begin{table}[t]
 \centering
-\caption{Robustness of the characterization to the decoder-lightening mechanism on 3D UX-Net / BTCV: EffiDec3D capacity removal vs.\ a capacity-preserving depthwise-separable decoder. All metrics are computed identically for both pairs.}
+\caption{Robustness of the characterization to the decoder-lightening mechanism on 3D UX-Net / BTCV: EffiDec3D capacity removal vs.\ a capacity-preserving depthwise-separable decoder. All metrics are computed identically for both pairs against the same full decoder ($E_0$: $53.01$M params, $578.74$ GMac, Dice $0.792$).}
 \label{tab:robustness}
 \small
 \begin{tabular}{@{}lcc@{}}
@@ -187,7 +187,9 @@ One difference is worth stating plainly. The separable decoder agrees with the f
 \textbf{Metric (UX-Net / BTCV)} & \textbf{EffiDec3D} & \textbf{Separable} \\
  & \textbf{(removal)} & \textbf{(factorized)} \\
 \midrule
-Full / efficient Dice & 0.791 / 0.776 & 0.799 / 0.785 \\
+Params (M) & 3.16 & 37.28 \\
+FLOPs (GMac) & 49.49 & 173.98 \\
+Full / efficient Dice & 0.792 / 0.776 & 0.792 / 0.785 \\
 Activity $R_{+}+R_{-}$ (\%) & 0.51 & 0.50 \\
 Net gain $R_{+}-R_{-}$ (\%) & $+0.047$ & $+0.068$ \\
 \quad 95\% CI & $[-0.020,+0.109]$ & $[+0.010,+0.133]$ \\

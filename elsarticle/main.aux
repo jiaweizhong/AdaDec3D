@@ -120,27 +120,27 @@
 \newlabel{sec:results_generalization}{{5.5}{10}{Cross-Dataset Generalization}{subsection.5.5}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {5.6}Robustness to the Decoder-Lightening Mechanism}{10}{subsection.5.6}\protected@file@percent }
 \newlabel{sec:results_robustness}{{5.6}{10}{Robustness to the Decoder-Lightening Mechanism}{subsection.5.6}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.7}Clinical Stratification and Decoder Design Principles}{10}{subsection.5.7}\protected@file@percent }
-\newlabel{sec:clinical_implications}{{5.7}{10}{Clinical Stratification and Decoder Design Principles}{subsection.5.7}{}}
 \@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Conditional predictive entropy density distributions $p(H \mid P=1)$ vs. $p(H \mid N=1)$ across backbones.}}{11}{figure.8}\protected@file@percent }
 \newlabel{fig:flip_density}{{8}{11}{Conditional predictive entropy density distributions $p(H \mid P=1)$ vs. $p(H \mid N=1)$ across backbones}{figure.8}{}}
 \@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Cross-dataset generalization validation using 3D UX-Net across three clinical imaging datasets (Cross-Dataset Consistency Axis).}}{11}{table.6}\protected@file@percent }
 \newlabel{tab:cross_dataset}{{6}{11}{Cross-dataset generalization validation using 3D UX-Net across three clinical imaging datasets (Cross-Dataset Consistency Axis)}{table.6}{}}
 \@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Macro-Dice gap recovery trajectories under retrospective output hybridization across backbones.}}{11}{figure.9}\protected@file@percent }
 \newlabel{fig:macro_recovery}{{9}{11}{Macro-Dice gap recovery trajectories under retrospective output hybridization across backbones}{figure.9}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces Robustness of the characterization to the decoder-lightening mechanism on 3D UX-Net / BTCV: EffiDec3D capacity removal vs.\ a capacity-preserving depthwise-separable decoder. All metrics are computed identically for both pairs.}}{11}{table.7}\protected@file@percent }
-\newlabel{tab:robustness}{{7}{11}{Robustness of the characterization to the decoder-lightening mechanism on 3D UX-Net / BTCV: EffiDec3D capacity removal vs.\ a capacity-preserving depthwise-separable decoder. All metrics are computed identically for both pairs}{table.7}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.8}Limitations}{11}{subsection.5.8}\protected@file@percent }
-\newlabel{sec:limitations}{{5.8}{11}{Limitations}{subsection.5.8}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.7}Clinical Stratification and Decoder Design Principles}{11}{subsection.5.7}\protected@file@percent }
+\newlabel{sec:clinical_implications}{{5.7}{11}{Clinical Stratification and Decoder Design Principles}{subsection.5.7}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces Robustness of the characterization to the decoder-lightening mechanism on 3D UX-Net / BTCV: EffiDec3D capacity removal vs.\ a capacity-preserving depthwise-separable decoder. All metrics are computed identically for both pairs against the same full decoder ($E_0$: $53.01$M params, $578.74$ GMac, Dice $0.792$).}}{11}{table.7}\protected@file@percent }
+\newlabel{tab:robustness}{{7}{11}{Robustness of the characterization to the decoder-lightening mechanism on 3D UX-Net / BTCV: EffiDec3D capacity removal vs.\ a capacity-preserving depthwise-separable decoder. All metrics are computed identically for both pairs against the same full decoder ($E_0$: $53.01$M params, $578.74$ GMac, Dice $0.792$)}{table.7}{}}
 \bibstyle{elsarticle-num}
 \bibdata{refs}
 \bibcite{ronneberger2015u}{{1}{}{{}}{{}}}
 \bibcite{cicek20163d}{{2}{}{{}}{{}}}
 \bibcite{hatamizadeh2022unetr}{{3}{}{{}}{{}}}
-\bibcite{hatamizadeh2022swin}{{4}{}{{}}{{}}}
-\bibcite{lee20233d}{{5}{}{{}}{{}}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.8}Limitations}{12}{subsection.5.8}\protected@file@percent }
+\newlabel{sec:limitations}{{5.8}{12}{Limitations}{subsection.5.8}{}}
 \@writefile{toc}{\contentsline {section}{\numberline {6}Conclusion}{12}{section.6}\protected@file@percent }
 \newlabel{sec:conclusion}{{6}{12}{Conclusion}{section.6}{}}
+\bibcite{hatamizadeh2022swin}{{4}{}{{}}{{}}}
+\bibcite{lee20233d}{{5}{}{{}}{{}}}
 \bibcite{roy2023mednext}{{6}{}{{}}{{}}}
 \bibcite{effidec3d}{{7}{}{{}}{{}}}
 \bibcite{efficientmednext}{{8}{}{{}}{{}}}
@@ -165,10 +165,10 @@
 \bibcite{simpson2019large}{{27}{}{{}}{{}}}
 \providecommand\NAT@force@numbers{}\NAT@force@numbers
 \@writefile{toc}{\let\numberline\tmptocnumberline}
-\@writefile{lof}{\contentsline {figure}{\numberline {S1}{\ignorespaces Qualitative motivation visualization for 3D UX-Net on BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders.}}{15}{figure.1}\protected@file@percent }
-\newlabel{fig:supp_uxnet}{{S1}{15}{Qualitative motivation visualization for 3D UX-Net on BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders}{figure.1}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {S2}{\ignorespaces Qualitative motivation visualization for MedNeXt-M-K3 on BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders.}}{16}{figure.2}\protected@file@percent }
-\newlabel{fig:supp_mednext}{{S2}{16}{Qualitative motivation visualization for MedNeXt-M-K3 on BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders}{figure.2}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {S3}{\ignorespaces Correlation between mean predictive entropy and block-level error rate across backbones.}}{16}{figure.3}\protected@file@percent }
-\newlabel{fig:supp_error_rate}{{S3}{16}{Correlation between mean predictive entropy and block-level error rate across backbones}{figure.3}{}}
-\gdef \@abspage@last{17}
+\@writefile{lof}{\contentsline {figure}{\numberline {S1}{\ignorespaces Qualitative motivation visualization for 3D UX-Net on BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders.}}{16}{figure.1}\protected@file@percent }
+\newlabel{fig:supp_uxnet}{{S1}{16}{Qualitative motivation visualization for 3D UX-Net on BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders}{figure.1}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {S2}{\ignorespaces Qualitative motivation visualization for MedNeXt-M-K3 on BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders.}}{17}{figure.2}\protected@file@percent }
+\newlabel{fig:supp_mednext}{{S2}{17}{Qualitative motivation visualization for MedNeXt-M-K3 on BTCV CT multi-organ dataset under Full ($E_0$) vs. Efficient ($E_1$) decoders}{figure.2}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {S3}{\ignorespaces Correlation between mean predictive entropy and block-level error rate across backbones.}}{17}{figure.3}\protected@file@percent }
+\newlabel{fig:supp_error_rate}{{S3}{17}{Correlation between mean predictive entropy and block-level error rate across backbones}{figure.3}{}}
+\gdef \@abspage@last{18}

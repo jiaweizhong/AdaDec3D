@@ -16,7 +16,7 @@ import argparse
 import torch
 import torch.nn as nn
 from ptflops import get_model_complexity_info
-from networks.UXNet_3D.network_backbone import UXNET_EffiDec3D
+from networks.UXNet_3D.network_backbone import UXNET, UXNET_EffiDec3D, UXNET_SepDec
 
 ENCODER_PREFIXES = ("uxnet_3d", "encoder")
 DECODER_PREFIXES = ("decoder", "out")
@@ -42,17 +42,26 @@ def module_macs(m, out):
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--network", default="effi", choices=["full", "effi", "sepdec"],
+                    help="full=dense UXNET (E0); effi=EffiDec3D (capacity removal); "
+                         "sepdec=depthwise-separable (capacity-preserving factorization)")
     ap.add_argument("--skip_aggregation", default="concatenation",
                     choices=["addition", "concatenation"],
-                    help="must match the canonical EffiDec3D config (now concatenation)")
+                    help="EffiDec3D config (concatenation is canonical); ignored for full/sepdec")
     args = ap.parse_args()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    model = UXNET_EffiDec3D(
-        in_chans=1, out_chans=14, depths=[2, 2, 2, 2],
-        feat_size=[48, 96, 192, 384], n_decoder_channels=48,
-        drop_path_rate=0, layer_scale_init_value=1e-6, spatial_dims=3,
-        skip_aggregation=args.skip_aggregation, resolution_factor=2).to(device).eval()
-    print(f"[config] skip_aggregation={args.skip_aggregation}")
+    common = dict(in_chans=1, out_chans=14, depths=[2, 2, 2, 2],
+                  feat_size=[48, 96, 192, 384], drop_path_rate=0,
+                  layer_scale_init_value=1e-6, spatial_dims=3)
+    if args.network == "full":
+        model = UXNET(**common).to(device).eval()
+    elif args.network == "sepdec":
+        model = UXNET_SepDec(**common).to(device).eval()
+    else:
+        model = UXNET_EffiDec3D(n_decoder_channels=48, resolution_factor=2,
+                                skip_aggregation=args.skip_aggregation, **common).to(device).eval()
+    print(f"[config] network={args.network}"
+          + (f"  skip_aggregation={args.skip_aggregation}" if args.network == "effi" else ""))
 
     top_macs = {name: 0 for name, _ in model.named_children()}
     handles = []

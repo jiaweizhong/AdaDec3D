@@ -1,12 +1,21 @@
 \section{Experimental Setup}
 \label{sec:experiments}
 
-This section describes the target 3D backbones, clinical datasets, evaluation axes, and implementation setup.
+This section describes the target 3D backbones, clinical datasets, evaluation axes, and implementation setup. Our design triangulates decoder computation with three complementary probes on a shared 3D UX-Net / BTCV anchor (Figure~\ref{fig:design}): an ecological \emph{generality} axis (matched full/efficient pairs across backbones and datasets), a \emph{causal} frozen shared-encoder $2\times2$ factorial, and a \emph{logic-robustness} control that replaces EffiDec3D's capacity removal with a capacity-preserving depthwise-separable decoder. The three probes differ in training regime (end-to-end vs.\ frozen encoder) and efficiency mechanism (capacity removal vs.\ preservation), so agreement among them is not built into any single intervention form.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.84\textwidth]{figures/figure_design.pdf}
+\caption{Experimental design: three complementary probes of decoder computation on a shared 3D UX-Net / BTCV anchor. They differ in training regime (end-to-end vs.\ frozen shared encoder) and efficiency mechanism (capacity removal vs.\ preservation), jointly testing generality across backbones and datasets, causal attribution of the removed factors, and robustness to the decoder-lightening logic.}
+\label{fig:design}
+\end{figure*}
 
 \subsection{Target Architectures and Intervention Specifications}
 \label{sec:backbones}
 
 We evaluate matched decoder pairs across three representative 3D medical image segmentation backbones covering distinct architectural paradigms: a large-kernel CNN (3D UX-Net \cite{lee20233d}), a vision transformer (SwinUNETR \cite{hatamizadeh2022swin}), and a ConvNeXt-style network (MedNeXt-M-K3 \cite{roy2023mednext}). Interventions occur strictly within the decoder pathway (upsampling, skip fusion, and refinement) while preserving identical encoder weights and feature dimensions. For each backbone, the efficient decoder baseline ($E_1$) implements a standardized capacity reduction: an $87.5\%$ feature channel compression ($C_{\text{full}} \rightarrow C_{\text{reduced}}$) and the omission of the highest-resolution skip-refinement stage (Stage 1), following the architecture-preserving principles of EffiDec3D \cite{effidec3d}. All parameters, FLOPs (profiled on a standardized $1 \times C \times 96 \times 96 \times 96$ patch), and volumetric inference latencies are summarized in Table~\ref{tab:main_results}.
+
+As a second, structurally different intervention template, we additionally train a \emph{depthwise-separable} decoder on the 3D UX-Net anchor. Unlike EffiDec3D, it removes no capacity: every channel width and high-resolution stage of the full decoder ($E_0$) is retained, and only each dense $3\times3\times3$ decoder convolution is factorized into a depthwise plus a pointwise convolution (reducing a dense $192\rightarrow192$ conv from $995$K to $42$K parameters). This lightens the decoder through an efficiency mechanism orthogonal to capacity pruning, and serves as the logic-robustness control of Section~\ref{sec:results_robustness}.
 
 \begin{table*}[t]
 \centering

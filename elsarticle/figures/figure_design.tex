@@ -1,0 +1,72 @@
+% Figure: experimental design -- three complementary probes on a shared anchor cell.
+% Standalone TikZ (compile: pdflatex figure_design.tex) -> figure_design.pdf
+\documentclass[border=8pt]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage{helvet}
+\renewcommand{\familydefault}{\sfdefault}
+\hyphenpenalty=10000 \exhyphenpenalty=10000 \tolerance=2000
+\usepackage{amsmath}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, calc, shadows.blur}
+
+\definecolor{cInk}{HTML}{22303f}
+\definecolor{cSub}{HTML}{5c6b7a}
+\definecolor{cBlue}{HTML}{34557a}
+\definecolor{cTeal}{HTML}{2f7d5f}
+\definecolor{cGold}{HTML}{ab7513}
+\definecolor{cLine}{HTML}{b6bec7}
+\definecolor{cBlueBg}{HTML}{eef3f8}
+\definecolor{cTealBg}{HTML}{ecf5f0}
+\definecolor{cGoldBg}{HTML}{f8f1e3}
+\definecolor{cAnchorBg}{HTML}{eceff3}
+
+\newcommand{\ttl}{\bfseries}
+\newcommand{\sub}{\footnotesize\color{cSub}}
+\newcommand{\foot}[1]{{\scriptsize\scshape\color{cSub}#1}}
+
+\tikzset{
+  spoke/.style={-{Stealth[length=3mm,width=2.4mm]}, draw=cSub, line width=1.3pt},
+  lens/.style 2 args={draw=#1, line width=1pt, rounded corners=4pt, fill=#2,
+     inner sep=8pt, align=left, text=cInk, text width=6.2cm,
+     blur shadow={shadow blur steps=5, shadow xshift=0.5pt, shadow yshift=-0.8pt, shadow opacity=16}},
+  hubcard/.style={draw=cInk!70, line width=1.2pt, rounded corners=4pt, fill=cAnchorBg,
+     inner sep=9pt, align=center, text=cInk, text width=2.9cm,
+     blur shadow={shadow blur steps=5, shadow xshift=0.5pt, shadow yshift=-0.8pt, shadow opacity=18}},
+  badge/.style={draw=cGold, line width=0.7pt, rounded corners=3pt, fill=white,
+     inner sep=2.2pt, font=\scriptsize\bfseries, text=cGold},
+}
+
+\begin{document}
+\begin{tikzpicture}
+
+% ---------------- anchor (hub) ----------------
+\node[hubcard] (hub) at (0,0)
+  {{\ttl Anchor cell}\\[3pt]\normalfont 3D UX-Net\\[1pt] BTCV CT\\[4pt]
+   {\sub matched Full ($E_0$)\\ vs. efficient ($E_1$)}};
+
+% ---------------- three lenses ----------------
+\node[lens={cTeal}{cTealBg}] (l1) at (7.2,3.55)
+  {{\ttl\textcolor{cTeal}{Generality}}\\[2pt]
+   Full vs.\ EffiDec3D across \textbf{3 backbones} (UX-Net, SwinUNETR, MedNeXt) and \textbf{3 datasets} (BTCV, MSD01, MSD08).\\[3pt]
+   \sub \emph{Does the pattern hold across architecture \& modality?}\\[3pt]
+   \foot{end-to-end $\cdot$ capacity removal}};
+
+\node[lens={cBlue}{cBlueBg}] (l2) at (7.2,0)
+  {{\ttl\textcolor{cBlue}{Causal factor attribution}}\\[2pt]
+   Frozen shared encoder, \textbf{$2\times2$} grid over decoder \textbf{channel width} $\times$ \textbf{resolution stage}.\\[3pt]
+   \sub \emph{Which removed factor drives the effect?}\\[3pt]
+   \foot{frozen encoder $\cdot$ capacity removal}};
+
+\node[lens={cGold}{cGoldBg}] (l3) at (7.2,-3.55)
+  {{\ttl\textcolor{cGold}{Logic robustness}}\hfill\tikz{\node[badge]{control};}\\[2pt]
+   \textbf{Depthwise-separable} decoder: same channels \& stages, each conv factorized (capacity preserved).\\[3pt]
+   \sub \emph{An artifact of pruning, or decoder-general?}\\[3pt]
+   \foot{end-to-end $\cdot$ capacity preservation}};
+
+% ---------------- spokes ----------------
+\draw[spoke] (hub.east) to[out=35,in=180] (l1.west);
+\draw[spoke] (hub.east) to[out=0,in=180]  (l2.west);
+\draw[spoke] (hub.east) to[out=-35,in=180] (l3.west);
+
+\end{tikzpicture}
+\end{document}

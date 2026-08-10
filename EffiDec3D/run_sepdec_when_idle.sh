@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # ---------------------------------------------------------------------------
-# Wait until the GPU is idle, then train the depthwise-separable decoder (E1')
-# and run the paired observation against the existing full 3D UX-Net (E0).
+# Overnight job. Waits until the GPU is idle, then in order:
+#   1. (re)trains the full 3D UX-Net E0 if its checkpoint is missing
+#      (the original E0 was deleted, so this is what runs tonight);
+#   2. trains the depthwise-separable decoder E1' if missing (already done -> skipped);
+#   3. runs the paired observation, full E0 vs separable E1' (3DUXNET_SEP).
+# Both E0 and E1' land under OBS_OUT, so the obs finds them without staging.
 # Safe to launch inside tmux and leave hanging:
 #     tmux new -s sepdec
 #     bash run_sepdec_when_idle.sh
@@ -17,7 +21,8 @@ GPU=${GPU:-0}                                   # physical GPU index to watch/us
 ROOT=${ROOT:-/root/autodl-tmp/btcv-synapse}     # BTCV13 dataset root
 CODE=${CODE:-/root/AdaDec3D/EffiDec3D}          # repo working dir
 DATASET=${DATASET:-BTCV13}
-OUTBASE=${OUTBASE:-/root/output/E1_uxnet_sepdec}   # training --output; main_train mangles it
+OUTBASE=${OUTBASE:-/root/output/E1_uxnet_sepdec}   # E1' training --output; main_train mangles it
+OUTBASE_E0=${OUTBASE_E0:-/root/output/E0_uxnet_full}  # E0 (full 3DUXNET) training --output
 OBS_OUT=${OBS_OUT:-/root/output}                # obs --output (globs for E0 + E1' ckpts)
 OBS_DIR=${OBS_DIR:-/root/obs-uxnet-sepdec}      # where results.json + figures land
 LOG=${LOG:-/root/output/sepdec_when_idle.log}
@@ -61,7 +66,25 @@ cd "$CODE" || { log "cannot cd $CODE"; exit 1; }
 log "git pull (fetch latest UXNET_SepDec code):"
 git pull 2>&1 | tee -a "$LOG" || log "git pull failed (continuing with local code)"
 
-# --------------------------- train E1' (skip if done) ---------------------------
+# --------------------------- E0 full 3D UX-Net (retrain if missing) ---------------------------
+E0CKPT=$(ls -1 "$OBS_OUT"/*/3DUXNET/"$DATASET"/best_metric_model.pth 2>/dev/null | head -1)
+if [ -n "$E0CKPT" ]; then
+  log "E0 (full 3DUXNET) checkpoint present ($E0CKPT) -> skipping"
+else
+  log "E0 full 3DUXNET checkpoint missing -> training it (45k iters) ..."
+  python main_train_BTCV_TU.py \
+    --root "$ROOT" --output "$OUTBASE_E0" \
+    --dataset "$DATASET" --network 3DUXNET \
+    --channels 48 96 192 384 --n_channels 1 --ds False --mode train --pretrain False \
+    --batch_size 1 --crop_sample 4 --lr 0.001 --optim AdamW --max_iter 45000 \
+    --eval_step 250 --val_batch 1 --gpu "$GPU" --cache_rate 1.0 --num_workers 4 --overlap 0.7 \
+    2>&1 | tee -a "$LOG"
+  rc=${PIPESTATUS[0]}
+  [ "$rc" -ne 0 ] && { log "E0 TRAINING FAILED (rc=$rc) -> abort"; exit "$rc"; }
+  log "E0 training complete"
+fi
+
+# --------------------------- E1' depthwise-separable (skip if done) ---------------------------
 CKPT=$(ls -1 "$OBS_OUT"/*/3DUXNET_SepDec/"$DATASET"/best_metric_model.pth 2>/dev/null | head -1)
 if [ -n "$CKPT" ]; then
   log "E1' checkpoint already present ($CKPT) -> skipping training"
@@ -75,8 +98,8 @@ else
     --eval_step 250 --val_batch 1 --gpu "$GPU" --cache_rate 1.0 --num_workers 4 --overlap 0.7 \
     2>&1 | tee -a "$LOG"
   rc=${PIPESTATUS[0]}
-  [ "$rc" -ne 0 ] && { log "TRAINING FAILED (rc=$rc) -> abort"; exit "$rc"; }
-  log "training complete"
+  [ "$rc" -ne 0 ] && { log "E1' TRAINING FAILED (rc=$rc) -> abort"; exit "$rc"; }
+  log "E1' training complete"
 fi
 
 # --------------------------- paired observation (E0 vs E1') ---------------------------

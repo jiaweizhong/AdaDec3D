@@ -112,7 +112,7 @@ While oracle concentration establishes that a small volume fraction \emph{could}
 \small
 \begin{tabular}{@{}lcc@{}}
 \toprule
-\textbf{Backbone} & \textbf{Location AUROC} & \textbf{Direction AUROC} \\
+\textbf{Backbone} & \textbf{Location AUROC $\uparrow$} & \textbf{Direction AUROC $\uparrow$} \\
 \midrule
 3D UX-Net & 0.900 & 0.591 \\
 SwinUNETR & 0.913 & 0.560 \\
@@ -133,7 +133,7 @@ MedNeXt-M-K3 & 0.907 & 0.556 \\
 \label{fig:flip_density}
 \end{figure*}
 
-As shown in Table~\ref{tab:predictability}, single-pass predictive Shannon entropy achieves high Location AUROC ($\ge 0.900\text{--}0.913$), reliably detecting active blocks. However, Direction AUROC drops to near-chance levels ($0.556\text{--}0.591$). Multi-sample epistemic disagreement via Test-Time Augmentation Mutual Information ($I(v)$) similarly yields modest direction AUROCs ($0.539\text{--}0.570$). Figure~\ref{fig:flip_density} exposes the physical cause: positive corrections $P(v)$ and negative degradations $N(v)$ share nearly identical conditional entropy distributions $p(H \mid P(v)=1) \approx p(H \mid N(v)=1)$, rendering them directionally indistinguishable from uncertainty alone. This exposes the fundamental \emph{Activity--Direction Predictability Gap}: predictive uncertainty identifies where computation alters predictions, but fails to predict whether those alterations will be beneficial or harmful.
+As shown in Table~\ref{tab:predictability}, single-pass predictive Shannon entropy achieves high Location AUROC ($\ge 0.900\text{--}0.913$), reliably detecting active blocks. However, Direction AUROC drops to near-chance levels ($0.556\text{--}0.591$). Multi-sample epistemic disagreement via Test-Time Augmentation Mutual Information ($I(v)$) similarly yields modest direction AUROCs ($0.539\text{--}0.570$ on 3D UX-Net and SwinUNETR) while serving as a weaker localization signal ($0.795\text{--}0.812$). Figure~\ref{fig:flip_density} exposes the physical cause: positive corrections $P(v)$ and negative degradations $N(v)$ share nearly identical conditional entropy distributions $p(H \mid P(v)=1) \approx p(H \mid N(v)=1)$, rendering them directionally indistinguishable from uncertainty alone. This exposes the fundamental \emph{Activity--Direction Predictability Gap}: predictive uncertainty identifies where computation alters predictions, but fails to predict whether those alterations will be beneficial or harmful.
 
 \begin{figure}[tb]
 \centering
@@ -171,7 +171,7 @@ High location AUROC ($0.865\text{--}0.900$), low direction AUROC ($0.520\text{--
 \subsection{Robustness to the Decoder-Lightening Mechanism}
 \label{sec:results_robustness}
 
-All results so far obtain the efficient decoder by EffiDec3D's capacity removal (channel reduction plus high-resolution stage omission). To test whether the characterization is an artifact of that specific pruning rather than a property of decoder computation, we repeat the anchor-cell analysis with a structurally different, capacity-preserving efficient decoder: a depthwise-separable decoder that keeps every channel and stage of the full decoder and only factorizes each convolution (Section~\ref{sec:backbones}). Table~\ref{tab:robustness} compares the two efficient decoders on 3D UX-Net / BTCV, with every metric computed identically.
+All results so far obtain the efficient decoder by EffiDec3D's capacity removal (channel reduction plus high-resolution stage omission). To test whether the characterization is an artifact of that specific pruning rather than a property of decoder computation, we repeat the anchor-cell analysis with a structurally different, capacity-preserving efficient decoder: a depthwise-separable decoder \cite{chollet2017xception} that keeps every channel and stage of the full decoder and only factorizes each convolution (Section~\ref{sec:backbones}). Table~\ref{tab:robustness} compares the two efficient decoders on 3D UX-Net / BTCV, with every metric computed identically.
 
 The two mechanisms reach very different operating points. The separable decoder preserves all channels and stages and only factorizes convolutions, cutting the full model ($53.0$M params, $578.7$ GMac) to $37.3$M / $174.0$ GMac---a $3.3\times$ FLOP reduction, and a $5.8\times$ reduction of the decoder pathway itself ($489\rightarrow84$ GMac), which accounts for $77.5\%$ of the full model's compute---whereas EffiDec3D's pruning is far more aggressive ($3.2$M / $49.5$ GMac). That the characterization holds at both points reinforces that it reflects decoder computation itself, not a particular efficiency budget. Each qualitative finding replicates under the separable decoder: bidirectional activity ($0.50\%$) far exceeds the net gain; the positive net that exists is concentrated at the immediate ground-truth boundary ($+1.58\%$ in the $0$--$1$ vox band); location predictability far exceeds direction predictability ($0.886$ vs.\ $0.582$); oracle concentration is near-total ($99.4\%$ of positive gain within the top $5\%$ of blocks, $K_{80}\le5\%$); and a $20\%$ entropy budget recovers the full macro-Dice gap. The values track the EffiDec3D pair closely despite an orthogonal efficiency mechanism.
 
@@ -219,7 +219,7 @@ These empirical insights establish three practical principles for future dynamic
 
 While this study provides a comprehensive characterization of 3D decoder computation, three primary limitations should be noted:
 
-First, our controlled interventions draw from architecture-preserving channel compression and stage omission templates (inspired by EffiDec3D and depthwise-separated decoder designs). Although validated across diverse CNN, ViT, and ConvNeXt backbones, future work may explore dynamic gating or non-uniform depth pruning to examine whether unconstrained architecture search yields different spatial redundancy patterns.
+First, our controlled interventions evaluate two representative decoder simplification templates (channel/stage pruning via EffiDec3D and depthwise-separable convolution factorization). Although validated across diverse CNN, ViT, and ConvNeXt backbones, future work may explore dynamic gating heads or unconstrained architecture search to examine whether non-standard decoders yield different spatial redundancy patterns.
 
 Second, selective spatial recovery is established via retrospective output-space hybridization. This defines an empirical opportunity bound for localized allocation rather than demonstrating an integrated, hardware-level dynamic execution engine with real-time runtime speedup and CUDA kernel acceleration.
 

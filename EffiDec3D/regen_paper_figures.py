@@ -215,12 +215,11 @@ def regen_h1_merged(out_png):
 
 
 def regen_boundary_merged(out_png):
-    """Figure 4: boundary-resolved decoder benefit for all three backbones on one figure,
+    """Figure 6: boundary-resolved decoder benefit for all three backbones on one figure,
     split into the paper's two quantities -- (a) net gain and (b) activity (P+N) -- versus
-    distance to the ground-truth boundary. One line per backbone; net panel carries the
-    subject-bootstrap 95% CI."""
+    distance to the ground-truth boundary, arranged vertically (2 rows x 1 col) for single-column layout."""
     markers = ["o", "s", "^"]
-    fig, axs = plt.subplots(1, 2, figsize=(9.6, 3.9), sharex=True)
+    fig, axs = plt.subplots(2, 1, figsize=(4.0, 4.0), sharex=True)
     bins = None
     for (cell_results, _, label, color), mk in zip(CELLS, markers):
         hb = load(cell_results)["H2_boundary"]
@@ -231,20 +230,21 @@ def regen_boundary_merged(out_png):
         yerr = [[(netf[i] - ci[i][0]) * 100 for i in range(len(x))],
                 [(ci[i][1] - netf[i]) * 100 for i in range(len(x))]]
         act = [(p + q) * 100 for p, q in zip(hb["positive_rate"], hb["negative_rate"])]
-        axs[0].errorbar(x, net, yerr=yerr, marker=mk, ms=6, lw=2.0, color=color,
-                        capsize=3, label=label, zorder=3)
-        axs[1].plot(x, act, marker=mk, ms=6, lw=2.0, color=color, label=label, zorder=3)
+        axs[0].errorbar(x, net, yerr=yerr, marker=mk, ms=4, lw=1.5, color=color,
+                        capsize=2.5, label=label, zorder=3)
+        axs[1].plot(x, act, marker=mk, ms=4, lw=1.5, color=color, label=label, zorder=3)
     axs[0].axhline(0, color="k", lw=.7, ls=":")
-    axs[0].set_title("(a) Net gain  $R_{+}\\!-\\!R_{-}$", fontsize=13)
-    axs[1].set_title("(b) Activity  $R_{+}\\!+\\!R_{-}$", fontsize=13)
-    axs[0].set_ylabel("rate (%)", fontsize=12)
+    axs[0].set_title("(a) Net gain  $R_{+}\\!-\\!R_{-}$", fontsize=9.5, pad=3)
+    axs[1].set_title("(b) Activity  $R_{+}\\!+\\!R_{-}$", fontsize=9.5, pad=3)
+    axs[0].set_ylabel("rate (%)", fontsize=9)
+    axs[1].set_ylabel("rate (%)", fontsize=9)
     for ax in axs:
-        ax.set_xticks(np.arange(len(bins))); ax.set_xticklabels(bins, fontsize=11)
-        ax.set_xlabel("distance to GT boundary (voxels)", fontsize=12)
-        ax.tick_params(labelsize=10)
+        ax.set_xticks(np.arange(len(bins))); ax.set_xticklabels(bins, fontsize=9)
+        ax.tick_params(labelsize=8, pad=2)
         ax.grid(True, ls=":", lw=.5, alpha=.5)
-    axs[0].legend(fontsize=11, framealpha=.95)
-    fig.tight_layout(); fig.savefig(out_png, dpi=DPI); plt.close(fig)
+    axs[1].set_xlabel("distance to GT boundary (voxels)", fontsize=9, labelpad=3)
+    axs[0].legend(fontsize=8, framealpha=.95, loc="upper right")
+    fig.tight_layout(pad=0.3); fig.savefig(out_png, dpi=DPI); plt.close(fig)
 
 
 if __name__ == "__main__":

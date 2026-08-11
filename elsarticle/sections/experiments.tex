@@ -1,13 +1,20 @@
 \section{Experimental Setup}
 \label{sec:experiments}
 
-This section describes the target 3D backbones, clinical datasets, evaluation axes, and implementation setup. Our design triangulates decoder computation with three complementary probes on a shared 3D UX-Net / BTCV anchor (Figure~\ref{fig:design}): an ecological \emph{generality} axis (matched full/efficient pairs across backbones and datasets), a \emph{causal} frozen shared-encoder $2\times2$ factorial, and a \emph{logic-robustness} control that replaces EffiDec3D's capacity removal with a capacity-preserving depthwise-separable decoder. The three probes differ in training regime (end-to-end vs.\ frozen encoder) and efficiency mechanism (capacity removal vs.\ preservation), so agreement among them is not built into any single intervention form.
+This section describes the target 3D backbones, clinical datasets, evaluation axes, and implementation setup. Our design triangulates decoder computation with three complementary probes on a shared 3D UX-Net / BTCV anchor (Figure~\ref{fig:design_arch} and Figure~\ref{fig:design_factorial}): an ecological \emph{generality} axis (matched full/efficient pairs across backbones and datasets), a \emph{causal} frozen shared-encoder $2\times2$ factorial, and a \emph{logic-robustness} control that replaces EffiDec3D's capacity removal with a capacity-preserving depthwise-separable decoder. The three probes differ in training regime (end-to-end vs.\ frozen encoder) and efficiency mechanism (capacity removal vs.\ preservation), so agreement among them is not built into any single intervention form.
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.98\textwidth]{figures/figure_design.pdf}
-\caption{Experimental design and decoder intervention paradigms: (a) structural comparison of Full baseline ($E_0$), EffiDec3D capacity pruning ($E_1$), and Depthwise-Separable convolution factorization ($E_1'$); (b) causal $2\times2$ factorial matrix isolating channel width ($C_{\text{dec}}$) from high-resolution stage retention ($RF$) under a frozen shared encoder ($\mathbf{E}_{\text{frozen}}$).}
-\label{fig:design}
+\includegraphics[width=0.8\textwidth]{figures/figure3a_architectures.pdf}
+\caption{Structural 3D decoder intervention paradigms evaluated on the anchor backbone: Full baseline ($E_0$), EffiDec3D capacity pruning ($E_1$), and Depthwise-Separable convolution factorization ($E_1'$).}
+\label{fig:design_arch}
+\end{figure*}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.8\textwidth]{figures/figure3b_factorial.pdf}
+\caption{Causal $2\times2$ factorial matrix isolating channel width ($C_{\text{dec}}$) from high-resolution stage retention ($RF$) under a frozen shared encoder ($\mathbf{E}_{\text{frozen}}$).}
+\label{fig:design_factorial}
 \end{figure*}
 
 \subsection{Target Architectures and Intervention Specifications}

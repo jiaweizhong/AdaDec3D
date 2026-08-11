@@ -1,0 +1,31 @@
+\documentclass[border=8pt, multi, tikz]{standalone}
+\usepackage{amsmath, amsfonts, amssymb}
+\usetikzlibrary{positioning, arrows.meta, shapes.geometric, calc}
+\begin{document}
+\begin{tikzpicture}
+
+\node[draw=purple!80!black, line width=1.2pt, fill=purple!10, rounded corners=6pt, inner sep=8pt, align=center, text width=2.6cm] (frozen_enc) at (-2.0,-3.0,0) {\textbf{\large Frozen Encoder}\\[3pt]{\small ($\mathbf{E}_{\mathrm{frozen}}$)}};
+
+\node[font=\bfseries\large] at (8.5,-0.1,0) {Retain Stage 1 ($RF_1$)};
+\node[font=\bfseries\large] at (17.5,-0.1,0) {Omit Stage 1 ($RF_2$)};
+
+\node[font=\bfseries\small, anchor=south west, text=blue!80!black] at (1.6,-1.2,0) {Full Channel ($C_{384}$)};
+\node[font=\bfseries\small, anchor=south west, text=teal!80!black] at (1.6,-4.8,0) {Reduced Channel ($C_{48}$)};
+
+\node[draw=blue!70, fill=blue!10, line width=1.2pt, rounded corners=6pt, inner sep=6pt, text width=4.8cm, align=center] (grid11) at (8.5,-1.2,0) {\textbf{\large Full ($C_{384}, RF_1$)}\\[3pt]{\small Dice: 80.44\%}};
+
+\node[draw=gray!70, fill=gray!10, line width=1.2pt, rounded corners=6pt, inner sep=6pt, text width=4.8cm, align=center] (grid12) at (17.5,-1.2,0) {\textbf{\large Res-Only ($C_{384}, RF_2$)}\\[3pt]{\small Dice: 77.97\%}};
+
+\node[draw=gray!70, fill=gray!10, line width=1.2pt, rounded corners=6pt, inner sep=6pt, text width=4.8cm, align=center] (grid21) at (8.5,-4.8,0) {\textbf{\large Chan-Only ($C_{48}, RF_1$)}\\[3pt]{\small Dice: 79.80\%}};
+
+\node[draw=teal!70, fill=teal!10, line width=1.2pt, rounded corners=6pt, inner sep=6pt, text width=4.8cm, align=center] (grid22) at (17.5,-4.8,0) {\textbf{\large Effi ($C_{48}, RF_2$)}\\[3pt]{\small Dice: 78.35\%}};
+
+\draw[<->, draw=red, line width=1.5pt] (grid11.east) -- (grid12.west) node[midway, above=4pt, font=\bfseries\small\color{red}, align=center] {$\Delta_{RF} = -338.7$ GMac\\[2pt]($-1.96\%$ Dice)};
+
+\draw[<->, draw=red, line width=1.5pt] (grid11.south) -- (grid21.north) node[midway, right=6pt, font=\bfseries\small\color{red}, align=center] {$\Delta_C = -44.5$M Params\\[2pt]($-0.13\%$ Dice)};
+
+\draw[->, draw=purple!80!black, line width=1.4pt, dashed] (frozen_enc.east) -- (1.2,-3.0) |- (grid11.west);
+\draw[->, draw=purple!80!black, line width=1.4pt, dashed] (frozen_enc.east) -- (1.2,-3.0) |- (grid21.west);
+
+\end{tikzpicture}
+\end{document}

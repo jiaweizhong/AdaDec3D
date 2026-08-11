@@ -10,7 +10,7 @@ Evaluating aggregate segmentation accuracy alongside computational complexity re
 
 \begin{figure}[tb]
 \centering
-\includegraphics[width=0.86\columnwidth]{figures/h1_merged.png}
+\includegraphics[width=0.9\columnwidth]{figures/h1_merged.png}
 \caption{Global flip rates ($R_{+}$, $N$, $R_{\text{net}}$) across backbones under Full ($E_0$) vs. Efficient ($E_1$) decoders on BTCV CT.}
 \label{fig:global_flips}
 \end{figure}
@@ -19,12 +19,12 @@ Read at face value, these aggregate numbers appear to justify aggressive decoder
 
 Evaluating voxel predictions demonstrates that decoder activity is governed by strong bidirectional cancellation ($P(v) \approx N(v)$), rendering aggregate net volume-wide gain statistically near-zero (Figure~\ref{fig:global_flips}). Positive voxel corrections $P(v)$ (where $E_0$ fixes an $E_1$ error) are substantially counterbalanced by negative degradations $N(v)$ (where $E_0$ degrades a correct $E_1$ prediction). Over the All-Volume domain ($\Omega_{\text{all}}$), subject-mean net gain rates $R_{\text{net}}^{\text{all}}$ remain minimal: $+0.046\%$ (95\% CI: $[-0.020\%, +0.110\%]$) for 3D UX-Net, $-0.001\%$ (95\% CI: $[-0.045\%, +0.040\%]$) for SwinUNETR, and $+0.052\%$ (95\% CI: $[-0.010\%, +0.108\%]$) for MedNeXt-M-K3. Even over the Foreground-Union domain ($\Omega_{\text{fg}}$), net gain rates stay small ($+0.381\%$ for 3D UX-Net, $-0.008\%$ for SwinUNETR, $+0.446\%$ for MedNeXt-M-K3), and all paired subject-bootstrap $95\%$ confidence intervals include zero. Rather than acting as a monotonic error corrector, high-capacity decoders perform spatial prediction reallocation whose net volume-wide effect is near-neutral.
 
-\begin{figure*}[tb]
+\begin{figure}[tb]
 \centering
-\includegraphics[width=0.86\textwidth]{figures/boundary_merged.png}
+\includegraphics[width=0.92\columnwidth]{figures/boundary_merged.png}
 \caption{Boundary-resolved decoder benefit versus physical distance to ground-truth boundary ($d_{GT}$) across backbones: (a) net gain $R_{+}-R_{-}$, and (b) activity $R_{+}+R_{-}$.}
 \label{fig:boundary_flips}
-\end{figure*}
+\end{figure}
 
 \subsection{Spatial and Anatomical Heterogeneity}
 \label{sec:results_heterogeneity}
@@ -89,7 +89,7 @@ Boundary Net Gain (\%) & $-0.020$ & $+0.033$ & $-0.004$ \\
 }
 \end{table}
 
-High-resolution stage retention ($RF_1 \rightarrow RF_2$) accounts for a major FLOP reduction ($657.8 \rightarrow 319.1\text{ GMac}$, $\Delta_{RF} = -338.66\text{ GMac}$) and controls spatial boundary refinement ($+0.033\%$ net gain in $0\text{--}2\text{ mm}$ band, decaying to $-0.011\%$ in interiors). Channel width reduction ($C_{384} \rightarrow C_{48}$) cuts parameter count by $95\%$ ($46.7\text{M} \rightarrow 2.2\text{M}$) while exerting a spatially diffuse, net-neutral effect ($\Delta_C = -0.020\%$). The near-zero interaction term ($\Delta_{C \times RF} = -0.004\%$) indicates that channel width and resolution scaling act approximately additively, allowing them to be decoupled in efficient decoder design.
+High-resolution stage omission ($RF_1 \rightarrow RF_2$) accounts for a major FLOP reduction ($657.8 \rightarrow 319.1\text{ GMac}$, $\Delta_{RF} = -338.66\text{ GMac}$) and controls spatial boundary refinement ($+0.033\%$ net gain in $0\text{--}2\text{ mm}$ band, decaying to $-0.011\%$ in interiors). Channel width reduction ($C_{384} \rightarrow C_{48}$) cuts parameter count by $95\%$ ($46.7\text{M} \rightarrow 2.2\text{M}$) while exerting a spatially diffuse, net-neutral effect ($\Delta_C = -0.020\%$). The near-zero interaction term ($\Delta_{C \times RF} = -0.004\%$) indicates that channel width and resolution scaling act approximately additively, allowing them to be decoupled in efficient decoder design.
 
 \begin{figure}[tb]
 \centering
@@ -171,7 +171,7 @@ High location AUROC ($0.865\text{--}0.900$), low direction AUROC ($0.520\text{--
 \subsection{Robustness to the Decoder-Lightening Mechanism}
 \label{sec:results_robustness}
 
-All results so far obtain the efficient decoder by EffiDec3D's capacity removal (channel reduction plus high-resolution stage omission). To test whether the characterization is an artifact of that specific pruning rather than a property of decoder computation, we repeat the anchor-cell analysis with a structurally different, capacity-preserving efficient decoder: a depthwise-separable decoder \cite{chollet2017xception} that keeps every channel and stage of the full decoder and only factorizes each convolution (Section~\ref{sec:backbones}). Table~\ref{tab:robustness} compares the two efficient decoders on 3D UX-Net / BTCV, with every metric computed identically.
+All results so far obtain the efficient decoder by EffiDec3D's capacity removal (channel reduction plus high-resolution stage omission). To test whether the characterization is an artifact of that specific pruning rather than a property of decoder computation, we repeat the anchor-cell analysis with a structurally different, capacity-preserving efficient decoder: a depthwise-separable decoder \cite{chollet2017xception} that keeps every channel and stage of the full decoder and only factorizes each convolution (Section~\ref{sec:backbones}). Table~\ref{tab:robustness} compares the two efficient decoders on 3D UX-Net / BTCV, with every metric computed identically against the same full decoder baseline ($E_0$: $53.01$M parameters, $578.74$ GMac, Dice $0.792$).
 
 The two mechanisms reach very different operating points. The separable decoder preserves all channels and stages and only factorizes convolutions, cutting the full model ($53.0$M params, $578.7$ GMac) to $37.3$M / $174.0$ GMac---a $3.3\times$ FLOP reduction, and a $5.8\times$ reduction of the decoder pathway itself ($489\rightarrow84$ GMac), which accounts for $77.5\%$ of the full model's compute---whereas EffiDec3D's pruning is far more aggressive ($3.2$M / $49.5$ GMac). That the characterization holds at both points reinforces that it reflects decoder computation itself, not a particular efficiency budget. Each qualitative finding replicates under the separable decoder: bidirectional activity ($0.50\%$) far exceeds the net gain; the positive net that exists is concentrated at the immediate ground-truth boundary ($+1.58\%$ in the $0$--$1$ vox band); location predictability far exceeds direction predictability ($0.886$ vs.\ $0.582$); oracle concentration is near-total ($99.4\%$ of positive gain within the top $5\%$ of blocks, $K_{80}\le5\%$); and a $20\%$ entropy budget recovers the full macro-Dice gap. The values track the EffiDec3D pair closely despite an orthogonal efficiency mechanism.
 
@@ -179,7 +179,7 @@ One difference is worth stating plainly. The separable decoder agrees with the f
 
 \begin{table}[t]
 \centering
-\caption{Robustness of the characterization to the decoder-lightening mechanism on 3D UX-Net / BTCV: EffiDec3D capacity removal vs.\ a capacity-preserving depthwise-separable decoder. All metrics are computed identically for both pairs against the same full decoder ($E_0$: $53.01$M params, $578.74$ GMac, Dice $0.792$).}
+\caption{Robustness of characterization findings under capacity removal versus capacity-preserving depthwise-separable factorization (3D UX-Net, BTCV CT).}
 \label{tab:robustness}
 \small
 \begin{tabular}{@{}lcc@{}}

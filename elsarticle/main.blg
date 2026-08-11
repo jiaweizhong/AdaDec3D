@@ -4,45 +4,45 @@ The top-level auxiliary file: main.aux
 The style file: elsarticle-num.bst
 Database file #1: refs.bib
 Warning--empty pages in lee20233d
-You've used 27 entries,
+You've used 28 entries,
             2952 wiz_defined-function locations,
-            814 strings with 11612 characters,
-and the built_in function-call counts, 10332 in all, are:
-= -- 922
-> -- 438
-< -- 13
-+ -- 164
-- -- 137
-* -- 678
-:= -- 1388
-add.period$ -- 27
-call.type$ -- 27
-change.case$ -- 27
+            819 strings with 11796 characters,
+and the built_in function-call counts, 10786 in all, are:
+= -- 969
+> -- 442
+< -- 14
++ -- 166
+- -- 138
+* -- 698
+:= -- 1435
+add.period$ -- 28
+call.type$ -- 28
+change.case$ -- 28
 chr.to.int$ -- 0
-cite$ -- 28
-duplicate$ -- 364
-empty$ -- 1128
-format.name$ -- 163
-if$ -- 2682
+cite$ -- 29
+duplicate$ -- 385
+empty$ -- 1186
+format.name$ -- 164
+if$ -- 2810
 int.to.chr$ -- 0
-int.to.str$ -- 27
-missing$ -- 27
-newline$ -- 89
-num.names$ -- 27
-pop$ -- 215
+int.to.str$ -- 28
+missing$ -- 28
+newline$ -- 92
+num.names$ -- 28
+pop$ -- 224
 preamble$ -- 1
 purify$ -- 0
 quote$ -- 0
-skip$ -- 693
+skip$ -- 732
 stack$ -- 0
-substring$ -- 586
-swap$ -- 125
-text.length$ -- 13
+substring$ -- 626
+swap$ -- 136
+text.length$ -- 14
 text.prefix$ -- 0
 top$ -- 0
 type$ -- 0
 warning$ -- 1
-while$ -- 74
-width$ -- 29
-write$ -- 239
+while$ -- 78
+width$ -- 30
+write$ -- 248
 (There was 1 warning)

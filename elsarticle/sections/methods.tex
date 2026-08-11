@@ -23,7 +23,7 @@ We analyze decoder capacity by isolating two generic architectural factors that 
 
 Crossing these two experimental factors forms a $2\times2$ factorial intervention design (Full $E_0$, Channel-reduced, Stage-reduced, and Combined-efficient $E_1$). The specific channel-reduction ratios and stage-removal configurations follow the architecture-preserving decoder simplification strategy introduced by EffiDec3D \cite{effidec3d}. Interventions occur strictly within the decoder pathway (upsampling, skip fusion, and refinement) while keeping the feature encoder architecture untouched.
 
-\textbf{Choice of Intervention Template}: We adopt the reduction principles of EffiDec3D as a controlled intervention template rather than treating EffiDec3D itself as the primary object of evaluation. Its decoder-localized and architecture-preserving modifications provide matched configurations in which channel capacity and high-resolution stage retention can be independently controlled. This enables spatial characterization of decoder contribution while minimizing confounding changes to the encoder family, prediction task, or training objective.
+\textbf{Choice of Intervention Template}: We adopt the reduction principles of EffiDec3D as a controlled intervention template rather than treating EffiDec3D itself as the primary object of evaluation. Its decoder-localized and architecture-preserving modifications provide matched configurations in which channel capacity and high-resolution stage retention can be independently controlled. By keeping encoder architectures and weights strictly identical across matched pairs, any observed prediction shifts can be attributed unambiguously to decoder capacity rather than upstream feature extraction variations. This enables spatial characterization of decoder contribution while minimizing confounding changes to the encoder family, prediction task, or training objective.
 
 \subsection{Voxel-Level Correctness Activity Framework}
 \label{sec:framework}
@@ -39,6 +39,7 @@ Defining voxel correctness indicators $C_f(v) = \mathbf{1}[\hat{y}_f(v) = y(v)]$
     \item \textbf{Decoder Net Gain ($G(v) = C_f(v) - C_e(v) = P(v) - N(v)$)}: Measures the net directional balance ($G(v) = +1$ for correction, $-1$ for degradation, $0$ for unchanged).
     \item \textbf{Correctness Activity ($A_{\text{corr}}(v) = P(v) + N(v) = |G(v)|$)}: Measures where additional decoder capacity alters prediction correctness (gross activity).
 \end{itemize}
+This dual formalization resolves a crucial distinction: while traditional aggregate metrics evaluate only net volume-wide gain $G(v)$, gross activity $A_{\text{corr}}(v)$ uncovers the full spatial extent of prediction reorganization induced by additional decoding capacity.
 
 \begin{figure*}[t]
 \centering
@@ -104,11 +105,11 @@ To analyze how correctness changes distribute relative to anatomical structures,
 \begin{equation}
 d_{GT}(v) = \min_{u \in \partial S_{GT}} \| \mathbf{D} (x_v - x_u) \|_2 ,
 \end{equation}
-where $\mathbf{D} = \text{diag}(s_x, s_y, s_z)$ incorporates dataset physical voxel spacing. We stratify correctness activity $A_{\text{corr}}(v)$ and net gain $G(v)$ across physical distance bands ($0\text{--}2$, $2\text{--}4$, $4\text{--}8$, and $>8\text{~mm}$) to isolate partial-volume boundary interfaces from homogeneous organ interiors.
+where $\mathbf{D} = \text{diag}(s_x, s_y, s_z)$ incorporates dataset physical voxel spacing. Measuring distance directly to the ground-truth boundary manifold $\partial S_{GT}$ provides an objective, invariant baseline unconfounded by model-prediction noise. We stratify correctness activity $A_{\text{corr}}(v)$ and net gain $G(v)$ across physical distance bands ($0\text{--}2$, $2\text{--}4$, $4\text{--}8$, and $>8\text{~mm}$) to isolate partial-volume transition zones along organ margins from homogeneous interior regions.
 
 \subsubsection{Spatial Block Partitioning}
 \label{sec:blocks}
-To handle spatial sparsity and noise, voxels are aggregated into contiguous cubic spatial blocks covering approximately $24 \times 24 \times 24\text{~mm}^3$ (BTCV: $16 \times 16 \times 12$; MSD01: $24 \times 24 \times 24$; MSD08: $30 \times 30 \times 16$ voxels). A block $b_r$ is active if $A_{\text{corr}}(r) = \mathbf{1}[\sum_{v \in b_r} A_{\text{corr}}(v) > 0]$, and its directional gain is $G(r) = \sum_{v \in b_r} G(v)$.
+To handle spatial sparsity and noise, voxels are aggregated into contiguous cubic spatial blocks covering approximately $24 \times 24 \times 24\text{~mm}^3$ (BTCV: $16 \times 16 \times 12$; MSD01: $24 \times 24 \times 24$; MSD08: $30 \times 30 \times 16$ voxels). Aggregating voxels into physical cubic patches filters isolated single-voxel fluctuations and standardizes the spatial unit across clinical scans with disparate acquisition grids. This invariant physical footprint ($\sim 24\text{~mm}$ per dimension) ensures that downstream concentration and predictability metrics remain directly comparable across backbones and imaging modalities. A block $b_r$ is active if $A_{\text{corr}}(r) = \mathbf{1}[\sum_{v \in b_r} A_{\text{corr}}(v) > 0]$, and its directional gain is $G(r) = \sum_{v \in b_r} G(v)$.
 
 \subsubsection{Gain Concentration ($K_{80}$)}
 \label{sec:k80}
@@ -132,4 +133,4 @@ Evaluating $R_{\text{rec}}(k)$ across varying spatial budgets $k$ establishes an
 
 \subsubsection{Factorial Factor Attribution}
 \label{sec:factorial}
-Under a frozen shared encoder, we evaluate a $2\times2$ factorial grid across channel width $C \in \{C_{384}, C_{48}\}$ and resolution scaling $RF \in \{RF_1, RF_2\}$. We compute channel main effect $\Delta_C$, resolution main effect $\Delta_{RF}$, and interaction $\Delta_{C \times RF}$ to isolate the architectural drivers of decoder performance.
+Under a frozen shared encoder, we evaluate a $2\times2$ factorial grid across channel width $C \in \{C_{384}, C_{48}\}$ and resolution scaling $RF \in \{RF_1, RF_2\}$ (Figure~\ref{fig:design_factorial}). We compute channel main effect $\Delta_C$, resolution main effect $\Delta_{RF}$, and interaction $\Delta_{C \times RF}$ to isolate the architectural drivers of decoder performance.

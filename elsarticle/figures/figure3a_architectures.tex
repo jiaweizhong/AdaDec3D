@@ -1,0 +1,527 @@
+
+\documentclass[border=8pt, multi, tikz]{standalone} 
+\usepackage{import}
+\subimport{C:/Users/jiawe/Repos/PlotNeuralNet/layers/}{init}
+\usetikzlibrary{positioning}
+\usetikzlibrary{3d} %for including external image 
+\usepackage{amsmath, amsfonts, amssymb}
+\def\ConvColor{rgb:yellow,5;red,2.5;white,5}
+\def\ConvReluColor{rgb:yellow,5;red,5;white,5}
+\def\PoolColor{rgb:red,1;black,0.3}
+\def\UnpoolColor{rgb:blue,2;green,1;black,0.3}
+\def\FcColor{rgb:blue,5;red,2.5;white,5}
+\def\FcReluColor{rgb:blue,5;red,5;white,4}
+\def\SoftmaxColor{rgb:magenta,5;black,7}   
+\def\SumColor{rgb:blue,5;green,15}
+
+\def\ConvColor{rgb:yellow,5;red,2.5;white,5}
+\def\ConvReluColor{rgb:yellow,5;red,5;white,5}
+\def\PoolColor{rgb:red,1;black,0.3}
+\def\UnpoolColor{rgb:blue,2;green,1;black,0.3}
+\def\FcColor{rgb:blue,5;red,2.5;white,5}
+\def\FcReluColor{rgb:blue,5;red,5;white,4}
+\def\SoftmaxColor{rgb:magenta,5;black,7}   
+\def\SumColor{rgb:blue,5;green,15}
+\def\edgecolor{rgb:blue,4;red,1;green,4;black,3}
+
+\def\EncoderColor{rgb:blue,4;red,1;green,2;white,3}
+\def\FullDecoderColor{rgb:blue,5;red,2;white,4}
+\def\EffiDecoderColor{rgb:green,4;blue,3;white,4}
+\def\DWColor{rgb:yellow,6;red,4;white,3}
+\def\PWColor{rgb:blue,6;red,2;white,3}
+\def\OutputColor{rgb:magenta,5;black,5}
+
+\newcommand{\copymidarrow}{\tikz \draw[-Stealth,line width=0.8mm,draw={rgb:blue,4;red,1;green,1;black,3}] (-0.3,0) -- ++(0.3,0);}
+
+\begin{document}
+\begin{tikzpicture}
+\tikzstyle{connection}=[ultra thick,every node/.style={sloped,allow upside down},draw=\edgecolor,opacity=0.7]
+\tikzstyle{copyconnection}=[ultra thick,every node/.style={sloped,allow upside down},draw={rgb:blue,4;red,1;green,1;black,3},opacity=0.7]
+\node[anchor=west, font=\small\bfseries\color{blue!80!black}] at (-2, 8.1, 0) {Full Baseline ($E_0$): $C_{384}$, All 4 Stages, Dense 3D Convs ($53.0$M Params, $578.7$ GMac)};
+\pic[shift={(-2,6.0,0)}] at (0,0,0)
+    {Box={
+        name=e0_in,
+        caption=Patch,
+        xlabel={{, }},
+        zlabel=,
+        fill={\ConvColor},
+        height=6.2,
+        width=0.8,
+        depth=6.2
+        }
+    };
+
+\pic[shift={(1.4,0,0)}] at (e0_in-east)
+    {Box={
+        name=e0_enc1,
+        caption=Enc1,
+        xlabel={{, }},
+        zlabel=,
+        fill={\EncoderColor},
+        height=6.2,
+        width=1.4,
+        depth=6.2
+        }
+    };
+
+\pic[shift={(1.2,0,0)}] at (e0_enc1-east)
+    {Box={
+        name=e0_enc2,
+        caption=Enc2,
+        xlabel={{, }},
+        zlabel=,
+        fill={\EncoderColor},
+        height=4.6,
+        width=2.0,
+        depth=4.6
+        }
+    };
+
+\pic[shift={(1.2,0,0)}] at (e0_enc2-east)
+    {Box={
+        name=e0_enc3,
+        caption=Enc3,
+        xlabel={{, }},
+        zlabel=,
+        fill={\EncoderColor},
+        height=3.2,
+        width=2.6,
+        depth=3.2
+        }
+    };
+
+\pic[shift={(1.4,0,0)}] at (e0_enc3-east)
+    {Box={
+        name=e0_bottleneck,
+        caption=Bottleneck,
+        xlabel={{, }},
+        zlabel=,
+        fill={\EncoderColor},
+        height=2.0,
+        width=3.8,
+        depth=2.0
+        }
+    };
+
+\pic[shift={(1.5,0,0)}] at (e0_bottleneck-east)
+    {Box={
+        name=e0_dec3,
+        caption=Dec3,
+        xlabel={{, }},
+        zlabel=,
+        fill={\FullDecoderColor},
+        height=3.2,
+        width=2.6,
+        depth=3.2
+        }
+    };
+
+\pic[shift={(1.2,0,0)}] at (e0_dec3-east)
+    {Box={
+        name=e0_dec2,
+        caption=Dec2,
+        xlabel={{, }},
+        zlabel=,
+        fill={\FullDecoderColor},
+        height=4.6,
+        width=2.0,
+        depth=4.6
+        }
+    };
+
+\pic[shift={(1.2,0,0)}] at (e0_dec2-east)
+    {Box={
+        name=e0_dec1,
+        caption=Dec1,
+        xlabel={{, }},
+        zlabel=,
+        fill={\FullDecoderColor},
+        height=6.2,
+        width=1.4,
+        depth=6.2
+        }
+    };
+
+\pic[shift={(1.4,0,0)}] at (e0_dec1-east)
+    {Box={
+        name=e0_out,
+        caption=Mask,
+        xlabel={{, }},
+        zlabel=,
+        fill={\OutputColor},
+        height=6.2,
+        width=1.0,
+        depth=6.2
+        }
+    };
+
+\draw [connection]  (e0_in-east)    -- node {\midarrow} (e0_enc1-west);
+
+\draw [connection]  (e0_enc1-east)    -- node {\midarrow} (e0_enc2-west);
+
+\draw [connection]  (e0_enc2-east)    -- node {\midarrow} (e0_enc3-west);
+
+\draw [connection]  (e0_enc3-east)    -- node {\midarrow} (e0_bottleneck-west);
+
+\draw [connection]  (e0_bottleneck-east)    -- node {\midarrow} (e0_dec3-west);
+
+\draw [connection]  (e0_dec3-east)    -- node {\midarrow} (e0_dec2-west);
+
+\draw [connection]  (e0_dec2-east)    -- node {\midarrow} (e0_dec1-west);
+
+\draw [connection]  (e0_dec1-east)    -- node {\midarrow} (e0_out-west);
+
+\path (e0_enc1-southeast) -- (e0_enc1-northeast) coordinate[pos=1.8] (e0_enc1-top) ;
+\path (e0_dec1-south)  -- (e0_dec1-north)  coordinate[pos=1.8] (e0_dec1-top) ;
+\draw [copyconnection]  (e0_enc1-northeast)  
+-- node {\copymidarrow}(e0_enc1-top)
+-- node {\copymidarrow}(e0_dec1-top)
+-- node {\copymidarrow} (e0_dec1-north);
+
+\path (e0_enc2-southeast) -- (e0_enc2-northeast) coordinate[pos=1.5] (e0_enc2-top) ;
+\path (e0_dec2-south)  -- (e0_dec2-north)  coordinate[pos=1.5] (e0_dec2-top) ;
+\draw [copyconnection]  (e0_enc2-northeast)  
+-- node {\copymidarrow}(e0_enc2-top)
+-- node {\copymidarrow}(e0_dec2-top)
+-- node {\copymidarrow} (e0_dec2-north);
+
+\path (e0_enc3-southeast) -- (e0_enc3-northeast) coordinate[pos=1.28] (e0_enc3-top) ;
+\path (e0_dec3-south)  -- (e0_dec3-north)  coordinate[pos=1.28] (e0_dec3-top) ;
+\draw [copyconnection]  (e0_enc3-northeast)  
+-- node {\copymidarrow}(e0_enc3-top)
+-- node {\copymidarrow}(e0_dec3-top)
+-- node {\copymidarrow} (e0_dec3-north);
+\node[anchor=west, font=\small\bfseries\color{teal!80!black}] at (-2, 3.9, 0) {EffiDec3D ($E_1$): $C_{48}$ ($-87.5\%$), Stage 1 Omitted ($3.2$M Params, $49.5$ GMac)};
+\pic[shift={(-2,2.2,0)}] at (0,0,0)
+    {Box={
+        name=e1_in,
+        caption=Patch,
+        xlabel={{, }},
+        zlabel=,
+        fill={\ConvColor},
+        height=6.2,
+        width=0.8,
+        depth=6.2
+        }
+    };
+
+\pic[shift={(1.4,0,0)}] at (e1_in-east)
+    {Box={
+        name=e1_enc1,
+        caption=Enc1,
+        xlabel={{, }},
+        zlabel=,
+        fill={\EncoderColor},
+        height=6.2,
+        width=1.4,
+        depth=6.2
+        }
+    };
+
+\pic[shift={(1.2,0,0)}] at (e1_enc1-east)
+    {Box={
+        name=e1_enc2,
+        caption=Enc2,
+        xlabel={{, }},
+        zlabel=,
+        fill={\EncoderColor},
+        height=4.6,
+        width=2.0,
+        depth=4.6
+        }
+    };
+
+\pic[shift={(1.2,0,0)}] at (e1_enc2-east)
+    {Box={
+        name=e1_enc3,
+        caption=Enc3,
+        xlabel={{, }},
+        zlabel=,
+        fill={\EncoderColor},
+        height=3.2,
+        width=2.6,
+        depth=3.2
+        }
+    };
+
+\pic[shift={(1.4,0,0)}] at (e1_enc3-east)
+    {Box={
+        name=e1_bottleneck,
+        caption=Bottleneck,
+        xlabel={{, }},
+        zlabel=,
+        fill={\EncoderColor},
+        height=2.0,
+        width=3.8,
+        depth=2.0
+        }
+    };
+
+\pic[shift={(1.5,0,0)}] at (e1_bottleneck-east)
+    {Box={
+        name=e1_dec3,
+        caption=Dec3,
+        xlabel={{, }},
+        zlabel=,
+        fill={\EffiDecoderColor},
+        height=3.2,
+        width=0.6,
+        depth=3.2
+        }
+    };
+
+\pic[shift={(1.2,0,0)}] at (e1_dec3-east)
+    {Box={
+        name=e1_dec2,
+        caption=Dec2,
+        xlabel={{, }},
+        zlabel=,
+        fill={\EffiDecoderColor},
+        height=4.6,
+        width=0.4,
+        depth=4.6
+        }
+    };
+
+\pic[shift={(1.4,0,0)}] at (e1_dec2-east)
+    {Box={
+        name=e1_out,
+        caption=Mask,
+        xlabel={{, }},
+        zlabel=,
+        fill={\OutputColor},
+        height=6.2,
+        width=1.0,
+        depth=6.2
+        }
+    };
+
+\draw [connection]  (e1_in-east)    -- node {\midarrow} (e1_enc1-west);
+
+\draw [connection]  (e1_enc1-east)    -- node {\midarrow} (e1_enc2-west);
+
+\draw [connection]  (e1_enc2-east)    -- node {\midarrow} (e1_enc3-west);
+
+\draw [connection]  (e1_enc3-east)    -- node {\midarrow} (e1_bottleneck-west);
+
+\draw [connection]  (e1_bottleneck-east)    -- node {\midarrow} (e1_dec3-west);
+
+\draw [connection]  (e1_dec3-east)    -- node {\midarrow} (e1_dec2-west);
+
+\draw [connection]  (e1_dec2-east)    -- node {\midarrow} (e1_out-west);
+
+\path (e1_enc2-southeast) -- (e1_enc2-northeast) coordinate[pos=1.68] (e1_enc2-top) ;
+\path (e1_dec2-south)  -- (e1_dec2-north)  coordinate[pos=1.68] (e1_dec2-top) ;
+\draw [copyconnection]  (e1_enc2-northeast)  
+-- node {\copymidarrow}(e1_enc2-top)
+-- node {\copymidarrow}(e1_dec2-top)
+-- node {\copymidarrow} (e1_dec2-north);
+
+\path (e1_enc3-southeast) -- (e1_enc3-northeast) coordinate[pos=1.35] (e1_enc3-top) ;
+\path (e1_dec3-south)  -- (e1_dec3-north)  coordinate[pos=1.35] (e1_dec3-top) ;
+\draw [copyconnection]  (e1_enc3-northeast)  
+-- node {\copymidarrow}(e1_enc3-top)
+-- node {\copymidarrow}(e1_dec3-top)
+-- node {\copymidarrow} (e1_dec3-north);
+\node[anchor=west, font=\small\bfseries\color{orange!90!black}] at (-2, -0.1, 0) {Separable ($E_1'$): $C_{384}$, All Stages, DW 3D Conv + PW 1x1x1 Conv ($37.3$M Params, $174.0$ GMac)};
+\pic[shift={(-2,-2.0,0)}] at (0,0,0)
+    {Box={
+        name=e1s_in,
+        caption=Patch,
+        xlabel={{, }},
+        zlabel=,
+        fill={\ConvColor},
+        height=6.2,
+        width=0.8,
+        depth=6.2
+        }
+    };
+
+\pic[shift={(1.4,0,0)}] at (e1s_in-east)
+    {Box={
+        name=e1s_enc1,
+        caption=Enc1,
+        xlabel={{, }},
+        zlabel=,
+        fill={\EncoderColor},
+        height=6.2,
+        width=1.4,
+        depth=6.2
+        }
+    };
+
+\pic[shift={(1.2,0,0)}] at (e1s_enc1-east)
+    {Box={
+        name=e1s_enc2,
+        caption=Enc2,
+        xlabel={{, }},
+        zlabel=,
+        fill={\EncoderColor},
+        height=4.6,
+        width=2.0,
+        depth=4.6
+        }
+    };
+
+\pic[shift={(1.2,0,0)}] at (e1s_enc2-east)
+    {Box={
+        name=e1s_enc3,
+        caption=Enc3,
+        xlabel={{, }},
+        zlabel=,
+        fill={\EncoderColor},
+        height=3.2,
+        width=2.6,
+        depth=3.2
+        }
+    };
+
+\pic[shift={(1.4,0,0)}] at (e1s_enc3-east)
+    {Box={
+        name=e1s_bottleneck,
+        caption=Bottleneck,
+        xlabel={{, }},
+        zlabel=,
+        fill={\EncoderColor},
+        height=2.0,
+        width=3.8,
+        depth=2.0
+        }
+    };
+
+\pic[shift={(1.5,0,0)}] at (e1s_bottleneck-east)
+    {Box={
+        name=e1s_dec3_dw,
+        caption=DW3D,
+        xlabel={{, }},
+        zlabel=,
+        fill={\DWColor},
+        height=3.2,
+        width=1.3,
+        depth=3.2
+        }
+    };
+
+\pic[shift={(1.0,0,0)}] at (e1s_dec3_dw-east)
+    {Box={
+        name=e1s_dec3_pw,
+        caption=PW1x1,
+        xlabel={{, }},
+        zlabel=,
+        fill={\PWColor},
+        height=3.2,
+        width=1.3,
+        depth=3.2
+        }
+    };
+
+\pic[shift={(1.3,0,0)}] at (e1s_dec3_pw-east)
+    {Box={
+        name=e1s_dec2_dw,
+        caption=DW3D,
+        xlabel={{, }},
+        zlabel=,
+        fill={\DWColor},
+        height=4.6,
+        width=1.0,
+        depth=4.6
+        }
+    };
+
+\pic[shift={(1.0,0,0)}] at (e1s_dec2_dw-east)
+    {Box={
+        name=e1s_dec2_pw,
+        caption=PW1x1,
+        xlabel={{, }},
+        zlabel=,
+        fill={\PWColor},
+        height=4.6,
+        width=1.0,
+        depth=4.6
+        }
+    };
+
+\pic[shift={(1.3,0,0)}] at (e1s_dec2_pw-east)
+    {Box={
+        name=e1s_dec1_dw,
+        caption=DW3D,
+        xlabel={{, }},
+        zlabel=,
+        fill={\DWColor},
+        height=6.2,
+        width=0.8,
+        depth=6.2
+        }
+    };
+
+\pic[shift={(1.0,0,0)}] at (e1s_dec1_dw-east)
+    {Box={
+        name=e1s_dec1_pw,
+        caption=PW1x1,
+        xlabel={{, }},
+        zlabel=,
+        fill={\PWColor},
+        height=6.2,
+        width=0.8,
+        depth=6.2
+        }
+    };
+
+\pic[shift={(1.4,0,0)}] at (e1s_dec1_pw-east)
+    {Box={
+        name=e1s_out,
+        caption=Mask,
+        xlabel={{, }},
+        zlabel=,
+        fill={\OutputColor},
+        height=6.2,
+        width=1.0,
+        depth=6.2
+        }
+    };
+
+\draw [connection]  (e1s_in-east)    -- node {\midarrow} (e1s_enc1-west);
+
+\draw [connection]  (e1s_enc1-east)    -- node {\midarrow} (e1s_enc2-west);
+
+\draw [connection]  (e1s_enc2-east)    -- node {\midarrow} (e1s_enc3-west);
+
+\draw [connection]  (e1s_enc3-east)    -- node {\midarrow} (e1s_bottleneck-west);
+
+\draw [connection]  (e1s_bottleneck-east)    -- node {\midarrow} (e1s_dec3_dw-west);
+
+\draw [connection]  (e1s_dec3_dw-east)    -- node {\midarrow} (e1s_dec3_pw-west);
+
+\draw [connection]  (e1s_dec3_pw-east)    -- node {\midarrow} (e1s_dec2_dw-west);
+
+\draw [connection]  (e1s_dec2_dw-east)    -- node {\midarrow} (e1s_dec2_pw-west);
+
+\draw [connection]  (e1s_dec2_pw-east)    -- node {\midarrow} (e1s_dec1_dw-west);
+
+\draw [connection]  (e1s_dec1_dw-east)    -- node {\midarrow} (e1s_dec1_pw-west);
+
+\draw [connection]  (e1s_dec1_pw-east)    -- node {\midarrow} (e1s_out-west);
+
+\path (e1s_enc1-southeast) -- (e1s_enc1-northeast) coordinate[pos=1.8] (e1s_enc1-top) ;
+\path (e1s_dec1_dw-south)  -- (e1s_dec1_dw-north)  coordinate[pos=1.8] (e1s_dec1_dw-top) ;
+\draw [copyconnection]  (e1s_enc1-northeast)  
+-- node {\copymidarrow}(e1s_enc1-top)
+-- node {\copymidarrow}(e1s_dec1_dw-top)
+-- node {\copymidarrow} (e1s_dec1_dw-north);
+
+\path (e1s_enc2-southeast) -- (e1s_enc2-northeast) coordinate[pos=1.5] (e1s_enc2-top) ;
+\path (e1s_dec2_dw-south)  -- (e1s_dec2_dw-north)  coordinate[pos=1.5] (e1s_dec2_dw-top) ;
+\draw [copyconnection]  (e1s_enc2-northeast)  
+-- node {\copymidarrow}(e1s_enc2-top)
+-- node {\copymidarrow}(e1s_dec2_dw-top)
+-- node {\copymidarrow} (e1s_dec2_dw-north);
+
+\path (e1s_enc3-southeast) -- (e1s_enc3-northeast) coordinate[pos=1.28] (e1s_enc3-top) ;
+\path (e1s_dec3_dw-south)  -- (e1s_dec3_dw-north)  coordinate[pos=1.28] (e1s_dec3_dw-top) ;
+\draw [copyconnection]  (e1s_enc3-northeast)  
+-- node {\copymidarrow}(e1s_enc3-top)
+-- node {\copymidarrow}(e1s_dec3_dw-top)
+-- node {\copymidarrow} (e1s_dec3_dw-north);
+
+\end{tikzpicture}
+\end{document}

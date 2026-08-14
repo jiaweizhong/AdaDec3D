@@ -8,7 +8,7 @@ Adaptive-resolution 3D medical image segmentation built on top of EffiDec3D (a l
 |---|---|
 | [Research_Proposal.md](Research_Proposal.md) | Project overview, motivation, method design, target venues |
 | [Observation_Study.md](Observation_Study.md) | O1–O11 exploratory observations; Go/No-Go gates for Paper B |
-| [Experiment-Design-AdaDec3D.md](Experiment-Design-AdaDec3D.md) | Training recipes, ablation plan, result tables for AdaDec3D (Paper B) |
+| [Experiment-Design-PaperB.md](Experiment-Design-PaperB.md) | Paper B: utility-aware adaptive decoding — learned flip-direction predictor, loss design, fail-fast go/no-go |
 
 ## Codebase layout
 

@@ -302,7 +302,7 @@ L = L_seg + 0.5·L_coarse + 0.1·L_unc + 0.05·L_res
 | L_budget | 0.1 | Penalize expected expert cost above the declared budget |
 | L_load_balance | 0.1 | Prevent routing collapse to a single expert |
 
-All λ values are ablated; see `Experiment-Design-AdaDec3D.md`.
+All λ values are ablated; see `Experiment-Design-PaperB.md`.
 
 **Two-stage training protocol:**
 
@@ -413,7 +413,7 @@ If any criterion fails, the routing strategy is reconsidered before implementing
 
 Full experiment groups (E2–E4), causal controls (C0–C7), and ablation matrix (A1–A6):
 
-> **Execution guide**: `Experiment-Design-AdaDec3D.md`
+> **Execution guide**: `Experiment-Design-PaperB.md`
 
 ## 7.6 Main Comparison
 

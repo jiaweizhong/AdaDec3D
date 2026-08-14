@@ -1,7 +1,7 @@
 # Paper A: Observation Study — Complete Experiment Guide
 
 > **Scientific motivation**: [Research_Proposal.md §3–5](Research_Proposal.md)
-> **Architecture and Paper B**: [Experiment-Design-AdaDec3D.md](Experiment-Design-AdaDec3D.md)
+> **Architecture and Paper B**: [Experiment-Design-PaperB.md](Experiment-Design-PaperB.md)
 
 ---
 
@@ -1729,7 +1729,7 @@ boundary shell. The metrics line up:
 > **These are observations, not an efficiency claim.** They *motivate* the Paper B
 > efficiency direction (region-adaptive decoding) but do not themselves demonstrate
 > lower executed cost or a deployable selector. That requires contiguous-region
-> analysis followed by the AdaDec3D method (`Experiment-Design-AdaDec3D.md`).
+> analysis followed by the AdaDec3D method (`Experiment-Design-PaperB.md`).
 
 ### MAC headroom (Paper B motivation, `profile_macs.py`)
 
@@ -1805,7 +1805,7 @@ Net flip $R_{\text{net}}$ by distance-to-boundary (bins 0–1 / 1–2 / 2–4 / 
 **E0/E1 baseline cross-check (2026-07-30).** UX-Net & Swin `tab:baseline`/`tab:arch` numbers verified against the CSV (UX concat 11.7×/16.8×/5.1×/7.7×; Swin concat 5.5×/5.5×/2.2×). Fixed one stale prose figure (Swin said "6.5× / 2.6 pt" = the *addition* config; corrected to concat 5.5× / 1.0 pt). **MedNeXt row is provisional** — the CSV is the oversized f_s=48 model (full 39.3M vs standard 17.6M, 2.24×); refresh `tab:arch` MedNeXt after the f_s=32 retrain.
 
 **Paper A conclusion (concat, 2026-07-29):** voxel net benefit ≈0, no recoverable region opportunity; flips predictable in location but net-neutral in direction (H2/P1 hold; H1/C1/P2 negative). Paper B proceeds independently in
-[Experiment-Design-AdaDec3D.md](Experiment-Design-AdaDec3D.md), with E1 (77.0%) as
+[Experiment-Design-PaperB.md](Experiment-Design-PaperB.md), with E1 (77.0%) as
 the iso-accuracy target.
 
 ---
